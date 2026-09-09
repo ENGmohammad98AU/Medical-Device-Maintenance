@@ -1,0 +1,29 @@
+[
+  {
+    "rule_id": "REF-001",
+    "sheet_name": "جدول الأعطال",
+    "device_id": "ASSET-001",
+    "device_name": "Hamilton C6 Ventilator",
+    "manufacturer": "Hamilton Medical",
+    "model": "C6",
+    "device_type": "VENTILATOR",
+    "fault_code": "H001",
+    "alarm_code": "H001",
+    "error_message": "Power supply failure",
+    "description": "Power supply failure and alarm",
+    "meaning": "Input mains power or battery supply is not available",
+    "severity": "HIGH",
+    "original_alarm_priority": "High",
+    "possible_causes": "Mains failure, battery depletion, power cable disconnected, internal supply fault",
+    "immediate_safety_action": "Keep backup ventilation ready and disconnect patient only after clinical safety assessment.",
+    "troubleshooting_steps": "Check mains power. Verify battery status. Inspect cables. Confirm power switch state. Run self-test.",
+    "recommended_solution": "Restore approved power source before use. Escalate if persistent.",
+    "verification_before_return_to_service": "Confirm normal power indicator and self-test pass.",
+    "source": "Manual: Hamilton Medical C6",
+    "reference_url": "https://example.com/manual",
+    "reference_page": "12",
+    "aliases": ["power fail", "battery low", "mains power error"],
+    "match_confidence": 0.99,
+    "match_status": "MATCHED"
+  }
+]

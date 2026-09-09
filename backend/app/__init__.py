@@ -1,0 +1,1 @@
+"""BioMed AI Assistant Backend"""
