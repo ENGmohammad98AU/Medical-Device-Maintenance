@@ -23,14 +23,6 @@ interface AnalysisResult {
 }
 
 const steps = ['وصف البلاغ والسياق', 'التحليل والتحقق', 'مراجعة المختص'];
-const faultIndicators = /fault|failure|failed|malfunction|error|alarm|warning|leak|pressure|sensor|power|battery|oxygen|display|screen|cable|connection|disconnected|stopped|broken|noise|sound|slow|problem|issue|not|cannot|calibration|عطل|خطأ|إنذار|تحذير|تسريب|ضغط|حساس|طاقة|بطارية|أكسجين|شاشة|توقف|مشكلة|لا|يعمل|حرارة/i;
-
-function isMeaningfulFault(text: string) {
-  const normalized = text.trim().toLowerCase();
-  if (normalized.length < 3 || /^[\W_\d]+$/.test(normalized) || new Set(normalized.replace(/\s/g, '')).size === 1) return false;
-  if (/^[a-z]+$/.test(normalized) && !faultIndicators.test(normalized)) return false;
-  return /\b(?:e|err|error)[- _]?\d{1,5}\b/i.test(normalized) || faultIndicators.test(normalized);
-}
 
 export default function MaintenancePage() {
   const navigate = useNavigate();
