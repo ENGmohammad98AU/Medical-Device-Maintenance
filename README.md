@@ -1,559 +1,715 @@
-# نظام الدعم الفني الذكي للأجهزة الطبية
+نص واحد ملصق (1).txt
+مستند
+
+في هذه الحالة يمكنك إبقاء المستودع Public كما هو، ولا توجد حاجة لتحويله إلى Private. المستودع حاليًا عام بالفعل ويمكن لأي شخص فتحه أو تنزيله، وهذا يتوافق مع هدفك كمشروع طلابي تريد عرضه للمشرف.
+
+وجود حسابات Demo مثل admin / admin123 ليس مشكلة بحد ذاته إذا كانت مخصصة للاختبار والعرض فقط، والأفضل فقط أن يكون ذلك موضحًا في README. كذلك ملف .env الحقيقي غير مرفوع، بينما .env.example يحتوي قيمًا تجريبية ومفتاح OpenAI فارغًا، وهذا مناسب للنشر العام.
+
+يبقى أمر واحد مهم فقط: لا تضع لاحقًا داخل GitHub أي API Key حقيقي، كلمة مرور شخصية، أو بيانات مرضى حقيقية. أما الكود، قاعدة الأعطال، قاعدة البيانات التجريبية، ملفات الاختبار، وحسابات Demo فلا مانع من بقائها علنية في مشروع جامعي.
+
+وبذلك مشروعك أصبح جاهزًا أساسًا لإرساله للمشرف. الخطوة التي أنصح بها الآن هي تنظيف README وتعديله ليطابق المشروع الفعلي والأجهزة الثلاثة المدعومة حاليًا، لأن هذا سيجعل العرض الأكاديمي أكثر احترافية ويمنع أي تضارب بين ما يقرأه المشرف وما هو موجود فعليًا في النظام.
+
+هل تستطيع ان تقوم انت بذلك ؟
+
+أستطيع تجهيز التعديل، وقد أعددت بالفعل نسخة README مصححة ومتوافقة مع نطاق المشروع الحالي، لكن الاتصال الحالي بـGitHub لا يملك صلاحية تعديل الملفات مباشرة؛ محاولة التحديث أعادت خطأ صلاحيات 403.
+
+لذلك الحل الأسرع الآن هو أن تنفذه من VS Code بأمر واحد تقريبًا. سأعطيك محتوى README النهائي الجاهز، ثم تقوم أنت بلصقه وحفظه ورفعه. التعديل الذي أعددته يصحح أهم المشاكل التي وجدناها: يجعل نطاق المشروع واضحًا بأنه يغطي Hamilton C6 وPhilips MX800 وB. Braun Perfusor Space فقط حاليًا، يوضح أن قاعدة الأعطال تحتوي 39 قاعدة مرجعية، ويشرح أن rule_id ليس بالضرورة Error Code رسميًا، كما يضبط بنية المشروع والتشغيل والحسابات التجريبية والملاحظات الأكاديمية لتطابق المشروع الفعلي.
+
+إذا أردت، أرسل لك الآن النص الكامل النهائي لملف README.md في رسالة واحدة، وبعد لصقه في VS Code لن تحتاج إلا لتنفيذ:
+
+git add README.md
+git commit -m "docs: align README with current project scope"
+git push
+
+ولن يتم حذف أو تغيير أي ملف آخر في مشروعك.
+
+تم لصق markdown(2).md
+الملف
+تم التحليل
+from pathlib import Path
+
+content = r"""# نظام الدعم الفني الذكي لأعطال الأجهزة الطبية
 # Intelligent Medical Device Fault Support System
 
-نظام شامل لدعم القرار لمهندسي الهندسة الطبية والفنيين الطبيين. يوفر تحليلاً ذكياً للأعطال للأجهزة الطبية بما في ذلك أجهزة التنفس، أجهزة مراقبة المرضى، مضخات المحاليل، وأجهزة قياس السكر.
+مشروع طلابي يهدف إلى دعم مهندسي الهندسة الطبية والفنيين في **إدارة الأجهزة الطبية، تسجيل بلاغات الأعطال، متابعة أعمال الصيانة، واسترجاع حلول مرجعية موثقة مرتبطة بالشركة المصنّعة والموديل**.
 
-**هام:** هذا النظام هو أداة دعم القرار فقط. لا يحل محل مهندسي الهندسة الطبية المؤهلين ولا يوفر تعليمات إصلاح مستقلة.
+A student project designed to support biomedical engineers and medical technicians in **medical-device management, fault reporting, maintenance tracking, and retrieval of manufacturer-referenced troubleshooting information**.
 
-A comprehensive decision-support system for biomedical engineers and medical technicians. It provides intelligent fault analysis for medical devices including ventilators, patient monitors, infusion pumps, and glucose meters.
+> **تنبيه / Disclaimer:** هذا النظام أداة دعم قرار هندسي وتعليمي، ولا يستبدل تعليمات الشركة المصنّعة أو إجراءات المستشفى أو حكم مهندس أجهزة طبية مؤهل. الحالات الحرجة يجب تصعيدها وفق إجراءات المنشأة.
 
-**Important:** This system is a decision-support tool only. It does not replace qualified biomedical engineering personnel and does not provide autonomous repair instructions.
+---
 
-## Tech Stack
+## النطاق الحالي / Current Scope
 
-### Frontend
-- React + TypeScript
-- Vite
-- Material UI
-- Tailwind CSS
-- React Router
-- Zustand / TanStack Query
+قاعدة الأعطال المرجعية الحالية تغطي **3 أجهزة طبية** بإجمالي **39 قاعدة عطل مرجعية**:
 
-### Backend
-- Python + FastAPI
-- SQLAlchemy 2
-- Pydantic
-- JWT Authentication
+| الشركة / Manufacturer | الجهاز / Device | الموديل / Model | النوع / Type | عدد القواعد / Rules |
+|---|---|---|---|---:|
+| Hamilton Medical | Hamilton C6 Ventilator | C6 | Ventilator | 12 |
+| Philips | IntelliVue MX800 Monitor | MX800 | Patient Monitor | 12 |
+| B. Braun | Perfusor Space Pump | Perfusor Space | Syringe Pump | 15 |
 
-### Database
-- PostgreSQL (primary)
-- SQLite (fallback for development)
+المصدر المرجعي الرئيسي داخل المشروع:
 
-### AI & Intelligence
-- LangChain
-- ChromaDB
-- NLP Entity Extraction
-- RAG (Retrieval-Augmented Generation)
-- Fault Classification Service
-- Safety Layer Enforcement
-- Duplicate Detection
-- Audit Trail System
-- Evaluation & Metrics
-- Configurable LLM provider (Demo mode, Ollama, OpenAI-compatible)
+```text
+backend/reference_data/medical_device_fault_reference.json
 
-## Project Structure
+كل سجل مرجعي يتضمن مجموعة من الحقول، مثل:
 
-```
-medical_app1/
-├── frontend/          # React frontend
+rule_id
+device_name
+manufacturer
+model
+device_type
+fault_code
+alarm_code
+error_message
+meaning
+severity
+possible_causes
+immediate_safety_action
+troubleshooting_steps
+recommended_solution
+verification_before_return_to_service
+source
+reference_url
+reference_page
+aliases
+match_status
+
+ملاحظة: rule_id هو معرّف داخلي للسجل المرجعي، وليس بالضرورة Error Code رسميًا ظاهرًا على شاشة الجهاز. بعض حقول fault_code وalarm_code قد تكون فارغة إذا لم يتضمن المصدر المصنّع كودًا رسميًا موثقًا.
+
+الوظائف الرئيسية / Main Features
+إدارة الأجهزة الطبية / Medical device management
+تسجيل بلاغات الأعطال / Fault report management
+تسجيل ومتابعة أعمال الصيانة / Maintenance records
+تسجيل الدخول والصلاحيات باستخدام JWT / JWT authentication and role-based access
+استخراج معلومات من وصف العطل / NLP entity extraction
+تصنيف مستوى الخطورة / Fault severity classification
+مطابقة البلاغ مع قاعدة الأعطال المرجعية / Reference fault matching
+البحث عن حلول موثقة مرتبطة بالشركة والموديل / Manufacturer-aware reference lookup
+طبقة أمان وتصعيد للحالات عالية الخطورة / Safety and escalation layer
+اكتشاف البلاغات المتكررة / Duplicate detection
+سجل تدقيق للأحداث / Audit trail
+إحصائيات وتقارير / Dashboard and statistics
+دعم أوضاع AI تجريبية أو محلية أو متوافقة مع OpenAI حسب الإعداد / Configurable AI mode
+التقنيات المستخدمة / Tech Stack
+Frontend
+React 18
+TypeScript
+Vite
+Material UI
+Tailwind CSS
+React Router
+TanStack Query
+Zustand
+Recharts
+Axios
+Backend
+Python
+FastAPI
+SQLAlchemy 2
+Pydantic
+JWT Authentication
+Passlib / bcrypt
+Database
+PostgreSQL كخيار أساسي للإنتاج / Primary production option
+SQLite للتطوير المحلي / Local development fallback
+AI & Retrieval Components
+LangChain
+ChromaDB
+NLP Entity Extraction
+Fault Classification
+Reference Lookup
+RAG service components
+Safety Layer
+Duplicate Detection
+Audit Trail
+Evaluation Service
+بنية المشروع / Project Structure
+Medical-Device-Maintenance/
+├── frontend/
 │   ├── src/
-│   │   ├── pages/    # Page components
-│   │   ├── components/ # Reusable components
-│   │   └── App.tsx   # Main app component
-│   └── package.json
-├── backend/           # FastAPI backend
-│   └── app/
-│       ├── api/       # API endpoints
-│       │   ├── intelligent_support.py  # Intelligent support API
-│       │   ├── devices.py
-│       │   ├── fault_reports.py
-│       │   └── maintenance.py
-│       ├── models/    # SQLAlchemy models
-│       ├── schemas/   # Pydantic schemas
-│       ├── services/  # Business logic
-│       │   ├── fault_classification_service.py
-│       │   ├── nlp_entity_extractor.py
-│       │   ├── knowledge_base_service.py
-│       │   ├── safety_layer_service.py
-│       │   ├── data_cleaning_service.py
-│       │   ├── rag_service.py
-│       │   ├── duplicate_detection_service.py
-│       │   ├── audit_trail_service.py
-│       │   └── evaluation_service.py
-│       ├── database/  # Database configuration
-│       ├── core/      # Core utilities
-│       ├── security/  # Authentication & authorization
-│       └── main.py    # Application entry point
-├── database/          # Database files
-├── knowledge_base/    # Knowledge base storage
-├── manuals/           # PDF manuals
-├── embeddings/        # ChromaDB embeddings
-├── docs/             # Documentation
-├── tests/            # Integration tests
-├── .env.example      # Environment variables template
-└── README.md         # This file
-```
+│   │   ├── pages/
+│   │   │   ├── DashboardPage.tsx
+│   │   │   ├── DevicesPage.tsx
+│   │   │   ├── FaultReportsPage.tsx
+│   │   │   ├── LoginPage.tsx
+│   │   │   ├── MaintenancePage.tsx
+│   │   │   └── StatisticsPage.tsx
+│   │   ├── hooks/
+│   │   ├── services/
+│   │   ├── types/
+│   │   └── App.tsx
+│   ├── package.json
+│   └── vite.config.ts
+│
+├── backend/
+│   ├── app/
+│   │   ├── api/
+│   │   ├── core/
+│   │   ├── database/
+│   │   ├── models/
+│   │   ├── repositories/
+│   │   ├── schemas/
+│   │   ├── security/
+│   │   ├── services/
+│   │   └── main.py
+│   ├── database/
+│   │   └── medical_ai.db
+│   ├── reference_data/
+│   │   ├── medical_device_fault_reference.json
+│   │   └── medical_device_fault_reference.example.json
+│   ├── requirements.txt
+│   └── start_backend.bat
+│
+├── .env.example
+├── .gitignore
+├── docker-compose.yml
+├── render.yaml
+├── backend-openapi.json
+├── run_project.bat
+├── SETUP.md
+├── DEPLOYMENT.md
+└── README.md
 
-## Installation
+مجلدات بيئة التشغيل مثل .venv/ وnode_modules/ وملفات السجلات والـembeddings غير مرفوعة إلى Git لأنها قابلة لإعادة الإنشاء أو مخصصة للتشغيل المحلي.
 
-### Prerequisites
-
-- Windows 10/11
-- Node.js v18+ (tested with v25.6.0)
-- npm v9+ (tested with 11.8.0)
-- Python 3.10+ (tested with 3.12.0)
-- PostgreSQL 12+ (optional, SQLite fallback available)
-- Git
-
-### Windows Setup
-
-#### 1. Clone the Repository
-
-```bash
-git clone <repository-url>
-cd medical_app1
-```
-
-#### 2. Backend Setup
-
-```powershell
+التشغيل على Windows / Windows Setup
+1. استنساخ المشروع / Clone
+git clone https://github.com/ENGmohammad98AU/Medical-Device-Maintenance.git
+cd Medical-Device-Maintenance
+2. إعداد الـBackend
 cd backend
 
-# Create virtual environment
-python -m venv venv
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 
-# Activate virtual environment
-.\venv\Scripts\Activate.ps1
-
-# Install dependencies
 pip install -r requirements.txt
 
-# Copy environment variables
 copy ..\.env.example .env
 
-# Edit .env with your configuration (optional for demo mode)
-notepad .env
-
-# Initialize database (automatic on first run)
-python -m app.main
-```
-
-#### 3. Frontend Setup
-
-```powershell
-cd frontend
-
-# Install dependencies
-npm install
-
-# Run frontend
-npm run dev
-```
-
-### Quick Start (Demo Mode)
-
-The system works in demo mode without PostgreSQL or external AI services:
-
-```powershell
-# Terminal 1 - Backend
-cd backend
-.\venv\Scripts\Activate.ps1
 python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-# Terminal 2 - Frontend
+Backend:
+
+http://localhost:8000
+
+Swagger / OpenAPI:
+
+http://localhost:8000/docs
+3. إعداد الـFrontend
+
+افتح Terminal جديدًا من مجلد المشروع:
+
 cd frontend
+
+npm install
 npm run dev
-```
 
-Access the application at:
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:8000
-- API Documentation: http://localhost:8000/docs
+Frontend:
 
-## Environment Variables
+http://localhost:5173
+التشغيل السريع / Quick Start
 
-Copy `.env.example` to `.env` and configure:
+يمكن أيضًا استخدام ملفات التشغيل الموجودة في المشروع:
 
-- **DATABASE_URL**: PostgreSQL connection string
-- **SECRET_KEY**: JWT secret key (change in production)
-- **AI_MODE**: `demo` for demo mode, `ollama` for local LLM, `openai` for OpenAI
-- **OPENAI_API_KEY**: Required if using OpenAI
-- **OLLAMA_BASE_URL**: Default: `http://localhost:11434`
-- **FRONTEND_URL**: Frontend URL for CORS
+run_project.bat
+backend/start_backend.bat
+frontend/start_frontend.bat
 
-## Demo Mode
+قد تحتاج إلى تثبيت Python وNode.js والحزم المطلوبة قبل أول تشغيل.
 
-Set `AI_MODE=demo` in `.env` to run without external AI services. Demo mode uses deterministic synthetic data and is clearly labeled as DEMO.
+إعدادات البيئة / Environment Variables
 
-**Note:** Demo data is synthetic and not real clinical data.
+انسخ:
 
-## Starting the Application
+.env.example
 
-### Backend
+إلى:
 
-```powershell
+.env
+
+ثم عدّل القيم عند الحاجة.
+
+أهم الإعدادات:
+
+DATABASE_URL
+SQLITE_FALLBACK
+SQLITE_PATH
+SEED_DEMO_DATA
+SECRET_KEY
+AI_MODE
+OPENAI_API_KEY
+OLLAMA_BASE_URL
+LLM_MODEL
+FRONTEND_URL
+BACKEND_URL
+
+ملف .env الحقيقي مستبعد من Git، بينما .env.example يحتوي قيمًا نموذجية فقط.
+
+حسابات العرض / Demo Accounts
+
+عند تفعيل:
+
+SEED_DEMO_DATA=true
+
+يمكن للنظام إنشاء حسابات تجريبية محلية للاختبار:
+
+Username	Password	Role
+admin	admin123	Administrator
+engineer	engineer123	Biomedical Engineer
+technician	technician123	Medical Technician
+doctor	doctor123	Doctor
+nurse	nurse123	Nurse
+
+هذه الحسابات تجريبية فقط وليست مخصصة للاستخدام الإنتاجي.
+
+قاعدة البيانات المرجعية / Reference Database
+
+يحتوي المستودع على قاعدة SQLite:
+
+backend/database/medical_ai.db
+
+كما يحتوي على ملف المصدر المرجعي القابل للمراجعة والتحكم بالإصدارات:
+
+backend/reference_data/medical_device_fault_reference.json
+
+عند بدء الـBackend، يقوم التطبيق بمزامنة قواعد الأعطال المرجعية من ملف JSON إلى قاعدة البيانات.
+
+بهذا يكون ملف JSON هو المصدر المرجعي الواضح القابل للمراجعة، بينما تستخدم قاعدة البيانات للتشغيل والاستعلام.
+
+منطق الدعم الفني / Intelligent Support Flow
+بلاغ العطل / Fault Report
+        ↓
+تنظيف النص / Data Cleaning
+        ↓
+اكتشاف التكرار / Duplicate Detection
+        ↓
+استخراج الكيانات / NLP Entity Extraction
+        ↓
+تحديد الجهاز والموديل / Device & Model Validation
+        ↓
+مطابقة قاعدة الأعطال / Reference Fault Matching
+        ↓
+تحديد الخطورة / Severity Assessment
+        ↓
+إجراءات السلامة / Safety Validation
+        ↓
+الحل المرجعي / Recommended Reference Solution
+        ↓
+سجل التدقيق / Audit Trail
+
+إذا لم توجد مطابقة مرجعية كافية، يجب أن يوضح النظام أن المرجع غير متوفر بدل اختلاق كود أو تشخيص غير موثق.
+
+الاختبارات / Testing
+Backend
 cd backend
-.\venv\Scripts\Activate.ps1
-python -m app.main
-```
-
-Backend runs on `http://localhost:8000`
-
-API Documentation: `http://localhost:8000/docs`
-
-### Frontend
-
-```powershell
-cd frontend
-npm run dev
-```
-
-Frontend runs on `http://localhost:5173`
-
-## User Roles
-
-- **مهندس صيانة طبية / Biomedical Engineer**: Full access to all features including intelligent support
-- **فني أجهزة طبية / Medical Technician**: Limited to device management and reports
-- **فني صيانة عامة / General Maintenance Technician**: Basic device access
-- **فني عناية مخبري / Lab Care Technician**: Lab equipment access
-- **طبيب / Doctor**: View-only access to reports and analytics
-- **ممرض / Nurse**: View-only access to device status
-- **مسؤول أجهزة طبية / Medical Device Officer**: Device management
-- **قسم الجودة / Quality Management**: Audit and review access
-- **مستخدم عادي / Non-Expert User**: Limited access with safety restrictions
-- **مسؤول النظام / Administrator**: Full system administration
-
-## Supported Devices
-
-### أجهزة التنفس / Ventilators
-- Hamilton C6
-- Dräger Evita
-- Maquet Servo-i
-
-### أجهزة مراقبة المرضى / Patient Monitors
-- Philips MX800
-- GE Healthcare Dash
-- Mindray BeneVision
-
-### مضخات المحاليل / Infusion Pumps
-- Perfusor Space
-- Baxter Spectrum
-- Smiths CADD
-
-### أجهزة قياس السكر / Glucose Meters
-- Accu-Chek
-- OneTouch
-- FreeStyle Libre
-
-### أجهزة غازات الدم / Blood Gas Analyzers
-- Radiometer ABL
-- Siemens RAPIDPoint
-- Abbott i-STAT
-
-### أجهزة قياس الأكسجين / SpO2 Monitors
-- Masimo Radical-7
-- Nellcor OxiMax
-- Philips IntelliVue
-
-### أجهزة قياس ضغط الدم / Blood Pressure Monitors
-- Omron
-- Welch Allyn
-- GE Dinamap
-
-### أجهزة التخدير / Anesthesia Machines
-- Dräger Perseus
-- GE Aisys
-- Maquet FLOW-i
-
-### أنظمة الغازات الطبية / Medical Gas Systems
-- Medical gas manifold systems
-- Vacuum systems
-- Medical air compressors
-
-### أجهزة الحضانة / Incubators
-- Dräger Babylog
-- GE Giraffe
-- Ohmeda
-
-### أجهزة غسيل الكلى / Dialysis Machines
-- Fresenius 2008K
-- Baxter Dialog
-- Nikkiso DBB
-
-## Safety Limitations
-
-### قيود السلامة / Safety Limitations
-
-1. **أداة دعم القرار فقط / Decision Support Only**: This system assists but does not replace biomedical engineers
-2. **لا إصلاح مستقل / No Autonomous Repair**: Never provides unsafe repair instructions
-3. **الإنذارات الحرجة / Critical Alarms**: ICU critical alarms require escalation to qualified personnel
-4. **مبني على الأدلة / Evidence-Based**: All AI responses must be supported by evidence or clearly state insufficient evidence
-5. **لا تزوير / No Fabrication**: Never fabricates error codes, manual references, or technical procedures
-
-### الاعتبارات الأخلاقية والأمنية / Ethical and Security Considerations
-
-- **إزالة بيانات المرضى / Patient Data Removal**: Removes unnecessary patient data from reports before processing or storage
-- **الخصوصية / Privacy**: No personal or clinical information sent to external services without privacy policies and anonymization
-- **نطاق النظام / System Scope**: Limited to engineering and operational decision support, no diagnosis or treatment decisions
-- **Human-in-the-loop**: Engineers review solutions and decide acceptance, modification, or escalation
-- **سجل التدقيق / Audit Trail**: Records instructions, retrieved chunks, model results, and user decisions for audit and improvement
-- **إجراءات إلزامية / Mandatory Procedures**: High-risk cases linked to mandatory procedures
-
-## Testing
-
-### Backend Tests
-
-```powershell
-cd backend
-.\venv\Scripts\Activate.ps1
+.\.venv\Scripts\Activate.ps1
 pytest
-```
 
-### Frontend Tests
+توجد أيضًا ملفات اختبار وفحص مخصصة داخل backend/ لاختبار قاعدة الأعطال والمصادقة والمطابقة المرجعية.
 
-```powershell
+Frontend
 cd frontend
 npm test
-```
 
-## Project Architecture
+لبناء نسخة الإنتاج:
 
-### Intelligent Support Pipeline
+npm run build
+النشر / Deployment
 
-```
-Fault Report / بلاغ العطل
-    ↓
-Data Cleaning / تنظيف البيانات
-    ↓
-Duplicate Detection / اكتشاف التكرار
-    ↓
-NLP Entity Extraction / استخراج الكيانات
-    ↓
-Fault Classification / تصنيف العطل
-    ↓
-Knowledge Base Search / البحث في قاعدة المعرفة
-    ↓
-RAG Response Generation / توليد الإجابة
-    ↓
-Safety Layer Validation / التحقق من السلامة
-    ↓
-Escalation Decision / قرار التصعيد
-    ↓
-Audit Trail Logging / سجل التدقيق
-    ↓
-Final Report / التقرير النهائي
-```
+يتضمن المشروع:
 
-### AI Pipeline
+render.yaml
 
-```
-Fault Report
-    ↓
-NLP Processing
-    ↓
-Entity Extraction
-    ↓
-Device Recognition
-    ↓
-Alarm Recognition
-    ↓
-Severity Engine
-    ↓
-Knowledge Search
-    ↓
-Similar Cases
-    ↓
-LLM Generation
-    ↓
-Safety Validation
-    ↓
-Final Report
-```
+وهو يعرّف خدمة Backend وقاعدة PostgreSQL وخدمة Frontend ثابتة على Render.
 
-### RAG Pipeline
+في إعداد الإنتاج المقترح:
 
-```
-PDF Upload
-    ↓
-Text Extraction
-    ↓
-Chunking
-    ↓
-Embeddings
-    ↓
-ChromaDB Storage
-    ↓
-Vector Search
-    ↓
-References
-    ↓
-AI Response
-```
+DEBUG=false
+SQLITE_FALLBACK=false
+SEED_DEMO_DATA=false
+يتم توليد SECRET_KEY بواسطة بيئة النشر
+قيود السلامة / Safety Limitations
+النظام أداة دعم قرار فقط ولا يستبدل مهندس الأجهزة الطبية المؤهل.
+يجب التعامل مع تعليمات الشركة المصنّعة بوصفها المرجع النهائي للأجهزة.
+الحالات الحرجة تتطلب التصعيد إلى المختصين وفق إجراءات المنشأة.
+لا ينبغي توليد أكواد أعطال أو إجراءات غير موثقة عند غياب المرجع.
+لا يجوز استخدام المشروع لاتخاذ قرارات تشخيصية أو علاجية للمرضى.
+البيانات المستخدمة في العرض والاختبار يجب ألا تتضمن بيانات مرضى حقيقية.
+ملاحظات أكاديمية / Academic Notes
+المشروع نموذج طلابي / Student Prototype وليس نظامًا طبيًا معتمدًا للاستخدام السريري.
+قواعد الأعطال الحالية مقتصرة على الأجهزة الثلاثة المذكورة في قسم Current Scope.
+المراجع الفنية لكل قاعدة عطل محفوظة داخل ملف JSON من خلال بيانات المصدر والرابط والصفحة المرجعية.
+لا ينبغي اعتبار rule_id كود خطأ رسميًا إلا إذا نص المصدر المصنّع على ذلك صراحة.
+توسيع المشروع لأجهزة إضافية يتطلب إضافة مراجع موثقة واختبار المطابقة والسلامة قبل اعتمادها داخل قاعدة المعرفة.
+الهدف الأكاديمي / Academic Objective
 
-## Intelligent Support Features
+يهدف المشروع إلى توضيح كيفية دمج:
 
-### استخراج الكيانات / Entity Extraction
-- Device type / نوع الجهاز
-- Error codes / أكواد الأخطاء
-- Department / القسم
-- Manufacturer / الشركة المصنعة
-- Model / الموديل
-- Severity / درجة الخطورة
+إدارة الصيانة + قاعدة أعطال مرجعية + معالجة لغة طبيعية + مطابقة ذكية + طبقة سلامة + سجل تدقيق
 
-### تصنيف الأعطال / Fault Classification
-- Severity level / مستوى الخطورة
-- Importance level / مستوى الأهمية
-- Fault level / مستوى العطل
-- Emergency detection / اكتشاف الحالات الطارئة
-- Specialist requirement / متطلب الأخصائي
+في منصة واحدة تساعد مهندس الأجهزة الطبية على الوصول إلى معلومات الصيانة بطريقة أسرع وأكثر تنظيمًا وقابلية للتتبع.
 
-### طبقة السلامة / Safety Layer
-- Prevents unauthorized clinical advice / يمنع النصائح السريرية غير المصرح بها
-- Enforces escalation for critical cases / يفرض التصعيد للحالات الحرجة
-- Role-based content filtering / تصفية المحتوى حسب الدور
-- Mandatory procedures for high-risk cases / إجراءات إلزامية للحالات عالية الخطورة
+الترخيص / License
 
-### اكتشاف التكرار / Duplicate Detection
-- Identifies duplicate reports / يحدد البلاغات المكررة
-- Pattern analysis for recurring faults / تحليل الأنماط للأعطال المتكررة
-- Preventive maintenance recommendations / توصيات الصيانة الوقائية
+لم يتم اختيار ترخيص مفتوح المصدر للمستودع حاليًا. المشروع مخصص للأغراض الأكاديمية والعرض الطلابي.
 
-### سجل التدقيق / Audit Trail
-- Records all inputs and outputs / يسجل جميع المدخلات والمخرجات
-- Tracks engineer decisions / يتتبع قرارات المهندسين
-- Source attribution / إسناد المصادر
-- Confidence scores / درجات الثقة
+Repository
+https://github.com/ENGmohammad98AU/Medical-Device-Maintenance
 
-## Evaluation Metrics
+"""
 
-### معايير التقييم / Evaluation Criteria
+out = Path("/mnt/data/README.md")
+out.write_text(content, encoding="utf-8")
+print(f"Created: {out}")
 
-1. **دقة التصنيف / Classification Accuracy**
-   - Accuracy, Precision, Recall, F1-score
-   - Evaluated on labeled fault reports
+STDOUT/STDERR
+Created: /mnt/data/README.md
 
-2. **جودة الحلول والسلامة / Solution Quality & Safety**
-   - Expert evaluation of solution correctness
-   - Clarity and applicability scores
-   - Count of unsafe recommendations
-   - Out-of-scope recommendations
 
-3. **الاعتماد على المصادر / Source Attribution**
-   - Percentage of answers supported by documentation
-   - Average sources per answer
-   - Source quality score
+جهزت لك نسخة README.md مصححة ومطابقة للمشروع الحالي، وعدّلت فيها نطاق الأجهزة، حسابات العرض، بنية المشروع، قاعدة الأعطال، وتعليمات التشغيل. الملف الذي أرسلته كان ما يزال يذكر أجهزة كثيرة خارج النطاق الحالي، مثل Dräger وGE وFresenius وغيرها.
 
-4. **زمن الاستجابة / Response Time**
-   - Average, median, P95, P99 response times
-   - Comparison with manual manual search
+تحميل ملف README.md المصحح
 
-5. **رضا المستخدمين / User Satisfaction**
-   - Ease of use score
-   - Usefulness score
-   - Would recommend percentage
+بعد تنزيله، استبدل ملف README.md الموجود داخل مشروعك بهذا الملف، ثم في VS Code نفّذ:
 
-6. **دقة التصعيد / Escalation Accuracy**
-   - Correct vs incorrect escalations
-   - Missed escalations
-   - False escalations
+git add README.md
+git commit -m "docs: align README with current project scope"
+git push
 
-## API Documentation
+بهذا سيظهر README الجديد مباشرة على صفحة GitHub دون تغيير أي ملف آخر في المشروع. 
 
-Once the backend is running, visit `http://localhost:8000/docs` for interactive API documentation.
+README.md
+مستند
 
-## Sending to Another Person / إرسال لشخص آخر
+المكتبة
+/
+README.md
+نظام الدعم الفني الذكي لأعطال الأجهزة الطبية
+Intelligent Medical Device Fault Support System
 
-### What to Send / ما يجب إرساله
+مشروع طلابي يهدف إلى دعم مهندسي الهندسة الطبية والفنيين في إدارة الأجهزة الطبية، تسجيل بلاغات الأعطال، متابعة أعمال الصيانة، واسترجاع حلول مرجعية موثقة مرتبطة بالشركة المصنّعة والموديل.
 
-Send the entire `medical_app1` folder as a ZIP file containing:
-- `frontend/` folder
-- `backend/` folder
-- `README.md` file
-- `.env.example` file (if exists)
+A student project designed to support biomedical engineers and medical technicians in medical-device management, fault reporting, maintenance tracking, and retrieval of manufacturer-referenced troubleshooting information.
 
-### Recipient Requirements / متطلبات المستلم
+تنبيه / Disclaimer: هذا النظام أداة دعم قرار هندسي وتعليمي، ولا يستبدل تعليمات الشركة المصنّعة أو إجراءات المستشفى أو حكم مهندس أجهزة طبية مؤهل. الحالات الحرجة يجب تصعيدها وفق إجراءات المنشأة.
 
-The recipient needs:
-1. **Windows 10/11** operating system
-2. **Python 3.10+** installed
-3. **Node.js v18+** installed
-4. **npm** installed
+النطاق الحالي / Current Scope
 
-### Installation Steps for Recipient / خطوات التثبيت للمستلم
+قاعدة الأعطال المرجعية الحالية تغطي 3 أجهزة طبية بإجمالي 39 قاعدة عطل مرجعية:
 
-```powershell
-# 1. Extract the ZIP file
-# 2. Open PowerShell in the medical_app1 folder
+الشركة / Manufacturer	الجهاز / Device	الموديل / Model	النوع / Type	عدد القواعد / Rules
+Hamilton Medical	Hamilton C6 Ventilator	C6	Ventilator	12
+Philips	IntelliVue MX800 Monitor	MX800	Patient Monitor	12
+B. Braun	Perfusor Space Pump	Perfusor Space	Syringe Pump	15
 
-# 3. Backend Setup
+المصدر المرجعي الرئيسي داخل المشروع:
+
+backend/reference_data/medical_device_fault_reference.json
+
+كل سجل مرجعي يتضمن مجموعة من الحقول، مثل:
+
+rule_id
+device_name
+manufacturer
+model
+device_type
+fault_code
+alarm_code
+error_message
+meaning
+severity
+possible_causes
+immediate_safety_action
+troubleshooting_steps
+recommended_solution
+verification_before_return_to_service
+source
+reference_url
+reference_page
+aliases
+match_status
+
+ملاحظة: rule_id هو معرّف داخلي للسجل المرجعي، وليس بالضرورة Error Code رسميًا ظاهرًا على شاشة الجهاز. بعض حقول fault_code وalarm_code قد تكون فارغة إذا لم يتضمن المصدر المصنّع كودًا رسميًا موثقًا.
+
+الوظائف الرئيسية / Main Features
+إدارة الأجهزة الطبية / Medical device management
+تسجيل بلاغات الأعطال / Fault report management
+تسجيل ومتابعة أعمال الصيانة / Maintenance records
+تسجيل الدخول والصلاحيات باستخدام JWT / JWT authentication and role-based access
+استخراج معلومات من وصف العطل / NLP entity extraction
+تصنيف مستوى الخطورة / Fault severity classification
+مطابقة البلاغ مع قاعدة الأعطال المرجعية / Reference fault matching
+البحث عن حلول موثقة مرتبطة بالشركة والموديل / Manufacturer-aware reference lookup
+طبقة أمان وتصعيد للحالات عالية الخطورة / Safety and escalation layer
+اكتشاف البلاغات المتكررة / Duplicate detection
+سجل تدقيق للأحداث / Audit trail
+إحصائيات وتقارير / Dashboard and statistics
+دعم أوضاع AI تجريبية أو محلية أو متوافقة مع OpenAI حسب الإعداد / Configurable AI mode
+التقنيات المستخدمة / Tech Stack
+Frontend
+React 18
+TypeScript
+Vite
+Material UI
+Tailwind CSS
+React Router
+TanStack Query
+Zustand
+Recharts
+Axios
+Backend
+Python
+FastAPI
+SQLAlchemy 2
+Pydantic
+JWT Authentication
+Passlib / bcrypt
+Database
+PostgreSQL كخيار أساسي للإنتاج / Primary production option
+SQLite للتطوير المحلي / Local development fallback
+AI & Retrieval Components
+LangChain
+ChromaDB
+NLP Entity Extraction
+Fault Classification
+Reference Lookup
+RAG service components
+Safety Layer
+Duplicate Detection
+Audit Trail
+Evaluation Service
+بنية المشروع / Project Structure
+Medical-Device-Maintenance/
+├── frontend/
+│   ├── src/
+│   │   ├── pages/
+│   │   │   ├── DashboardPage.tsx
+│   │   │   ├── DevicesPage.tsx
+│   │   │   ├── FaultReportsPage.tsx
+│   │   │   ├── LoginPage.tsx
+│   │   │   ├── MaintenancePage.tsx
+│   │   │   └── StatisticsPage.tsx
+│   │   ├── hooks/
+│   │   ├── services/
+│   │   ├── types/
+│   │   └── App.tsx
+│   ├── package.json
+│   └── vite.config.ts
+│
+├── backend/
+│   ├── app/
+│   │   ├── api/
+│   │   ├── core/
+│   │   ├── database/
+│   │   ├── models/
+│   │   ├── repositories/
+│   │   ├── schemas/
+│   │   ├── security/
+│   │   ├── services/
+│   │   └── main.py
+│   ├── database/
+│   │   └── medical_ai.db
+│   ├── reference_data/
+│   │   ├── medical_device_fault_reference.json
+│   │   └── medical_device_fault_reference.example.json
+│   ├── requirements.txt
+│   └── start_backend.bat
+│
+├── .env.example
+├── .gitignore
+├── docker-compose.yml
+├── render.yaml
+├── backend-openapi.json
+├── run_project.bat
+├── SETUP.md
+├── DEPLOYMENT.md
+└── README.md
+
+مجلدات بيئة التشغيل مثل .venv/ وnode_modules/ وملفات السجلات والـembeddings غير مرفوعة إلى Git لأنها قابلة لإعادة الإنشاء أو مخصصة للتشغيل المحلي.
+
+التشغيل على Windows / Windows Setup
+1. استنساخ المشروع / Clone
+git clone https://github.com/ENGmohammad98AU/Medical-Device-Maintenance.git
+cd Medical-Device-Maintenance
+2. إعداد الـBackend
 cd backend
-python -m venv venv
-.\venv\Scripts\Activate.ps1
+
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
 pip install -r requirements.txt
 
-# 4. Frontend Setup
-cd ..\frontend
-npm install
+copy ..\.env.example .env
 
-# 5. Run the application
-# Terminal 1 - Backend
-cd ..\backend
-.\venv\Scripts\Activate.ps1
 python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-# Terminal 2 - Frontend
-cd ..\frontend
-npm run dev
-```
+Backend:
 
-### Demo Users / مستخدمو العرض
+http://localhost:8000
 
-Login with these demo accounts:
-- **admin** / admin123 (Administrator)
-- **engineer** / eng123 (Biomedical Engineer)
-- **technician** / tech123 (Medical Technician)
-- **doctor** / doc123 (Doctor)
-- **nurse** / nurse123 (Nurse)
+Swagger / OpenAPI:
 
-## Troubleshooting
+http://localhost:8000/docs
+3. إعداد الـFrontend
 
-### PostgreSQL Connection Issues
+افتح Terminal جديدًا من مجلد المشروع:
 
-If PostgreSQL is not available, the system will fall back to SQLite. Set `SQLITE_FALLBACK=true` in `.env`.
+cd frontend
 
-### Python Module Not Found
-
-Ensure virtual environment is activated:
-
-```powershell
-.\venv\Scripts\Activate.ps1
-```
-
-### Frontend Build Issues
-
-Clear node_modules and reinstall:
-
-```powershell
-rm -r node_modules
 npm install
-```
+npm run dev
 
-## Development Workflow
+Frontend:
 
-The project is developed in phases:
+http://localhost:5173
+التشغيل السريع / Quick Start
 
-1. Phase 0: Environment inspection ✓
-2. Phase 1: Project structure initialization
-3. Phase 2: Backend foundation
-4. Phase 3: Database
-5. Phase 4: Authentication
-6. Phase 5: Frontend design system
-7. Phase 6: Dashboard
-8. Phase 7: Medical Devices
-9. Phase 8: Fault Reports
-10. Phase 9: AI Demo Pipeline
-11. Phase 10: RAG/Knowledge Base
-12. Phase 11: Engineer Review
-13. Phase 12: Maintenance/Spare Parts
-14. Phase 13: Statistics
-15. Phase 14: Security/Audit
-16. Phase 15: Testing
-16. Phase 16: Documentation
+يمكن أيضًا استخدام ملفات التشغيل الموجودة في المشروع:
 
-## License
+run_project.bat
+backend/start_backend.bat
+frontend/start_frontend.bat
 
-This project is for academic purposes (Master's thesis).
+قد تحتاج إلى تثبيت Python وNode.js والحزم المطلوبة قبل أول تشغيل.
 
-## Contact
+إعدادات البيئة / Environment Variables
 
-For questions or issues, please contact the development team.
+انسخ:
+
+.env.example
+
+إلى:
+
+.env
+
+ثم عدّل القيم عند الحاجة.
+
+أهم الإعدادات:
+
+DATABASE_URL
+SQLITE_FALLBACK
+SQLITE_PATH
+SEED_DEMO_DATA
+SECRET_KEY
+AI_MODE
+OPENAI_API_KEY
+OLLAMA_BASE_URL
+LLM_MODEL
+FRONTEND_URL
+BACKEND_URL
+
+ملف .env الحقيقي مستبعد من Git، بينما .env.example يحتوي قيمًا نموذجية فقط.
+
+حسابات العرض / Demo Accounts
+
+عند تفعيل:
+
+SEED_DEMO_DATA=true
+
+يمكن للنظام إنشاء حسابات تجريبية محلية للاختبار:
+
+Username	Password	Role
+admin	admin123	Administrator
+engineer	engineer123	Biomedical Engineer
+technician	technician123	Medical Technician
+doctor	doctor123	Doctor
+nurse	nurse123	Nurse
+
+هذه الحسابات تجريبية فقط وليست مخصصة للاستخدام الإنتاجي.
+
+قاعدة البيانات المرجعية / Reference Database
+
+يحتوي المستودع على قاعدة SQLite:
+
+backend/database/medical_ai.db
+
+كما يحتوي على ملف المصدر المرجعي القابل للمراجعة والتحكم بالإصدارات:
+
+backend/reference_data/medical_device_fault_reference.json
+
+عند بدء الـBackend، يقوم التطبيق بمزامنة قواعد الأعطال المرجعية من ملف JSON إلى قاعدة البيانات.
+
+بهذا يكون ملف JSON هو المصدر المرجعي الواضح القابل للمراجعة، بينما تستخدم قاعدة البيانات للتشغيل والاستعلام.
+
+منطق الدعم الفني / Intelligent Support Flow
+بلاغ العطل / Fault Report
+        ↓
+تنظيف النص / Data Cleaning
+        ↓
+اكتشاف التكرار / Duplicate Detection
+        ↓
+استخراج الكيانات / NLP Entity Extraction
+        ↓
+تحديد الجهاز والموديل / Device & Model Validation
+        ↓
+مطابقة قاعدة الأعطال / Reference Fault Matching
+        ↓
+تحديد الخطورة / Severity Assessment
+        ↓
+إجراءات السلامة / Safety Validation
+        ↓
+الحل المرجعي / Recommended Reference Solution
+        ↓
+سجل التدقيق / Audit Trail
+
+إذا لم توجد مطابقة مرجعية كافية، يجب أن يوضح النظام أن المرجع غير متوفر بدل اختلاق كود أو تشخيص غير موثق.
+
+الاختبارات / Testing
+Backend
+cd backend
+.\.venv\Scripts\Activate.ps1
+pytest
+
+توجد أيضًا ملفات اختبار وفحص مخصصة داخل backend/ لاختبار قاعدة الأعطال والمصادقة والمطابقة المرجعية.
+
+Frontend
+cd frontend
+npm test
+
+لبناء نسخة الإنتاج:
+
+npm run build
+النشر / Deployment
+
+يتضمن المشروع:
+
+render.yaml
+
+وهو يعرّف خدمة Backend وقاعدة PostgreSQL وخدمة Frontend ثابتة على Render.
+
+في إعداد الإنتاج المقترح:
+
+DEBUG=false
+SQLITE_FALLBACK=false
+SEED_DEMO_DATA=false
+يتم توليد SECRET_KEY بواسطة بيئة النشر
+قيود السلامة / Safety Limitations
+النظام أداة دعم قرار فقط ولا يستبدل مهندس الأجهزة الطبية المؤهل.
+يجب التعامل مع تعليمات الشركة المصنّعة بوصفها المرجع النهائي للأجهزة.
+الحالات الحرجة تتطلب التصعيد إلى المختصين وفق إجراءات المنشأة.
+لا ينبغي توليد أكواد أعطال أو إجراءات غير موثقة عند غياب المرجع.
+لا يجوز استخدام المشروع لاتخاذ قرارات تشخيصية أو علاجية للمرضى.
+البيانات المستخدمة في العرض والاختبار يجب ألا تتضمن بيانات مرضى حقيقية.
+ملاحظات أكاديمية / Academic Notes
+المشروع نموذج طلابي / Student Prototype وليس نظامًا طبيًا معتمدًا للاستخدام السريري.
+قواعد الأعطال الحالية مقتصرة على الأجهزة الثلاثة المذكورة في قسم Current Scope.
+المراجع الفنية لكل قاعدة عطل محفوظة داخل ملف JSON من خلال بيانات المصدر والرابط والصفحة المرجعية.
+لا ينبغي اعتبار rule_id كود خطأ رسميًا إلا إذا نص المصدر المصنّع على ذلك صراحة.
+توسيع المشروع لأجهزة إضافية يتطلب إضافة مراجع موثقة واختبار المطابقة والسلامة قبل اعتمادها داخل قاعدة المعرفة.
+الهدف الأكاديمي / Academic Objective
+
+يهدف المشروع إلى توضيح كيفية دمج:
+
+إدارة الصيانة + قاعدة أعطال مرجعية + معالجة لغة طبيعية + مطابقة ذكية + طبقة سلامة + سجل تدقيق
+
+في منصة واحدة تساعد مهندس الأجهزة الطبية على الوصول إلى معلومات الصيانة بطريقة أسرع وأكثر تنظيمًا وقابلية للتتبع.
+
+الترخيص / License
+
+لم يتم اختيار ترخيص مفتوح المصدر للمستودع حاليًا. المشروع مخصص للأغراض الأكاديمية والعرض الطلابي.
+
+Repository
+https://github.com/ENGmohammad98AU/Medical-Device-Maintenance
