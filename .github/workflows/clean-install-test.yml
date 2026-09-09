@@ -15,10 +15,10 @@ permissions:
   contents: read
 
 jobs:
-  clean-install-windows:
-    name: Clean install on Windows
+  backend-clean-install:
+    name: Backend clean install on Windows
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
 
     steps:
       - name: Checkout fresh repository
@@ -51,13 +51,19 @@ jobs:
           & "backend\.venv\Scripts\python.exe" -m pip install --upgrade pip
           & "backend\.venv\Scripts\python.exe" -m pip install -r backend\requirements.txt
 
-      - name: Run backend automated tests
+      - name: Initialize clean database
         shell: pwsh
         working-directory: backend
         run: |
-          & ".\.venv\Scripts\python.exe" -m pytest -q
+          & ".\.venv\Scripts\python.exe" -c "from pathlib import Path; from app.database.base import Base; from app.database.connection import engine, SessionLocal; import app.models.user, app.models.device, app.models.fault_report, app.models.maintenance, app.models.fault_reference_rule, app.models.audit_log, app.models.analysis_event; from app.database.seed import seed_database; from app.services.fault_reference_lookup_service import FaultReferenceLookupService; Base.metadata.create_all(bind=engine); seed_database(); db=SessionLocal(); p=Path('reference_data/medical_device_fault_reference.json'); n=FaultReferenceLookupService(db).load_rules_from_json(str(p)); print('reference_rules_imported=' + str(n)); db.close()"
 
-      - name: Start backend from clean database
+      - name: Verify clean database contents
+        shell: pwsh
+        working-directory: backend
+        run: |
+          & ".\.venv\Scripts\python.exe" -c "from app.database.connection import SessionLocal; from app.models.user import User; from app.models.device import Device; from app.models.fault_reference_rule import FaultReferenceRule; db=SessionLocal(); u=db.query(User).count(); d=db.query(Device).count(); r=db.query(FaultReferenceRule).count(); print(f'users={u}, devices={d}, reference_rules={r}'); db.close(); assert u >= 5; assert d >= 3; assert r == 39"
+
+      - name: Start backend
         id: backend_start
         shell: pwsh
         run: |
@@ -68,6 +74,7 @@ jobs:
             -RedirectStandardOutput "$PWD\backend-stdout.log" `
             -RedirectStandardError "$PWD\backend-stderr.log" `
             -PassThru
+
           "pid=$($process.Id)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
           $healthy = $false
@@ -89,7 +96,7 @@ jobs:
             exit 1
           }
 
-          Write-Host "Backend health check passed."
+          Write-Host "Backend started successfully."
 
       - name: Verify API health and documentation
         shell: pwsh
@@ -103,6 +110,8 @@ jobs:
           if ($docs.StatusCode -ne 200) {
             throw "Swagger docs endpoint failed."
           }
+
+          Write-Host "API health and documentation passed."
 
       - name: Verify demo authentication
         shell: pwsh
@@ -123,11 +132,40 @@ jobs:
 
           Write-Host "Demo authentication passed."
 
-      - name: Verify reference database contains 39 rules
+      - name: Stop backend before automated tests
+        if: always() && steps.backend_start.outputs.pid != ''
+        shell: pwsh
+        run: |
+          Stop-Process -Id "${{ steps.backend_start.outputs.pid }}" -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
+
+      - name: Run backend automated tests
         shell: pwsh
         working-directory: backend
         run: |
-          & ".\.venv\Scripts\python.exe" -c "from app.database.connection import SessionLocal; from app.models.fault_reference_rule import FaultReferenceRule; db=SessionLocal(); count=db.query(FaultReferenceRule).count(); print('reference_rules=' + str(count)); db.close(); assert count == 39"
+          & ".\.venv\Scripts\python.exe" -m pytest -q
+
+      - name: Show backend logs on failure
+        if: failure()
+        shell: pwsh
+        run: |
+          if (Test-Path "$PWD\backend-stdout.log") {
+            Write-Host "=== backend stdout ==="
+            Get-Content "$PWD\backend-stdout.log"
+          }
+          if (Test-Path "$PWD\backend-stderr.log") {
+            Write-Host "=== backend stderr ==="
+            Get-Content "$PWD\backend-stderr.log"
+          }
+
+  frontend-clean-install:
+    name: Frontend clean install on Windows
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout fresh repository
+        uses: actions/checkout@v4
 
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
@@ -160,21 +198,56 @@ jobs:
         run: |
           npm test -- --run --passWithNoTests
 
-      - name: Show backend logs on failure
+      - name: Start built frontend preview
+        id: frontend_start
+        shell: pwsh
+        run: |
+          $process = Start-Process `
+            -FilePath "npm.cmd" `
+            -ArgumentList "run","preview","--","--host","127.0.0.1","--port","4173" `
+            -WorkingDirectory "$PWD\frontend" `
+            -RedirectStandardOutput "$PWD\frontend-stdout.log" `
+            -RedirectStandardError "$PWD\frontend-stderr.log" `
+            -PassThru
+
+          "pid=$($process.Id)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+          $ready = $false
+          for ($i = 0; $i -lt 45; $i++) {
+            Start-Sleep -Seconds 1
+            try {
+              $response = Invoke-WebRequest -Uri "http://127.0.0.1:4173" -UseBasicParsing -TimeoutSec 3
+              if ($response.StatusCode -eq 200) {
+                $ready = $true
+                break
+              }
+            } catch {}
+          }
+
+          if (-not $ready) {
+            Write-Host "Frontend preview failed to start."
+            if (Test-Path "$PWD\frontend-stdout.log") { Get-Content "$PWD\frontend-stdout.log" }
+            if (Test-Path "$PWD\frontend-stderr.log") { Get-Content "$PWD\frontend-stderr.log" }
+            exit 1
+          }
+
+          Write-Host "Frontend preview passed."
+
+      - name: Stop frontend preview
+        if: always() && steps.frontend_start.outputs.pid != ''
+        shell: pwsh
+        run: |
+          Stop-Process -Id "${{ steps.frontend_start.outputs.pid }}" -Force -ErrorAction SilentlyContinue
+
+      - name: Show frontend logs on failure
         if: failure()
         shell: pwsh
         run: |
-          if (Test-Path "$PWD\backend-stdout.log") {
-            Write-Host "=== backend stdout ==="
-            Get-Content "$PWD\backend-stdout.log"
+          if (Test-Path "$PWD\frontend-stdout.log") {
+            Write-Host "=== frontend stdout ==="
+            Get-Content "$PWD\frontend-stdout.log"
           }
-          if (Test-Path "$PWD\backend-stderr.log") {
-            Write-Host "=== backend stderr ==="
-            Get-Content "$PWD\backend-stderr.log"
+          if (Test-Path "$PWD\frontend-stderr.log") {
+            Write-Host "=== frontend stderr ==="
+            Get-Content "$PWD\frontend-stderr.log"
           }
-
-      - name: Stop backend
-        if: always() && steps.backend_start.outputs.pid != ''
-        shell: pwsh
-        run: |
-          Stop-Process -Id "${{ steps.backend_start.outputs.pid }}" -Force -ErrorAction SilentlyContinue
