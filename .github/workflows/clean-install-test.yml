@@ -1,0 +1,180 @@
+name: Clean Install Test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/clean-install-test.yml"
+      - "backend/**"
+      - "frontend/**"
+      - ".env.example"
+      - "README.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  clean-install-windows:
+    name: Clean install on Windows
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout fresh repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Verify Python
+        shell: pwsh
+        run: |
+          python --version
+          python -m pip --version
+
+      - name: Create clean backend environment
+        shell: pwsh
+        run: |
+          if (Test-Path "backend\.venv") { Remove-Item -Recurse -Force "backend\.venv" }
+          if (Test-Path "backend\database\medical_ai.db") { Remove-Item -Force "backend\database\medical_ai.db" }
+          Copy-Item ".env.example" "backend\.env" -Force
+          python -m venv backend\.venv
+
+      - name: Install backend dependencies from scratch
+        shell: pwsh
+        run: |
+          & "backend\.venv\Scripts\python.exe" -m pip install --upgrade pip
+          & "backend\.venv\Scripts\python.exe" -m pip install -r backend\requirements.txt
+
+      - name: Run backend automated tests
+        shell: pwsh
+        working-directory: backend
+        run: |
+          & ".\.venv\Scripts\python.exe" -m pytest -q
+
+      - name: Start backend from clean database
+        id: backend_start
+        shell: pwsh
+        run: |
+          $process = Start-Process `
+            -FilePath "$PWD\backend\.venv\Scripts\python.exe" `
+            -ArgumentList "-m","uvicorn","app.main:app","--host","127.0.0.1","--port","8000" `
+            -WorkingDirectory "$PWD\backend" `
+            -RedirectStandardOutput "$PWD\backend-stdout.log" `
+            -RedirectStandardError "$PWD\backend-stderr.log" `
+            -PassThru
+          "pid=$($process.Id)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+          $healthy = $false
+          for ($i = 0; $i -lt 60; $i++) {
+            Start-Sleep -Seconds 1
+            try {
+              $response = Invoke-RestMethod -Uri "http://127.0.0.1:8000/health" -TimeoutSec 3
+              if ($response.status -eq "healthy") {
+                $healthy = $true
+                break
+              }
+            } catch {}
+          }
+
+          if (-not $healthy) {
+            Write-Host "Backend failed to become healthy."
+            if (Test-Path "$PWD\backend-stdout.log") { Get-Content "$PWD\backend-stdout.log" }
+            if (Test-Path "$PWD\backend-stderr.log") { Get-Content "$PWD\backend-stderr.log" }
+            exit 1
+          }
+
+          Write-Host "Backend health check passed."
+
+      - name: Verify API health and documentation
+        shell: pwsh
+        run: |
+          $health = Invoke-RestMethod -Uri "http://127.0.0.1:8000/health"
+          if ($health.status -ne "healthy") {
+            throw "Health endpoint did not return healthy."
+          }
+
+          $docs = Invoke-WebRequest -Uri "http://127.0.0.1:8000/docs" -UseBasicParsing
+          if ($docs.StatusCode -ne 200) {
+            throw "Swagger docs endpoint failed."
+          }
+
+      - name: Verify demo authentication
+        shell: pwsh
+        run: |
+          $login = Invoke-RestMethod `
+            -Method Post `
+            -Uri "http://127.0.0.1:8000/api/auth/login" `
+            -ContentType "application/x-www-form-urlencoded" `
+            -Body @{ username = "admin"; password = "admin123" }
+
+          if (-not $login.access_token) {
+            throw "Demo admin login did not return an access token."
+          }
+
+          if ($login.user.username -ne "admin") {
+            throw "Unexpected demo user returned by login."
+          }
+
+          Write-Host "Demo authentication passed."
+
+      - name: Verify reference database contains 39 rules
+        shell: pwsh
+        working-directory: backend
+        run: |
+          & ".\.venv\Scripts\python.exe" -c "from app.database.connection import SessionLocal; from app.models.fault_reference_rule import FaultReferenceRule; db=SessionLocal(); count=db.query(FaultReferenceRule).count(); print('reference_rules=' + str(count)); db.close(); assert count == 39"
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Verify Node.js
+        shell: pwsh
+        run: |
+          node --version
+          npm --version
+
+      - name: Install frontend dependencies from lockfile
+        shell: pwsh
+        working-directory: frontend
+        run: |
+          npm ci
+
+      - name: Build frontend
+        shell: pwsh
+        working-directory: frontend
+        run: |
+          npm run build
+
+      - name: Run frontend tests
+        shell: pwsh
+        working-directory: frontend
+        run: |
+          npm test -- --run --passWithNoTests
+
+      - name: Show backend logs on failure
+        if: failure()
+        shell: pwsh
+        run: |
+          if (Test-Path "$PWD\backend-stdout.log") {
+            Write-Host "=== backend stdout ==="
+            Get-Content "$PWD\backend-stdout.log"
+          }
+          if (Test-Path "$PWD\backend-stderr.log") {
+            Write-Host "=== backend stderr ==="
+            Get-Content "$PWD\backend-stderr.log"
+          }
+
+      - name: Stop backend
+        if: always() && steps.backend_start.outputs.pid != ''
+        shell: pwsh
+        run: |
+          Stop-Process -Id "${{ steps.backend_start.outputs.pid }}" -Force -ErrorAction SilentlyContinue
