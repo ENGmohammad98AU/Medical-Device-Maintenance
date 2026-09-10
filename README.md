@@ -1,7 +1,7 @@
-# نظام الدعم الفني الذكي لأعطال الأجهزة الطبية
+# نظام دعم فني لدعم ومعالجة طلبات العملاء معتمد على نماذج معالجة اللغة الكبيرة في عملية التصنيف والتوجيه
 # Intelligent Medical Device Fault Support System
 
-مشروع طلابي يهدف إلى دعم مهندسي الهندسة الطبية والفنيين في **إدارة الأجهزة الطبية، تسجيل بلاغات الأعطال، متابعة أعمال الصيانة، واسترجاع حلول مرجعية موثقة مرتبطة بالشركة المصنّعة والموديل**.
+مشروع مقدّم لنيل درجة الماجستير في علوم الحاسوب في الجامعة الافتراضية السورية يعمل على **إدارة الأجهزة الطبية، تسجيل بلاغات الأعطال، متابعة أعمال الصيانة، واسترجاع حلول مرجعية موثقة مرتبطة بالشركة المصنّعة والموديل**.
 
 A student project designed to support biomedical engineers and medical technicians in **medical-device management, fault reporting, maintenance tracking, and retrieval of manufacturer-referenced troubleshooting information**.
 
