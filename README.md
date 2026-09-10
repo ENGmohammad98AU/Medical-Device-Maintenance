@@ -6,10 +6,10 @@
 [فتح الموقع](https://medical-app-frontend-8iiq.onrender.com/login)
 
 🎥 **فيديو عرض المشروع / Project Demo**  
-[مشاهدة فيديو المشروع](report%20%2B%20demo/DEMO.mp4)
+[مشاهدة أو تحميل فيديو المشروع](https://github.com/ENGmohammad98AU/Medical-Device-Maintenance/raw/refs/heads/main/report%20%2B%20demo/DEMO.mp4)
 
 📄 **تقرير مشروع الماجستير / Master's Project Report**  
-[فتح وتحميل التقرير](report%20%2B%20demo/mohamad_330903_F25-Report.docx)
+[تحميل تقرير المشروع](https://github.com/ENGmohammad98AU/Medical-Device-Maintenance/raw/refs/heads/main/report%20%2B%20demo/mohamad_330903_F25-Report.docx)
 
 مشروع مقدّم لنيل درجة الماجستير في علوم الحاسوب في الجامعة الافتراضية السورية يعمل على **إدارة الأجهزة الطبية، تسجيل بلاغات الأعطال، متابعة أعمال الصيانة، واسترجاع حلول مرجعية موثقة مرتبطة بالشركة المصنّعة والموديل**.
 
