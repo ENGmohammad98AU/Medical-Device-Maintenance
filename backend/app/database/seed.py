@@ -78,24 +78,48 @@ def seed_core_devices(db: Session) -> int:
 
 
 def seed_demo_users(db: Session) -> int:
-    """Create local-only demo users without overwriting existing accounts."""
-    created = 0
+    """Create or synchronize the five fixed demo users."""
+    synchronized = 0
+
     for email, username, password, full_name, role in DEMO_USERS:
-        if db.query(User).filter((User.username == username) | (User.email == email)).first():
-            continue
-        db.add(User(
-            email=email,
-            username=username,
-            hashed_password=get_password_hash(password),
-            full_name=full_name,
-            role=role,
-            is_active=True,
-            department="Biomedical Engineering" if role in {UserRole.BIOMEDICAL_ENGINEER, UserRole.MEDICAL_TECHNICIAN} else None,
-        ))
-        created += 1
-    if created:
-        db.commit()
-    return created
+        user = db.query(User).filter(User.username == username).first()
+
+        if user is None:
+            user = db.query(User).filter(User.email == email).first()
+
+        department = (
+            "Biomedical Engineering"
+            if role in {
+                UserRole.BIOMEDICAL_ENGINEER,
+                UserRole.MEDICAL_TECHNICIAN,
+            }
+            else None
+        )
+
+        if user is None:
+            user = User(
+                email=email,
+                username=username,
+                hashed_password=get_password_hash(password),
+                full_name=full_name,
+                role=role,
+                is_active=True,
+                department=department,
+            )
+            db.add(user)
+        else:
+            user.email = email
+            user.username = username
+            user.hashed_password = get_password_hash(password)
+            user.full_name = full_name
+            user.role = role
+            user.is_active = True
+            user.department = department
+
+        synchronized += 1
+
+    db.commit()
+    return synchronized
 
 
 def bootstrap_admin_user(db: Session) -> bool:

@@ -21,7 +21,7 @@ services:
       - key: SQLITE_FALLBACK
         value: "false"
       - key: SEED_DEMO_DATA
-        value: "false"
+        value: "true"
       - key: AI_MODE
         value: demo
       - key: BOOTSTRAP_ADMIN_USERNAME
