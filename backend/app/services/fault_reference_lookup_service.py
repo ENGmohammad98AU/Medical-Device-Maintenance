@@ -175,8 +175,14 @@ class FaultReferenceLookupService:
     ) -> Dict[str, Any]:
         """Return the best verified reference match, or NO_MATCH when confidence is insufficient."""
         session = db or self.db
-        normalized_fault = self._clean(fault_query)
         normalized_description = self._clean(description)
+        # The maintenance screen accepts one free-text problem description and
+        # therefore does not always send a separate fault/error-code value.
+        # Treat that description as the primary lookup query when ``fault_query``
+        # is empty.  Previously the method returned NO_MATCH immediately in this
+        # common path, even though the bundled reference database contained an
+        # exact alias for the submitted description.
+        normalized_fault = self._clean(fault_query) or normalized_description
         normalized_device = self._clean(device_query)
 
         if not normalized_fault:

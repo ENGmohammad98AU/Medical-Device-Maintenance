@@ -64,8 +64,11 @@ export default function MaintenancePage() {
         device_name: selectedDevice.name,
         manufacturer: selectedDevice.manufacturer,
         model: selectedDevice.model,
+        // This screen intentionally has one free-text description field. The
+        // API uses it as the reference-search query when no separate fault code
+        // is supplied.
         fault: '',
-        description,
+        description: description.trim(),
         customer_expertise: expertise,
         device_location: selectedDevice.location || selectedDevice.department,
         patient_connected: patientConnected,

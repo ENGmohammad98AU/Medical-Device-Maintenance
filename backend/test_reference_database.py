@@ -49,6 +49,39 @@ def test_arabic_alias_matches_hamilton_c6():
         session.close()
 
 
+def test_description_is_used_when_separate_fault_field_is_empty():
+    service, session, _ = make_service()
+    try:
+        result = service.lookup(
+            device_query="Hamilton C6 Ventilator",
+            fault_query="",
+            description="الجهاز يعرض رسالة بطارية منخفضة ولا يبدأ التشغيل",
+            manufacturer="Hamilton Medical",
+            model="C6",
+        )
+        assert result["matched"] is True
+        assert result["matched_fault"] == "Battery low"
+        assert result["match_status"] == "MATCHED"
+    finally:
+        session.close()
+
+
+def test_description_fallback_keeps_model_guard_enabled():
+    service, session, _ = make_service()
+    try:
+        result = service.lookup(
+            device_query="Philips IntelliVue MX800 Monitor",
+            fault_query="",
+            description="الجهاز يعرض رسالة بطارية منخفضة",
+            manufacturer="Philips",
+            model="MX800",
+        )
+        assert result["matched"] is False
+        assert result["matched_fault"] == ""
+    finally:
+        session.close()
+
+
 def test_model_guard_prevents_cross_device_match():
     service, session, _ = make_service()
     try:
