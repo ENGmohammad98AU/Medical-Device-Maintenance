@@ -111,6 +111,22 @@ def test_philips_arabic_alias_matches_mx800():
         session.close()
 
 
+def test_philips_natural_arabic_description_matches_without_fault_field():
+    service, session, _ = make_service()
+    try:
+        result = service.lookup(
+            device_query="Philips IntelliVue MX800 Monitor",
+            fault_query="",
+            description="تظهر رسالة انفصال أقطاب ECG على الشاشة",
+            manufacturer="Philips",
+            model="MX800",
+        )
+        assert result["matched"] is True
+        assert result["matched_fault"] == "ECG Leads Off"
+    finally:
+        session.close()
+
+
 def test_bbraun_alias_matches_perfusor_space():
     service, session, _ = make_service()
     try:

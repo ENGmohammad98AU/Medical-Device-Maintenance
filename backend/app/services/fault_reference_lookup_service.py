@@ -56,6 +56,13 @@ class FaultReferenceLookupService:
     @staticmethod
     def _clean(value: str) -> str:
         value = (value or "").casefold()
+        # Normalize common Arabic spelling variants so a natural report such as
+        # "أقطاب" can match a verified alias written as "اقطاب".  Diacritics
+        # and tatweel are presentation characters and must not affect lookup.
+        value = re.sub(r"[\u0640\u064b-\u065f\u0670]", "", value)
+        value = value.translate(str.maketrans({
+            "أ": "ا", "إ": "ا", "آ": "ا", "ٱ": "ا", "ى": "ي",
+        }))
         value = re.sub(r"[^\w\u0600-\u06ff]+", " ", value)
         return re.sub(r"\s+", " ", value).strip()
 
@@ -295,7 +302,15 @@ class FaultReferenceLookupService:
                 candidate_tokens = self._tokens(candidate)
                 overlap = 0.0
                 if query_tokens and candidate_tokens:
-                    overlap = len(query_tokens & candidate_tokens) / len(query_tokens | candidate_tokens)
+                    shared_tokens = query_tokens & candidate_tokens
+                    overlap = len(shared_tokens) / len(query_tokens | candidate_tokens)
+                    # Extra context words in a maintenance report should not
+                    # dilute a distinctive multi-token alarm phrase. Require at
+                    # least two shared terms, then score how much of the trusted
+                    # candidate phrase is covered by the report.
+                    if len(shared_tokens) >= 2:
+                        candidate_coverage = len(shared_tokens) / len(candidate_tokens)
+                        text_score = max(text_score, candidate_coverage * 0.9)
                 text_score = max(text_score, (seq * 0.65) + (overlap * 0.35))
 
         # Description is supporting context only; it must not override a weak fault match.
