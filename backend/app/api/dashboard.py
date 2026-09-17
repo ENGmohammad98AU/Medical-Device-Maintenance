@@ -11,6 +11,7 @@ from app.api.dependencies import get_current_active_user
 from app.models.user import User
 from app.models.device import Device, DeviceStatus
 from app.models.fault_report import FaultReport, FaultSeverity, FaultStatus
+from app.models.audit_log import AuditLog
 
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
@@ -51,9 +52,13 @@ def get_dashboard_stats(
     # Total devices
     total_devices = db.query(Device).count()
     
-    # Average AI confidence
-    avg_confidence = db.query(func.avg(FaultReport.ai_confidence)).filter(
-        FaultReport.ai_confidence.isnot(None)
+    # Average confidence of successful reference-grounded maintenance analyses.
+    # The maintenance workflow persists its result in AuditLog on a 0..1 scale;
+    # FaultReport.ai_confidence belongs to the separate legacy report workflow
+    # and is commonly NULL, which previously made this card display 0%.
+    avg_confidence = db.query(func.avg(AuditLog.confidence_score)).filter(
+        AuditLog.action == "FAULT_ANALYSIS",
+        AuditLog.confidence_score > 0,
     ).scalar()
     
     # Average response time (time to resolve). Calculate in Python so the
@@ -75,7 +80,7 @@ def get_dashboard_stats(
         "resolved_reports": resolved_reports,
         "out_of_service_devices": out_of_service,
         "total_devices": total_devices,
-        "ai_confidence": round(avg_confidence, 2) if avg_confidence else 0,
+        "ai_confidence": round(float(avg_confidence) * 100, 2) if avg_confidence is not None else 0,
         "average_response_time_minutes": round(resolved_with_time, 2) if resolved_with_time else 0
     }
 
