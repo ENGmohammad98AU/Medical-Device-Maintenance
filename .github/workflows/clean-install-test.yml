@@ -9,6 +9,14 @@ on:
       - "frontend/**"
       - ".env.example"
       - "README.md"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/clean-install-test.yml"
+      - "backend/**"
+      - "frontend/**"
+      - ".env.example"
+      - "README.md"
   workflow_dispatch:
 
 permissions:
@@ -61,7 +69,7 @@ jobs:
         shell: pwsh
         working-directory: backend
         run: |
-          & ".\.venv\Scripts\python.exe" -c "from app.database.connection import SessionLocal; from app.models.user import User; from app.models.device import Device; from app.models.fault_reference_rule import FaultReferenceRule; db=SessionLocal(); u=db.query(User).count(); d=db.query(Device).count(); r=db.query(FaultReferenceRule).count(); print(f'users={u}, devices={d}, reference_rules={r}'); db.close(); assert u >= 5; assert d >= 3; assert r == 39"
+          & ".\.venv\Scripts\python.exe" -c "from app.database.connection import SessionLocal; import app.models.maintenance, app.models.fault_report; from app.models.user import User; from app.models.device import Device; from app.models.fault_reference_rule import FaultReferenceRule; db=SessionLocal(); u=db.query(User).count(); d=db.query(Device).count(); r=db.query(FaultReferenceRule).count(); print(f'users={u}, devices={d}, reference_rules={r}'); db.close(); assert u >= 5; assert d >= 3; assert r == 39"
 
       - name: Start backend
         id: backend_start

@@ -269,27 +269,38 @@ class SafetyLayerService:
         required_actions = []
         mandatory_procedures = []
         
-        # Check if escalation is required based on safety check
-        if safety_check.requires_specialist_escalation:
+        # Determine escalation reasons first, then apply a strict priority.
+        # EMERGENCY must never be downgraded to SPECIALIST by a later rule.
+        is_emergency = bool(
+            hasattr(classification, 'is_emergency') and classification.is_emergency
+        )
+        classification_requires_specialist = bool(
+            hasattr(classification, 'requires_specialist') and classification.requires_specialist
+        )
+        safety_requires_specialist = bool(safety_check.requires_specialist_escalation)
+
+        if is_emergency:
+            escalation_required = True
+            escalation_level = "EMERGENCY"
+        elif classification_requires_specialist or safety_requires_specialist:
             escalation_required = True
             escalation_level = "SPECIALIST"
+
+        # Preserve all relevant actions without allowing them to change the
+        # already-selected escalation priority.
+        if safety_requires_specialist:
             required_actions.append("Immediate specialist consultation required")
             mandatory_procedures.append("Document safety concerns in patient record")
             mandatory_procedures.append("Notify clinical supervisor")
-        
-        # Check if escalation is required based on classification
-        if hasattr(classification, 'is_emergency') and classification.is_emergency:
-            escalation_required = True
-            escalation_level = "EMERGENCY"
+
+        if is_emergency:
             required_actions.append("Emergency protocol activation")
             required_actions.append("Immediate clinical notification")
             mandatory_procedures.append("Activate emergency response team")
             mandatory_procedures.append("Document emergency in incident log")
             mandatory_procedures.append("Notify hospital administration")
-        
-        if hasattr(classification, 'requires_specialist') and classification.requires_specialist:
-            escalation_required = True
-            escalation_level = "SPECIALIST"
+
+        if classification_requires_specialist:
             required_actions.append("Specialist consultation required")
             mandatory_procedures.append("Schedule specialist review within 24 hours")
             mandatory_procedures.append("Document specialist findings")
@@ -319,7 +330,8 @@ class SafetyLayerService:
         Returns:
             Filtered content with clinical advice removed or flagged
         """
-        if user_role in ['DOCTOR', 'NURSE']:
+        normalized_role = (user_role or "").strip().lower()
+        if normalized_role in ['doctor', 'nurse']:
             return content  # Clinical staff can see all content
         
         content_lower = content.lower()
