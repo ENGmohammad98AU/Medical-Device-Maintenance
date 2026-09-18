@@ -9,6 +9,14 @@ on:
       - "frontend/**"
       - ".env.example"
       - "README.md"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/clean-install-test.yml"
+      - "backend/**"
+      - "frontend/**"
+      - ".env.example"
+      - "README.md"
   workflow_dispatch:
 
 permissions:
