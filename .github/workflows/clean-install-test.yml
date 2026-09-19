@@ -19,6 +19,9 @@ jobs:
     name: Backend clean install on Windows
     runs-on: windows-latest
     timeout-minutes: 35
+    env:
+      DATABASE_URL: sqlite:///./database/medical_ai.db
+      SQLITE_FALLBACK: "true"
 
     steps:
       - name: Checkout fresh repository
@@ -61,7 +64,7 @@ jobs:
         shell: pwsh
         working-directory: backend
         run: |
-          & ".\.venv\Scripts\python.exe" -c "from app.database.connection import SessionLocal; from app.models.user import User; from app.models.device import Device; from app.models.fault_reference_rule import FaultReferenceRule; db=SessionLocal(); u=db.query(User).count(); d=db.query(Device).count(); r=db.query(FaultReferenceRule).count(); print(f'users={u}, devices={d}, reference_rules={r}'); db.close(); assert u >= 5; assert d >= 3; assert r == 39"
+          & ".\.venv\Scripts\python.exe" -c "from app.database.connection import SessionLocal; from app.models.user import User; from app.models.device import Device; from app.models.fault_reference_rule import FaultReferenceRule; import app.models.maintenance, app.models.fault_report; db=SessionLocal(); u=db.query(User).count(); d=db.query(Device).count(); r=db.query(FaultReferenceRule).count(); print(f'users={u}, devices={d}, reference_rules={r}'); db.close(); assert u >= 5; assert d >= 3; assert r == 39"
 
       - name: Start backend
         id: backend_start
