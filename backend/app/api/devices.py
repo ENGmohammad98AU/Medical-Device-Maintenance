@@ -66,7 +66,10 @@ def update_device(
 ):
     """Update device"""
     device_service = DeviceService(db)
-    device = device_service.update_device(device_id, device_data)
+    try:
+        device = device_service.update_device(device_id, device_data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if not device:
         raise HTTPException(status_code=404, detail="Device not found")
     return device

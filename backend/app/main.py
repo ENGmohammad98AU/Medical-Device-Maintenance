@@ -12,7 +12,12 @@ from app.core.config import settings
 from app.core.logging import setup_logging
 from app.database.connection import engine, SessionLocal
 from app.database.base import Base
-from app.database.seed import seed_database, seed_core_devices, bootstrap_admin_user
+from app.database.seed import (
+    bootstrap_admin_user,
+    seed_core_devices,
+    seed_database,
+    sync_postgres_device_type_enum,
+)
 from app.services.fault_reference_lookup_service import FaultReferenceLookupService
 
 # Import models to register them with SQLAlchemy
@@ -51,6 +56,9 @@ async def lifespan(app: FastAPI):
     # development-only; production can optionally bootstrap one admin from env.
     db = SessionLocal()
     try:
+        enum_values_added = sync_postgres_device_type_enum(db)
+        if enum_values_added:
+            logger.info("PostgreSQL device type enum synchronized: %s added", enum_values_added)
         core_created = seed_core_devices(db)
         logger.info("Core device catalog synchronized: %s created", core_created)
         if bootstrap_admin_user(db):

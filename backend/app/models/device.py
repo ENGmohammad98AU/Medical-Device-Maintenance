@@ -13,6 +13,13 @@ class DeviceType(str, enum.Enum):
     VENTILATOR = "ventilator"
     PATIENT_MONITOR = "patient_monitor"
     SYRINGE_PUMP = "syringe_pump"
+    INFUSION_PUMP = "infusion_pump"
+    DEFIBRILLATOR = "defibrillator"
+    ECG_MACHINE = "ecg_machine"
+    ULTRASOUND = "ultrasound"
+    XRAY_MACHINE = "xray_machine"
+    MRI_MACHINE = "mri_machine"
+    CT_SCANNER = "ct_scanner"
 
 
 class DeviceStatus(str, enum.Enum):

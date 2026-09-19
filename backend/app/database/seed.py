@@ -5,6 +5,7 @@ strictly opt-in for local development. A production bootstrap administrator can
 be created only from explicit environment credentials.
 """
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from app.database.connection import SessionLocal
 from app.models.user import User, UserRole
@@ -62,6 +63,37 @@ DEMO_USERS = [
     ("doctor@biomed.ai", "doctor", "doctor123", "Doctor", UserRole.DOCTOR),
     ("nurse@biomed.ai", "nurse", "nurse123", "Nurse", UserRole.NURSE),
 ]
+
+
+def sync_postgres_device_type_enum(db: Session) -> int:
+    """Add newly supported device types to an existing PostgreSQL enum."""
+    if db.bind is None or db.bind.dialect.name != "postgresql":
+        return 0
+
+    enum_exists = db.execute(text(
+        "SELECT 1 FROM pg_type WHERE typname = 'devicetype'"
+    )).scalar()
+    if not enum_exists:
+        return 0
+
+    existing = set(db.execute(text(
+        """
+        SELECT enumlabel
+        FROM pg_enum
+        JOIN pg_type ON pg_type.oid = pg_enum.enumtypid
+        WHERE pg_type.typname = 'devicetype'
+        """
+    )).scalars())
+
+    added = 0
+    for device_type in DeviceType:
+        # SQLAlchemy persists Python enum member names for native PostgreSQL enums.
+        label = device_type.name
+        if label not in existing:
+            db.execute(text(f"ALTER TYPE devicetype ADD VALUE IF NOT EXISTS '{label}'"))
+            added += 1
+    db.commit()
+    return added
 
 
 def seed_core_devices(db: Session) -> int:
