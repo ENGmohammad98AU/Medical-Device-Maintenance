@@ -25,6 +25,7 @@ import {
 } from '@mui/material';
 import {
   Add as AddIcon,
+  Clear as ClearIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
   Warning as WarningIcon,
@@ -34,11 +35,13 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../hooks/useAuth';
 import api from '../services/auth';
+import { filterFaultReports, normalizeEnumValue } from '../utils/faultReportFilters';
 
 interface FaultReport {
   id: number;
   device_id: number;
   device_name?: string;
+  alarm_code?: string | null;
   error_message: string;
   description: string;
   severity: string;
@@ -50,37 +53,58 @@ interface FaultReport {
   created_at: string;
 }
 
-const severityLevels = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
-const statusLevels = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
+interface DeviceSummary {
+  id: number;
+  name: string;
+  manufacturer: string;
+  model: string;
+  serial_number: string;
+  status: string;
+}
+
+const severityLevels = ['low', 'medium', 'high', 'critical'];
+const reportStatusLevels = ['open', 'in_progress', 'resolved', 'escalated', 'rejected'];
+const deviceStatusLevels = [
+  'operational',
+  'maintenance_required',
+  'under_maintenance',
+  'out_of_service',
+  'retired',
+];
 
 const severityColors: Record<string, string> = {
-  LOW: '#4caf50',
-  MEDIUM: '#ff9800',
-  HIGH: '#f44336',
-  CRITICAL: '#d32f2f',
+  low: '#4caf50',
+  medium: '#ff9800',
+  high: '#f44336',
+  critical: '#d32f2f',
 };
 
 const statusColors: Record<string, string> = {
-  OPEN: '#f44336',
-  IN_PROGRESS: '#ff9800',
-  RESOLVED: '#4caf50',
-  CLOSED: '#9e9e9e',
+  open: '#f44336',
+  in_progress: '#ff9800',
+  resolved: '#4caf50',
+  escalated: '#9c27b0',
+  rejected: '#9e9e9e',
 };
+
+const formatEnumLabel = (value: string) => value.replace(/_/g, ' ').toUpperCase();
 
 export default function FaultReportsPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const [reports, setReports] = useState<FaultReport[]>([]);
-  const [devices, setDevices] = useState<any[]>([]);
+  const [devices, setDevices] = useState<DeviceSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [page] = useState(1);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [editingReport, setEditingReport] = useState<FaultReport | null>(null);
   const [aiAnalysis, setAiAnalysis] = useState<any>(null);
   const [filterSeverity, setFilterSeverity] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterDevice, setFilterDevice] = useState('');
+  const [filterDeviceStatus, setFilterDeviceStatus] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [formData, setFormData] = useState({
     device_id: '',
     error_message: '',
@@ -93,13 +117,13 @@ export default function FaultReportsPage() {
     }
     fetchReports();
     fetchDevices();
-  }, [isAuthenticated, navigate, page]);
+  }, [isAuthenticated, navigate]);
 
   const fetchReports = async () => {
     setLoading(true);
     setError('');
     try {
-      const response = await api.get(`/api/fault-reports/?skip=${(page - 1) * 10}&limit=10`);
+      const response = await api.get('/api/fault-reports/?skip=0&limit=1000');
       setReports(response.data);
       setLoading(false);
     } catch (err: any) {
@@ -110,7 +134,7 @@ export default function FaultReportsPage() {
 
   const fetchDevices = async () => {
     try {
-      const response = await api.get('/api/devices/?limit=100');
+      const response = await api.get('/api/devices/?limit=1000');
       setDevices(response.data);
     } catch (err: any) {
       console.error('Failed to fetch devices');
@@ -203,11 +227,26 @@ export default function FaultReportsPage() {
     }
   };
 
-  const filteredReports = reports.filter((report) => {
-    if (filterSeverity && report.severity !== filterSeverity) return false;
-    if (filterStatus && report.status !== filterStatus) return false;
-    return true;
+  const filteredReports = filterFaultReports(reports, devices, {
+    query: searchQuery,
+    deviceId: filterDevice,
+    deviceStatus: filterDeviceStatus,
+    severity: filterSeverity,
+    reportStatus: filterStatus,
   });
+
+  const deviceById = new Map(devices.map((device) => [device.id, device]));
+  const hasActiveFilters = Boolean(
+    searchQuery || filterDevice || filterDeviceStatus || filterSeverity || filterStatus,
+  );
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setFilterDevice('');
+    setFilterDeviceStatus('');
+    setFilterSeverity('');
+    setFilterStatus('');
+  };
 
   return (
     <Container maxWidth="xl">
@@ -234,37 +273,78 @@ export default function FaultReportsPage() {
           </Button>
         </Box>
 
-        <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+        <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+          <TextField
+            label="ابحث باسم الجهاز أو العطل / Search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            sx={{ minWidth: 280, flexGrow: 1 }}
+          />
+          <FormControl sx={{ minWidth: 210 }}>
+            <InputLabel>الجهاز / Device</InputLabel>
+            <Select
+              value={filterDevice}
+              label="الجهاز / Device"
+              onChange={(e) => setFilterDevice(e.target.value)}
+            >
+              <MenuItem value="">الكل / All</MenuItem>
+              {devices.map((device) => (
+                <MenuItem key={device.id} value={device.id.toString()}>
+                  {device.name} - {device.serial_number}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl sx={{ minWidth: 190 }}>
+            <InputLabel>حالة الجهاز / Device Status</InputLabel>
+            <Select
+              value={filterDeviceStatus}
+              label="حالة الجهاز / Device Status"
+              onChange={(e) => setFilterDeviceStatus(e.target.value)}
+            >
+              <MenuItem value="">الكل / All</MenuItem>
+              {deviceStatusLevels.map((level) => (
+                <MenuItem key={level} value={level}>
+                  {formatEnumLabel(level)}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <FormControl sx={{ minWidth: 150 }}>
-            <InputLabel>Severity</InputLabel>
+            <InputLabel>خطورة العطل / Severity</InputLabel>
             <Select
               value={filterSeverity}
-              label="Severity"
+              label="خطورة العطل / Severity"
               onChange={(e) => setFilterSeverity(e.target.value)}
             >
-              <MenuItem value="">All</MenuItem>
+              <MenuItem value="">الكل / All</MenuItem>
               {severityLevels.map((level) => (
                 <MenuItem key={level} value={level}>
-                  {level}
+                  {formatEnumLabel(level)}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
-          <FormControl sx={{ minWidth: 150 }}>
-            <InputLabel>Status</InputLabel>
+          <FormControl sx={{ minWidth: 180 }}>
+            <InputLabel>حالة التقرير / Report Status</InputLabel>
             <Select
               value={filterStatus}
-              label="Status"
+              label="حالة التقرير / Report Status"
               onChange={(e) => setFilterStatus(e.target.value)}
             >
-              <MenuItem value="">All</MenuItem>
-              {statusLevels.map((level) => (
+              <MenuItem value="">الكل / All</MenuItem>
+              {reportStatusLevels.map((level) => (
                 <MenuItem key={level} value={level}>
-                  {level.replace('_', ' ')}
+                  {formatEnumLabel(level)}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
+          {hasActiveFilters && (
+            <Button startIcon={<ClearIcon />} onClick={clearFilters}>
+              مسح الفلاتر / Clear
+            </Button>
+          )}
         </Box>
 
         {error && (
@@ -277,10 +357,14 @@ export default function FaultReportsPage() {
           <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
             <CircularProgress />
           </Box>
-        ) : (
-          <Grid container spacing={3}>
-            {filteredReports.map((report) => (
-              <Grid item xs={12} sm={6} md={4} key={report.id}>
+        ) : filteredReports.length === 0 ? (
+            <Alert severity="info">
+              لا توجد تقارير مطابقة لمعايير البحث. يمكنك مسح الفلاتر لإظهار جميع البيانات.
+            </Alert>
+          ) : (
+            <Grid container spacing={3}>
+              {filteredReports.map((report) => (
+                <Grid item xs={12} sm={6} md={4} key={report.id}>
                 <Card
                   sx={{
                     height: '100%',
@@ -293,20 +377,20 @@ export default function FaultReportsPage() {
                 >
                   <CardContent>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                      <WarningIcon sx={{ fontSize: 40, color: severityColors[report.severity] }} />
+                      <WarningIcon sx={{ fontSize: 40, color: severityColors[normalizeEnumValue(report.severity)] }} />
                       <Box sx={{ display: 'flex', gap: 1 }}>
                         <Chip
-                          label={report.severity}
+                          label={formatEnumLabel(report.severity)}
                           sx={{
-                            backgroundColor: severityColors[report.severity],
+                            backgroundColor: severityColors[normalizeEnumValue(report.severity)],
                             color: 'white',
                             fontSize: '0.75rem',
                           }}
                         />
                         <Chip
-                          label={report.status.replace('_', ' ')}
+                          label={formatEnumLabel(report.status)}
                           sx={{
-                            backgroundColor: statusColors[report.status],
+                            backgroundColor: statusColors[normalizeEnumValue(report.status)],
                             color: 'white',
                             fontSize: '0.75rem',
                           }}
@@ -314,7 +398,7 @@ export default function FaultReportsPage() {
                       </Box>
                     </Box>
                     <Typography variant="h6" component="div" gutterBottom noWrap>
-                      {report.device_name || `Device #${report.device_id}`}
+                      {report.device_name || deviceById.get(report.device_id)?.name || `Device #${report.device_id}`}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" gutterBottom noWrap>
                       {report.error_message}
@@ -337,7 +421,7 @@ export default function FaultReportsPage() {
                     <Button size="small" onClick={() => handleOpenDialog(report)} startIcon={<EditIcon />}>
                       تعديل / Edit
                     </Button>
-                    {report.status === 'OPEN' && (
+                    {normalizeEnumValue(report.status) === 'open' && (
                       <Button size="small" color="success" onClick={() => handleResolve(report.id)} startIcon={<CheckCircleIcon />}>
                         حل / Resolve
                       </Button>
@@ -347,10 +431,10 @@ export default function FaultReportsPage() {
                     </Button>
                   </CardActions>
                 </Card>
-              </Grid>
-            ))}
-          </Grid>
-        )}
+                </Grid>
+              ))}
+            </Grid>
+          )}
 
         <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="md" fullWidth>
           <DialogTitle>
@@ -439,7 +523,7 @@ export default function FaultReportsPage() {
                     <Chip
                       label={aiAnalysis.severity}
                       sx={{
-                        backgroundColor: severityColors[aiAnalysis.severity],
+                        backgroundColor: severityColors[normalizeEnumValue(aiAnalysis.severity)],
                         color: 'white',
                       }}
                     />
