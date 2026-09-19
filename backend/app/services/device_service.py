@@ -50,6 +50,10 @@ class DeviceService:
     
     def update_device(self, device_id: int, device_data: DeviceUpdate) -> Optional[Device]:
         """Update device"""
+        if device_data.serial_number:
+            existing = self.repository.get_by_serial_number(device_data.serial_number)
+            if existing and existing.id != device_id:
+                raise ValueError("Serial number already exists")
         return self.repository.update(device_id, device_data)
     
     def delete_device(self, device_id: int) -> bool:

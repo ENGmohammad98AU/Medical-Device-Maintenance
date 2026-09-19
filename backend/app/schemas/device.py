@@ -24,14 +24,20 @@ class DeviceBase(BaseModel):
 
 class DeviceCreate(DeviceBase):
     """Device creation schema"""
-    pass
+    status: DeviceStatus = DeviceStatus.OPERATIONAL
 
 
 class DeviceUpdate(BaseModel):
     """Device update schema"""
     name: Optional[str] = Field(None, min_length=2, max_length=100)
+    type: Optional[DeviceType] = None
+    manufacturer: Optional[str] = Field(None, min_length=2, max_length=100)
+    model: Optional[str] = Field(None, min_length=1, max_length=50)
+    serial_number: Optional[str] = Field(None, min_length=1, max_length=50)
+    department: Optional[str] = Field(None, min_length=2, max_length=50)
     status: Optional[DeviceStatus] = None
     location: Optional[str] = None
+    purchase_date: Optional[datetime] = None
     warranty_expiry: Optional[datetime] = None
     notes: Optional[str] = None
 

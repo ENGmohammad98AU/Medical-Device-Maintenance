@@ -52,23 +52,24 @@ interface Device {
 }
 
 const deviceTypes = [
-  'VENTILATOR',
-  'PATIENT_MONITOR',
-  'SYRINGE_PUMP',
-  'INFUSION_PUMP',
-  'DEFIBRILLATOR',
-  'ECG_MACHINE',
-  'ULTRASOUND',
-  'XRAY_MACHINE',
-  'MRI_MACHINE',
-  'CT_SCANNER',
+  'ventilator',
+  'patient_monitor',
+  'syringe_pump',
+  'infusion_pump',
+  'defibrillator',
+  'ecg_machine',
+  'ultrasound',
+  'xray_machine',
+  'mri_machine',
+  'ct_scanner',
 ];
 
 const deviceStatuses = [
-  'OPERATIONAL',
-  'MAINTENANCE_REQUIRED',
-  'OUT_OF_SERVICE',
-  'RETIRED',
+  'operational',
+  'maintenance_required',
+  'under_maintenance',
+  'out_of_service',
+  'retired',
 ];
 
 const departments = [
@@ -83,17 +84,32 @@ const departments = [
 ];
 
 const statusColors: Record<string, string> = {
-  OPERATIONAL: '#4caf50',
-  MAINTENANCE_REQUIRED: '#ff9800',
-  OUT_OF_SERVICE: '#f44336',
-  RETIRED: '#9e9e9e',
+  operational: '#4caf50',
+  maintenance_required: '#ff9800',
+  under_maintenance: '#2196f3',
+  out_of_service: '#f44336',
+  retired: '#9e9e9e',
 };
 
 const statusIcons: Record<string, React.ReactElement> = {
-  OPERATIONAL: <CheckCircleIcon />,
-  MAINTENANCE_REQUIRED: <BuildIcon />,
-  OUT_OF_SERVICE: <WarningIcon />,
-  RETIRED: <DeleteIcon />,
+  operational: <CheckCircleIcon />,
+  maintenance_required: <BuildIcon />,
+  under_maintenance: <BuildIcon />,
+  out_of_service: <WarningIcon />,
+  retired: <DeleteIcon />,
+};
+
+const formatEnumLabel = (value: string) => value.replace(/_/g, ' ').toUpperCase();
+
+const getApiErrorMessage = (error: any) => {
+  const detail = error?.response?.data?.detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item) => `${item.loc?.slice(1).join('.') || 'field'}: ${item.msg}`)
+      .join('، ');
+  }
+  if (typeof detail === 'string') return detail;
+  return 'تعذر حفظ الجهاز. تحقق من البيانات وحاول مجدداً / Failed to save device';
 };
 
 export default function DevicesPage() {
@@ -108,12 +124,12 @@ export default function DevicesPage() {
   const [editingDevice, setEditingDevice] = useState<Device | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    type: 'PATIENT_MONITOR',
+    type: 'patient_monitor',
     manufacturer: '',
     model: '',
     serial_number: '',
     department: 'ICU',
-    status: 'OPERATIONAL',
+    status: 'operational',
     location: '',
     purchase_date: '',
     warranty_expiry: '',
@@ -161,12 +177,12 @@ export default function DevicesPage() {
       setEditingDevice(null);
       setFormData({
         name: '',
-        type: 'PATIENT_MONITOR',
+        type: 'patient_monitor',
         manufacturer: '',
         model: '',
         serial_number: '',
         department: 'ICU',
-        status: 'OPERATIONAL',
+        status: 'operational',
         location: '',
         purchase_date: '',
         warranty_expiry: '',
@@ -183,16 +199,24 @@ export default function DevicesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+    const payload = {
+      ...formData,
+      location: formData.location.trim() || null,
+      purchase_date: formData.purchase_date || null,
+      warranty_expiry: formData.warranty_expiry || null,
+      notes: formData.notes.trim() || null,
+    };
     try {
       if (editingDevice) {
-        await api.put(`/api/devices/${editingDevice.id}`, formData);
+        await api.put(`/api/devices/${editingDevice.id}`, payload);
       } else {
-        await api.post('/api/devices/', formData);
+        await api.post('/api/devices/', payload);
       }
       handleCloseDialog();
-      fetchDevices();
+      await fetchDevices();
     } catch (err: any) {
-      setError('Failed to save device');
+      setError(getApiErrorMessage(err));
     }
   };
 
@@ -268,7 +292,7 @@ export default function DevicesPage() {
                         <MedicalServicesIcon sx={{ fontSize: 40, color: '#e53935' }} />
                         <Chip
                           icon={statusIcons[device.status]}
-                          label={device.status.replace('_', ' ')}
+                          label={formatEnumLabel(device.status)}
                           sx={{
                             backgroundColor: statusColors[device.status],
                             color: 'white',
@@ -369,7 +393,7 @@ export default function DevicesPage() {
                   >
                     {deviceTypes.map((type) => (
                       <MenuItem key={type} value={type}>
-                        {type.replace('_', ' ')}
+                        {formatEnumLabel(type)}
                       </MenuItem>
                     ))}
                   </TextField>
@@ -433,7 +457,7 @@ export default function DevicesPage() {
                   >
                     {deviceStatuses.map((status) => (
                       <MenuItem key={status} value={status}>
-                        {status.replace('_', ' ')}
+                        {formatEnumLabel(status)}
                       </MenuItem>
                     ))}
                   </TextField>
