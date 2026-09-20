@@ -23,6 +23,11 @@ services:
       DEBUG: "true"
       ENVIRONMENT: development
       FRONTEND_URL: http://localhost:5173
+      AI_MODE: ${AI_MODE:-reference}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4.1-mini-2025-04-14}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-30}
+      MAX_TOKENS: ${MAX_TOKENS:-1000}
     ports:
       - "8000:8000"
     depends_on:

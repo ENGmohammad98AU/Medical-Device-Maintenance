@@ -3,6 +3,7 @@ Application Configuration
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, SecretStr
 from typing import Optional
 import os
 
@@ -31,12 +32,13 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
     # AI Configuration
-    AI_MODE: str = "demo"  # demo, ollama, openai
-    OPENAI_API_KEY: Optional[str] = None
+    AI_MODE: str = "reference"  # reference (demo is a legacy alias), openai
+    OPENAI_API_KEY: Optional[SecretStr] = None
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    LLM_MODEL: str = "gpt-4"
+    LLM_MODEL: str = "gpt-4.1-mini-2025-04-14"
+    LLM_TIMEOUT_SECONDS: float = Field(default=30.0, gt=0, le=60)
     TEMPERATURE: float = 0.7
-    MAX_TOKENS: int = 1000
+    MAX_TOKENS: int = Field(default=1000, ge=128, le=4096)
     
     # RAG Configuration
     CHROMA_PERSIST_DIR: str = "./embeddings"

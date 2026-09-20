@@ -23,7 +23,11 @@ services:
       - key: SEED_DEMO_DATA
         value: "true"
       - key: AI_MODE
-        value: demo
+        value: reference
+      - key: LLM_MODEL
+        value: gpt-4.1-mini-2025-04-14
+      - key: LLM_TIMEOUT_SECONDS
+        value: "30"
       - key: BOOTSTRAP_ADMIN_USERNAME
         sync: false
       - key: BOOTSTRAP_ADMIN_PASSWORD
