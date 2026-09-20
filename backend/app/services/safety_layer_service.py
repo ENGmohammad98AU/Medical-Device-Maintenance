@@ -289,9 +289,11 @@ class SafetyLayerService:
         
         if hasattr(classification, 'requires_specialist') and classification.requires_specialist:
             escalation_required = True
-            escalation_level = "SPECIALIST"
+            if escalation_level != "EMERGENCY":
+                escalation_level = "SPECIALIST"
             required_actions.append("Specialist consultation required")
-            mandatory_procedures.append("Schedule specialist review within 24 hours")
+            if escalation_level != "EMERGENCY":
+                mandatory_procedures.append("Schedule specialist review within 24 hours")
             mandatory_procedures.append("Document specialist findings")
         
         # High-risk mandatory procedures
@@ -319,7 +321,7 @@ class SafetyLayerService:
         Returns:
             Filtered content with clinical advice removed or flagged
         """
-        if user_role in ['DOCTOR', 'NURSE']:
+        if user_role.upper() in ['DOCTOR', 'NURSE']:
             return content  # Clinical staff can see all content
         
         content_lower = content.lower()

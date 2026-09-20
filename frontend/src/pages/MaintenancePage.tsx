@@ -8,9 +8,10 @@ import {
 import { ArrowBack as ArrowBackIcon, CheckCircle as CheckCircleIcon, Psychology as PsychologyIcon, Security as SecurityIcon } from '@mui/icons-material';
 import { useAuth } from '../hooks/useAuth';
 import api from '../services/auth';
+import LLMTriageSummary, { TriageMetadata } from '../components/LLMTriageSummary';
 
 interface Device { id: number; name: string; type: string; manufacturer: string; model: string; serial_number: string; department: string; location?: string; }
-interface AnalysisResult {
+interface AnalysisResult extends TriageMetadata {
   audit_log_id: string; severity: string; fault_level: string; is_emergency: boolean; safety_impact: string;
   extracted_entities: Record<string, Array<{ value: string }>>; rag_response: string; rag_sources: string[];
   rag_confidence: number; warning_message?: string; escalation_required: boolean; recommended_action: string;
@@ -73,11 +74,12 @@ export default function MaintenancePage() {
         device_location: selectedDevice.location || selectedDevice.department,
         patient_connected: patientConnected,
       };
-      if (import.meta.env.DEV) console.debug('maintenance analysis request', requestData);
-      const response = await api.post('/api/intelligent-support/analyze-fault', requestData);
+      const response = await api.post('/api/intelligent-support/analyze-fault', requestData, { timeout: 90000 });
       setAnalysis(response.data); setActiveStep(1);
-      if (import.meta.env.DEV) console.debug('maintenance analysis response', response.data);
-    } catch (err: any) { setError(err.response?.data?.detail || 'تعذر تحليل البلاغ'); }
+    } catch (err: any) {
+      const detail = err.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : 'تعذر تحليل البلاغ. تحقق من الوصف وأعد المحاولة.');
+    }
     finally { setBusy(false); }
   };
 
@@ -110,7 +112,7 @@ export default function MaintenancePage() {
       <Typography color="text.secondary" sx={{ mb: 3 }}>تُستخدم البيانات للتحقق من السلامة وتحديد مسار الإحالة المناسب.</Typography>
       <Grid container spacing={2}>
         <Grid item xs={12}><TextField fullWidth select label="الجهاز" value={deviceId} onChange={(event) => setDeviceId(Number(event.target.value))} required>{devices.map((device) => <MenuItem key={device.id} value={device.id}>{device.name} | {device.model} | {device.serial_number}</MenuItem>)}</TextField></Grid>
-        <Grid item xs={12}><TextField fullWidth multiline minRows={3} label="وصف العطل" value={description} onChange={(event) => setDescription(event.target.value)} required /></Grid>
+        <Grid item xs={12}><TextField fullWidth multiline minRows={3} label="وصف العطل" value={description} onChange={(event) => setDescription(event.target.value)} inputProps={{ maxLength: 4000 }} helperText="أدخل وصفًا فنيًا دون أسماء المرضى أو أرقام ملفاتهم أو بيانات الاتصال." required /></Grid>
         <Grid item xs={12} md={6}><TextField fullWidth select label="خبرة مقدم البلاغ" value={expertise} onChange={(event) => setExpertise(event.target.value)}><MenuItem value="NOVICE">أساسية</MenuItem><MenuItem value="INTERMEDIATE">متوسطة</MenuItem><MenuItem value="ADVANCED">متقدمة</MenuItem><MenuItem value="EXPERT">خبير</MenuItem></TextField></Grid>
         <Grid item xs={12}><FormControlLabel control={<Switch checked={patientConnected} onChange={(event) => setPatientConnected(event.target.checked)} />} label="المريض متصل بالجهاز حاليًا" /></Grid>
       </Grid>
@@ -119,20 +121,20 @@ export default function MaintenancePage() {
 
     {analysis && !analysis.reference_found && <Card><CardContent>
       <Alert severity="info">لا توجد حالياً معلومات مرجعية كافية لتشخيص هذا العطل. يرجى إضافة المرجع الفني الخاص بالجهاز.</Alert>
-      <Button onClick={reset} sx={{ mt: 2 }}>بلاغ جديد</Button>
     </CardContent></Card>}
 
-    {analysis && analysis.reference_found && <>
+    {analysis && <>
       <Grid container spacing={3}>
         <Grid item xs={12} md={5}><Card><CardContent>
           <Typography variant="h6" gutterBottom><SecurityIcon sx={{ verticalAlign: 'middle', mr: 1 }} />نتيجة التحقق والتصنيف</Typography>
+          <LLMTriageSummary result={analysis} />
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}><Chip label={`الخطورة: ${analysis.severity}`} color={analysis.is_emergency ? 'error' : 'warning'} /><Chip label={`المستوى: ${analysis.fault_level}`} /><Chip label={analysis.escalation_required ? 'يتطلب إحالة' : 'دعم اعتيادي'} color={analysis.escalation_required ? 'error' : 'success'} /></Box>
           <Typography variant="body2" sx={{ mb: 1 }}><strong>الأثر على السلامة:</strong> {analysis.safety_impact}</Typography><Typography variant="body2"><strong>الإجراء المقترح:</strong> {analysis.recommended_action}</Typography>
           {analysis.warning_message && <Alert severity="warning" sx={{ mt: 2 }}>{analysis.warning_message}</Alert>}
           <Typography variant="subtitle2" sx={{ mt: 3 }}>الكيانات الفنية المستخرجة</Typography>
           {Object.entries(analysis.extracted_entities).filter(([key]) => key !== 'confidence_scores').map(([key, values]) => <Typography variant="body2" key={key}>{key}: {values.map((value) => value.value).join('، ') || 'غير محدد'}</Typography>)}
         </CardContent></Card></Grid>
-        <Grid item xs={12} md={7}><Card><CardContent>
+        {analysis.reference_found && <Grid item xs={12} md={7}><Card><CardContent>
           <Typography variant="h6" gutterBottom>الإجابة الفنية ومصادرها</Typography>
           {analysis.matched_fault && <Alert severity="success" sx={{ mb: 2 }}><strong>العطل المرجعي المطابق:</strong> {analysis.matched_fault}</Alert>}
           {analysis.meaning && <Typography sx={{ whiteSpace: 'pre-line' }}><strong>المعنى:</strong> {analysis.meaning}</Typography>}
@@ -154,8 +156,8 @@ export default function MaintenancePage() {
           {analysis.source && <Typography variant="body2">• {analysis.source}{analysis.reference_page ? ` — الصفحة ${analysis.reference_page}` : ''}</Typography>}
           {analysis.rag_sources.filter((source) => !analysis.source || !source.includes(analysis.source)).map((source) => <Typography variant="body2" key={source}>• {source}</Typography>)}
           {analysis.reference_url && <Button component="a" href={analysis.reference_url} target="_blank" rel="noopener noreferrer" size="small" sx={{ mt: 1 }}>فتح المرجع الأصلي</Button>}
-          <Box><Typography variant="caption" color="text.secondary">ثقة المطابقة: {Math.round((analysis.match_confidence || analysis.rag_confidence) * 100)}% | الحالة: {analysis.match_status}</Typography></Box>
-        </CardContent></Card></Grid>
+          <Box><Typography variant="caption" color="text.secondary">درجة المطابقة النصية: {Math.round((analysis.match_confidence || analysis.rag_confidence) * 100)}% | الحالة: {analysis.match_status} — لا تمثل دقة النموذج اللغوي.</Typography></Box>
+        </CardContent></Card></Grid>}
       </Grid>
       <Card sx={{ mt: 3 }}><CardContent><Typography variant="h6" gutterBottom>3. مراجعة المختص وحفظ القرار</Typography>
         <Grid container spacing={2}><Grid item xs={12} md={5}><TextField fullWidth select label="قرار المختص" value={decision} onChange={(event) => setDecision(event.target.value)}><MenuItem value="APPROVED">اعتماد التوصية</MenuItem><MenuItem value="MODIFIED">اعتماد بعد التعديل</MenuItem><MenuItem value="ESCALATED">إحالة لمختص</MenuItem><MenuItem value="REJECTED">رفض التوصية</MenuItem></TextField></Grid><Grid item xs={12} md={7}><TextField fullWidth label="ملاحظات القرار" value={comments} onChange={(event) => setComments(event.target.value)} /></Grid></Grid>

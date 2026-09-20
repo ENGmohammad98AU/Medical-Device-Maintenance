@@ -30,6 +30,7 @@ from app.services.duplicate_detection_service import DuplicateDetectionService
 from app.services.audit_trail_service import AuditTrailService
 from app.services.evaluation_service import EvaluationService
 from app.services.fault_reference_lookup_service import FaultReferenceLookupService
+from app.services.llm_triage_service import LLMTriageService, LLMRun, apply_triage, redact_report
 
 
 router = APIRouter(prefix="/api/intelligent-support", tags=["Intelligent Support"])
@@ -42,6 +43,7 @@ knowledge_service = KnowledgeBaseService()
 safety_service = SafetyLayerService()
 data_cleaning_service = DataCleaningService()
 rag_service = RAGService()
+llm_service = LLMTriageService()
 
 
 class FaultAnalysisRequest(BaseModel):
@@ -50,11 +52,16 @@ class FaultAnalysisRequest(BaseModel):
     device_name: Optional[str] = Field(None, description="Displayed device name")
     manufacturer: Optional[str] = Field(None, description="Displayed manufacturer")
     model: Optional[str] = Field(None, description="Displayed device model")
-    fault: str = Field(default="", description="Fault or error code")
-    description: str = Field(..., description="Fault description")
+    fault: str = Field(default="", max_length=200, description="Fault or error code")
+    description: str = Field(..., min_length=10, max_length=4000, description="Technical fault description without patient identifiers")
     customer_expertise: str = Field(default="INTERMEDIATE", description="Customer expertise level")
     device_location: Optional[str] = Field(None, description="Location of device")
     patient_connected: bool = Field(default=False, description="Whether patient is connected")
+
+    @field_validator("description", mode="before")
+    @classmethod
+    def strip_description(cls, value):
+        return value.strip() if isinstance(value, str) else value
 
     @field_validator("customer_expertise")
     @classmethod
@@ -140,6 +147,12 @@ class FaultAnalysisResponse(BaseModel):
     confidence_score: float
     sources: List[str]
     audit_log_id: str
+    classification_source: str = "RULES"
+    fault_category: Optional[str] = None
+    routing_target: str = "BIOMEDICAL_ENGINEERING"
+    routing_is_proposal: bool = True
+    safety_guards: List[str] = Field(default_factory=list)
+    llm: LLMRun = Field(default_factory=lambda: LLMRun(status="disabled"))
 
 
 FAULT_INDICATORS = {
@@ -191,11 +204,11 @@ def analyze_fault(
     fault_text = (request.fault or "").strip()
     description_text = (request.description or "").strip()
     if not description_text:
-        logger.info("maintenance_validation device_id=%s model=%s fault=%r description=%r validation=invalid final_response=validation_error", request.device_id, request.model, fault_text, description_text)
+        logger.info("maintenance_validation device_id=%s validation=invalid", request.device_id)
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="يرجى إدخال وصف العطل")
 
     if fault_text and not _is_meaningful_fault(fault_text):
-        logger.info("maintenance_validation device_id=%s model=%s fault=%r description=%r validation=invalid final_response=validation_error", request.device_id, request.model, fault_text, description_text)
+        logger.info("maintenance_validation device_id=%s validation=invalid", request.device_id)
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="يرجى إدخال العطل")
 
     device = db.query(Device).filter(Device.id == request.device_id).first()
@@ -208,7 +221,7 @@ def analyze_fault(
     model = device.model
     description = request.description.strip()
     fault = fault_text
-    logger.info("maintenance_validation device_id=%s model=%s fault=%r description=%r validation=valid", device.id, model, fault, description)
+    logger.info("maintenance_validation device_id=%s validation=valid", device.id)
 
     # Step 0: Look up the imported fault-reference workbook data in the project SQLite
     # fallback/local database rather than relying on demo or hard-coded sample text.
@@ -228,7 +241,7 @@ def analyze_fault(
         
         # Step 0: Clean data
         full_text = f"{device_name} {fault} {description} {model} {manufacturer}"
-        cleaned_data = data_cleaning_service.clean_data(full_text)
+        cleaned_data = data_cleaning_service.clean_data(redact_report(full_text))
         
         # Step 0.5: Check for duplicates
         report_data = {
@@ -241,12 +254,24 @@ def analyze_fault(
         duplicate_check = duplicate_detection_service.check_duplicate(report_data)
         
         # Step 1: Classify the fault
-        classification = classification_service.classify_fault(
+        rule_classification = classification_service.classify_fault(
             device_type=device_type,
             error_message=f"{fault} {description}",
             customer_expertise=request.customer_expertise,
             device_location=request.device_location,
             patient_connected=request.patient_connected
+        )
+
+        # The external model receives a minimal, redacted technical report, never
+        # user identity, device serial number, location, or database credentials.
+        llm_run = llm_service.classify(
+            report_text=f"{fault} {description}".strip(), device_type=device_type,
+            manufacturer=manufacturer, model=model,
+            patient_connected=request.patient_connected, reference=reference_lookup,
+        )
+        classification, classification_source, routing_target, safety_guards = apply_triage(
+            rule_classification, llm_run,
+            reference_lookup.get("severity") if reference_lookup.get("matched") else None,
         )
         
         # Step 2: Extract entities using NLP
@@ -322,6 +347,11 @@ def analyze_fault(
         elif not rag_reference_found:
             rag_result['response'] = NO_REFERENCE_MESSAGE
 
+        # LLM outcomes, refusals and outages all remain reviewable, even without
+        # a matching manual. No model output populates technical repair fields.
+        if llm_run.status != "disabled":
+            rag_result['requires_review'] = True
+
         logger.info(
             "maintenance_reference device_id=%s model=%s db_reference_found=%s rag_reference_found=%s "
             "reference_found=%s sources=%s final_response_type=%s",
@@ -359,7 +389,7 @@ def analyze_fault(
             user_id=str(current_user.id),
             user_role=current_user.role.value,
             action="FAULT_ANALYSIS",
-            original_input=full_text,
+            original_input=redact_report(full_text),
             cleaned_input=cleaned_data.cleaned_text,
             extracted_entities=extracted_entities,
             classification_result={
@@ -367,7 +397,19 @@ def analyze_fault(
                 'importance': classification.importance.value,
                 'fault_level': classification.fault_level.value,
                 'is_emergency': classification.is_emergency,
-                'requires_specialist': classification.requires_specialist
+                'requires_specialist': classification.requires_specialist,
+                'classification_source': classification_source,
+                'routing_target': routing_target,
+                'routing_is_proposal': True,
+                'safety_guards': safety_guards,
+                'rule_baseline': {
+                    'severity': rule_classification.severity.value,
+                    'importance': rule_classification.importance.value,
+                    'fault_level': rule_classification.fault_level.value,
+                    'is_emergency': rule_classification.is_emergency,
+                    'requires_specialist': rule_classification.requires_specialist,
+                },
+                'llm': llm_run.model_dump(),
             },
             retrieved_chunks=rag_result['retrieved_context'],
             retrieval_scores=[],
@@ -413,7 +455,7 @@ def analyze_fault(
 
             # Data cleaning results
             cleaned_text=cleaned_data.cleaned_text,
-            removed_patient_data=cleaned_data.removed_patient_data,
+            removed_patient_data=["[REDACTED]"] if cleaned_data.removed_patient_data or "[REDACTED]" in cleaned_data.cleaned_text else [],
             detected_language=cleaned_data.detected_language,
 
             # Duplicate detection
@@ -422,7 +464,7 @@ def analyze_fault(
             duplicate_similarity_score=duplicate_check.similarity_score if duplicate_check else None,
 
             # Classification results
-            severity=(reference_lookup.get("severity") if db_reference_found else classification.severity.value) or classification.severity.value,
+            severity=classification.severity.value,
             importance=classification.importance.value,
             fault_level=classification.fault_level.value,
             is_emergency=classification.is_emergency,
@@ -465,13 +507,21 @@ def analyze_fault(
             # Metadata
             confidence_score=avg_confidence,
             sources=sources,
-            audit_log_id=audit_entry.id
+            audit_log_id=audit_entry.id,
+            classification_source=classification_source,
+            fault_category=llm_run.decision.fault_category if llm_run.decision else None,
+            routing_target=routing_target,
+            safety_guards=safety_guards,
+            llm=llm_run,
         )
         
-    except Exception as e:
+    except HTTPException:
+        raise
+    except Exception:
+        logger.error("Fault analysis failed for device_id=%s", device.id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Fault analysis failed: {str(e)}"
+            detail="Fault analysis failed. Please try again or contact support."
         )
 
 
