@@ -84,5 +84,10 @@
     }
   ],
   "model_file_bytes": 919096585,
-  "model_file_sha256": "d43d836fc5e240df9013733ccd214972c5d21bd9ec47e574e4f1e359cf90aed0"
+  "model_file_sha256": "d43d836fc5e240df9013733ccd214972c5d21bd9ec47e574e4f1e359cf90aed0",
+  "wasm_session_options": {
+    "graphOptimizationLevel": "disabled",
+    "enableCpuMemArena": false,
+    "enableMemPattern": false
+  }
 }

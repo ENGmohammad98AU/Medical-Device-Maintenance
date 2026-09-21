@@ -11,7 +11,8 @@
     "test": "vitest",
     "prebuild": "node scripts/prepare-onnx.mjs",
     "predev": "node scripts/prepare-onnx.mjs",
-    "smoke:llm": "vite-node scripts/smoke-local-llm.ts"
+    "smoke:llm": "vite-node scripts/smoke-local-llm.ts",
+    "smoke:llm:wasm": "vite-node scripts/smoke-wasm-llm.ts"
   },
   "dependencies": {
     "@emotion/react": "^11.13.3",
