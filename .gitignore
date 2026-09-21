@@ -51,6 +51,8 @@ logs/
 
 # Node
 node_modules/
+frontend/public/onnx/
+.cache/
 dist/
 .npm/
 .eslintcache

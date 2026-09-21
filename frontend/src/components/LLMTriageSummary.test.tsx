@@ -3,6 +3,15 @@ import { describe, expect, it } from 'vitest';
 import LLMTriageSummary from './LLMTriageSummary';
 
 describe('LLM classification provenance', () => {
+  it('distinguishes local category inference from server severity', () => {
+    const html = renderToStaticMarkup(<LLMTriageSummary result={{
+      classification_source: 'BROWSER_LLM_CATEGORY_WITH_RULE_GUARDS', fault_category: 'POWER',
+      llm: {status: 'success', provider: 'browser-local', model: 'Qwen3', client_reported: true},
+    }} />);
+    expect(html).toContain('الخطورة: قواعد الخادم');
+    expect(html).toContain('الطاقة والبطارية');
+    expect(html).toContain('نتيجة أرسلها المتصفح');
+  });
   it('shows a genuine LLM result and proposed review destination', () => {
     const html = renderToStaticMarkup(<LLMTriageSummary result={{
       classification_source: 'LLM_WITH_RULE_GUARDS', routing_target: 'MANUFACTURER_SUPPORT',

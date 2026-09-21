@@ -1,0 +1,5 @@
+[
+  {"name": "بطارية — عربي", "report_text": "بطارية الجهاز لا تشحن ويتوقف الجهاز عند فصل الكهرباء.", "device_type": "VENTILATOR", "patient_connected": false, "expected": "POWER"},
+  {"name": "برمجيات — إنجليزي", "report_text": "The display is frozen and the software is not responding.", "device_type": "PATIENT_MONITOR", "patient_connected": false, "expected": "SOFTWARE"},
+  {"name": "نص غير فني — عربي", "report_text": "مرحبا كيف حالك اليوم أريد الحديث عن الطقس.", "device_type": "VENTILATOR", "patient_connected": false, "expected": "UNKNOWN"}
+]
