@@ -17,6 +17,9 @@ self.addEventListener('message', async (event: MessageEvent<{id: number; input: 
     self.postMessage({id, progress: {stage: 'loading'}});
     generator ??= pipeline<'text-generation'>('text-generation', config.model, {
       dtype: 'q4', device: 'wasm', revision: config.revision,
+      // The default graph optimizations abort for this pinned q4 model on WASM.
+      // Avoid optimizer/prepacking copies and arena growth in the browser.
+      session_options: {graphOptimizationLevel: 'disabled', enableCpuMemArena: false, enableMemPattern: false},
       progress_callback: (event) => {
         if (event.status === 'progress' && event.file.endsWith('.onnx')) {
           self.postMessage({id, progress: {stage: 'loading', percent: Math.min(100, event.progress)}});
