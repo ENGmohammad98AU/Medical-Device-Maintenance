@@ -31,6 +31,7 @@ from app.services.audit_trail_service import AuditTrailService
 from app.services.evaluation_service import EvaluationService
 from app.services.fault_reference_lookup_service import FaultReferenceLookupService
 from app.services.llm_triage_service import LLMTriageService, LLMRun, apply_triage, redact_report
+from app.services.browser_llm_service import BrowserLLMResult, browser_run
 
 
 router = APIRouter(prefix="/api/intelligent-support", tags=["Intelligent Support"])
@@ -57,6 +58,7 @@ class FaultAnalysisRequest(BaseModel):
     customer_expertise: str = Field(default="INTERMEDIATE", description="Customer expertise level")
     device_location: Optional[str] = Field(None, description="Location of device")
     patient_connected: bool = Field(default=False, description="Whether patient is connected")
+    browser_llm: Optional[BrowserLLMResult] = None
 
     @field_validator("description", mode="before")
     @classmethod
@@ -264,11 +266,18 @@ def analyze_fault(
 
         # The external model receives a minimal, redacted technical report, never
         # user identity, device serial number, location, or database credentials.
-        llm_run = llm_service.classify(
-            report_text=f"{fault} {description}".strip(), device_type=device_type,
-            manufacturer=manufacturer, model=model,
-            patient_connected=request.patient_connected, reference=reference_lookup,
-        )
+        if request.browser_llm is not None:
+            # Local success, failure and disablement never fall back to a cloud API.
+            llm_run = browser_run(
+                request.browser_llm, report_text=f"{fault} {description}".strip(),
+                device_type=device_type, patient_connected=request.patient_connected,
+            )
+        else:
+            llm_run = llm_service.classify(
+                report_text=f"{fault} {description}".strip(), device_type=device_type,
+                manufacturer=manufacturer, model=model,
+                patient_connected=request.patient_connected, reference=reference_lookup,
+            )
         classification, classification_source, routing_target, safety_guards = apply_triage(
             rule_classification, llm_run,
             reference_lookup.get("severity") if reference_lookup.get("matched") else None,
@@ -509,7 +518,7 @@ def analyze_fault(
             sources=sources,
             audit_log_id=audit_entry.id,
             classification_source=classification_source,
-            fault_category=llm_run.decision.fault_category if llm_run.decision else None,
+            fault_category=llm_run.browser_category or (llm_run.decision.fault_category if llm_run.decision else None),
             routing_target=routing_target,
             safety_guards=safety_guards,
             llm=llm_run,

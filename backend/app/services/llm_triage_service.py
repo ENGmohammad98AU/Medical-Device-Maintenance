@@ -79,6 +79,12 @@ class LLMRun(BaseModel):
     usage: Dict[str, int] = Field(default_factory=dict)
     error_code: Optional[str] = None
     decision: Optional[LLMDecision] = None
+    client_reported: bool = False
+    model_revision: Optional[str] = None
+    runtime: Optional[str] = None
+    quantization: Optional[str] = None
+    output_token: Optional[str] = None
+    browser_category: Optional[Literal["POWER", "SENSOR", "CIRCUIT", "MECHANICAL", "SOFTWARE", "ALARM", "OTHER", "UNKNOWN"]] = None
 
 
 def redact_report(text: str) -> str:
@@ -108,6 +114,8 @@ class LLMTriageService:
         patient_connected: bool, reference: Dict[str, Any],
     ) -> LLMRun:
         mode = self.config.AI_MODE.strip().lower()
+        if mode == "browser":
+            return LLMRun(status="unavailable", provider="browser-local", error_code="browser_result_required")
         if mode in {"reference", "demo"}:
             return LLMRun(status="disabled")
         if mode not in {"openai", "groq"}:
@@ -285,6 +293,13 @@ def apply_triage(
             guards.append("RULE_SAFETY_FLOOR")
     elif decision:
         route = "REQUEST_CLARIFICATION"
+    if run.status == "success" and run.client_reported and run.browser_category:
+        # The browser supplies only a category. Severity and priority stay under
+        # server rules/reference control. No client-generated safety values.
+        if run.browser_category == "UNKNOWN":
+            source, route = "REVIEW_REQUIRED", "REQUEST_CLARIFICATION"
+        else:
+            source, route = "BROWSER_LLM_CATEGORY_WITH_RULE_GUARDS", "BIOMEDICAL_ENGINEERING"
     if reference_severity in SeverityLevel._value2member_map_:
         ref_severity = SeverityLevel(reference_severity)
         if severities.index(ref_severity) > severities.index(severity):

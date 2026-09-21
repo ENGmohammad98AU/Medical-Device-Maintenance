@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
     # AI Configuration
-    AI_MODE: str = "reference"  # reference (demo is a legacy alias), groq, openai
+    AI_MODE: str = "browser"  # Browser LLM category + server rules; optional reference/groq/openai
     OPENAI_API_KEY: Optional[SecretStr] = None
     GROQ_API_KEY: Optional[SecretStr] = None
     GROQ_MODEL: str = "openai/gpt-oss-20b"

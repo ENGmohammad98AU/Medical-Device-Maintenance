@@ -156,6 +156,7 @@ export default function LoginPage() {
             <Typography variant="subtitle1" sx={{ color: '#334155', mt: 1 }}>
               نظام صيانة الأجهزة الطبية الذكي
             </Typography>
+            <Button onClick={() => navigate('/local-model')} sx={{mt: 2}}>تجربة النموذج المجاني دون تسجيل دخول</Button>
           </Box>
 
           <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>

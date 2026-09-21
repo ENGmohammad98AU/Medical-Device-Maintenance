@@ -8,6 +8,7 @@ import DevicesPage from './pages/DevicesPage'
 import FaultReportsPage from './pages/FaultReportsPage'
 import MaintenancePage from './pages/MaintenancePage'
 import StatisticsPage from './pages/StatisticsPage'
+import LocalModelPage from './pages/LocalModelPage'
 import './i18n'
 
 const theme = createTheme({
@@ -71,6 +72,7 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/local-model" element={<LocalModelPage />} />
             <Route path="/dashboard" element={<ProtectedRoute path="/dashboard"><DashboardPage /></ProtectedRoute>} />
             <Route path="/devices" element={<ProtectedRoute path="/devices"><DevicesPage /></ProtectedRoute>} />
             <Route path="/fault-reports" element={<ProtectedRoute path="/fault-reports"><FaultReportsPage /></ProtectedRoute>} />

@@ -23,7 +23,7 @@ services:
       - key: SEED_DEMO_DATA
         value: "true"
       - key: AI_MODE
-        value: reference
+        value: browser
       - key: LLM_MODEL
         value: gpt-4.1-mini-2025-04-14
       - key: GROQ_MODEL

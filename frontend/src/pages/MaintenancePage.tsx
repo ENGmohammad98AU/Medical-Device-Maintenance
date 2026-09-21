@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Alert, Box, Button, Card, CardContent, Chip, CircularProgress, Container,
@@ -9,6 +9,9 @@ import { ArrowBack as ArrowBackIcon, CheckCircle as CheckCircleIcon, Psychology 
 import { useAuth } from '../hooks/useAuth';
 import api from '../services/auth';
 import LLMTriageSummary, { TriageMetadata } from '../components/LLMTriageSummary';
+import { useLocalModel } from '../hooks/useLocalModel';
+import { localModelConfig } from '../llm/localModelContract';
+import LocalModelProgress from '../components/LocalModelProgress';
 
 interface Device { id: number; name: string; type: string; manufacturer: string; model: string; serial_number: string; department: string; location?: string; }
 interface AnalysisResult extends TriageMetadata {
@@ -40,6 +43,10 @@ export default function MaintenancePage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [useLocal, setUseLocal] = useState(true);
+  const localModel = useLocalModel();
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
   useEffect(() => {
     if (!isAuthenticated) { navigate('/login'); return; }
@@ -74,7 +81,12 @@ export default function MaintenancePage() {
         device_location: selectedDevice.location || selectedDevice.department,
         patient_connected: patientConnected,
       };
-      const response = await api.post('/api/intelligent-support/analyze-fault', requestData, { timeout: 90000 });
+      const browser_llm = useLocal ? await localModel.run({
+        report_text: requestData.description, device_type: selectedDevice.type.toUpperCase().replace(/[- ]/g, '_'),
+        patient_connected: requestData.patient_connected,
+      }) : {status: 'disabled', revision: localModelConfig.revision, latency_ms: 0};
+      if (!mounted.current) return;
+      const response = await api.post('/api/intelligent-support/analyze-fault', {...requestData, browser_llm}, { timeout: 90000 });
       setAnalysis(response.data); setActiveStep(1);
     } catch (err: any) {
       const detail = err.response?.data?.detail;
@@ -110,12 +122,16 @@ export default function MaintenancePage() {
     {!analysis && <Card><CardContent>
       <Typography variant="h6" gutterBottom>1. إدخال البلاغ وبيانات الجهاز</Typography>
       <Typography color="text.secondary" sx={{ mb: 3 }}>تُستخدم البيانات للتحقق من السلامة وتحديد مسار الإحالة المناسب.</Typography>
+      <Alert severity="warning" sx={{mb: 2}}>في حالات الخطر الفوري، اتبع إجراءات المنشأة ولا تنتظر التحليل الآلي.</Alert>
       <Grid container spacing={2}>
-        <Grid item xs={12}><TextField fullWidth select label="الجهاز" value={deviceId} onChange={(event) => setDeviceId(Number(event.target.value))} required>{devices.map((device) => <MenuItem key={device.id} value={device.id}>{device.name} | {device.model} | {device.serial_number}</MenuItem>)}</TextField></Grid>
-        <Grid item xs={12}><TextField fullWidth multiline minRows={3} label="وصف العطل" value={description} onChange={(event) => setDescription(event.target.value)} inputProps={{ maxLength: 4000 }} helperText="أدخل وصفًا فنيًا دون أسماء المرضى أو أرقام ملفاتهم أو بيانات الاتصال." required /></Grid>
-        <Grid item xs={12} md={6}><TextField fullWidth select label="خبرة مقدم البلاغ" value={expertise} onChange={(event) => setExpertise(event.target.value)}><MenuItem value="NOVICE">أساسية</MenuItem><MenuItem value="INTERMEDIATE">متوسطة</MenuItem><MenuItem value="ADVANCED">متقدمة</MenuItem><MenuItem value="EXPERT">خبير</MenuItem></TextField></Grid>
-        <Grid item xs={12}><FormControlLabel control={<Switch checked={patientConnected} onChange={(event) => setPatientConnected(event.target.checked)} />} label="المريض متصل بالجهاز حاليًا" /></Grid>
+        <Grid item xs={12}><TextField fullWidth disabled={busy} select label="الجهاز" value={deviceId} onChange={(event) => setDeviceId(Number(event.target.value))} required>{devices.map((device) => <MenuItem key={device.id} value={device.id}>{device.name} | {device.model} | {device.serial_number}</MenuItem>)}</TextField></Grid>
+        <Grid item xs={12}><TextField fullWidth disabled={busy} multiline minRows={3} label="وصف العطل" value={description} onChange={(event) => setDescription(event.target.value)} inputProps={{ maxLength: 4000 }} helperText="أدخل وصفًا فنيًا دون أسماء المرضى أو أرقام ملفاتهم أو بيانات الاتصال." required /></Grid>
+        <Grid item xs={12} md={6}><TextField fullWidth disabled={busy} select label="خبرة مقدم البلاغ" value={expertise} onChange={(event) => setExpertise(event.target.value)}><MenuItem value="NOVICE">أساسية</MenuItem><MenuItem value="INTERMEDIATE">متوسطة</MenuItem><MenuItem value="ADVANCED">متقدمة</MenuItem><MenuItem value="EXPERT">خبير</MenuItem></TextField></Grid>
+        <Grid item xs={12}><FormControlLabel control={<Switch disabled={busy} checked={patientConnected} onChange={(event) => setPatientConnected(event.target.checked)} />} label="المريض متصل بالجهاز حاليًا" /></Grid>
       </Grid>
+      <FormControlLabel control={<Switch checked={useLocal} disabled={busy} onChange={(event) => setUseLocal(event.target.checked)} />} label="اقتراح فئة العطل بنموذج محلي مجاني" />
+      <Alert severity="info" sx={{mt: 2}}>لا يحتاج النموذج إلى حساب خارجي أو مفتاح API. التنزيل الأول نحو 950 ميغابايت، ثم يعمل على جهازك. تبقى الخطورة وإجراءات الصيانة خاضعة للقواعد والمراجع ومراجعة المختص.</Alert>
+      {localModel.progress && <LocalModelProgress progress={localModel.progress} cancel={localModel.cancel} cancelLabel="متابعة بالقواعد دون انتظار النموذج" />}
       <Button variant="contained" onClick={runAnalysis} disabled={busy} startIcon={busy ? <CircularProgress size={18} /> : <PsychologyIcon />} sx={{ mt: 3 }}>التحقق والتحليل</Button>
     </CardContent></Card>}
 
