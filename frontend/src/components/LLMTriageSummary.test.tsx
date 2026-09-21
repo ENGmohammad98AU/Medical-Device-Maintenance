@@ -24,4 +24,12 @@ describe('LLM classification provenance', () => {
     expect(html).toContain('يرجى توضيح الأعراض');
     expect(html).not.toContain('التصنيف: نموذج لغوي');
   });
+  it('explains quota exhaustion and labels the fallback as rules', () => {
+    const html = renderToStaticMarkup(<LLMTriageSummary result={{
+      classification_source: 'RULES', llm: { status: 'error', provider: 'groq', error_code: 'rate_limit' },
+    }} />);
+    expect(html).toContain('حد الاستخدام المتاح مؤقتًا');
+    expect(html).toContain('التصنيف: القواعد المرجعية');
+    expect(html).not.toContain('التصنيف: نموذج لغوي');
+  });
 });

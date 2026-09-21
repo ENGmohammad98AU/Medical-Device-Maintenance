@@ -1,7 +1,9 @@
-"""One real, billable provider call with synthetic device text only.
+"""One real provider call with synthetic device text only.
 
 From backend: python scripts/smoke_test_llm.py
-Requires AI_MODE=openai and OPENAI_API_KEY in backend/.env or the environment.
+Use AI_MODE=groq and GROQ_API_KEY for a Groq Free-plan account, or
+AI_MODE=openai and OPENAI_API_KEY for separately billed OpenAI usage.
+Provider account limits/billing apply; no automatic retries or provider fallback.
 """
 import json
 from pathlib import Path

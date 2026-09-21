@@ -76,7 +76,7 @@ backend/reference_data/medical_device_fault_reference.json
 - اكتشاف البلاغات المتكررة / Duplicate detection
 - سجل تدقيق للأحداث / Audit trail
 - إحصائيات وتقارير / Dashboard and statistics
-- تصنيف محلي بالقواعد أو تصنيف LLM عبر OpenAI في صفحة الصيانة، مع توجيه مقترح ومراجعة بشرية / Reference or OpenAI LLM triage
+- تصنيف محلي بالقواعد أو تصنيف LLM عبر Groq أو OpenAI في صفحة الصيانة، مع توجيه مقترح ومراجعة بشرية / Reference, Groq, or OpenAI LLM triage
 
 ---
 
@@ -273,6 +273,8 @@ SEED_DEMO_DATA
 SECRET_KEY
 AI_MODE
 OPENAI_API_KEY
+GROQ_API_KEY
+GROQ_MODEL
 OLLAMA_BASE_URL
 LLM_MODEL
 FRONTEND_URL
@@ -283,8 +285,11 @@ BACKEND_URL
 
 ### التصنيف والتوجيه بنموذج لغوي كبير
 
-تدعم صفحة الصيانة استدعاء LLM فعليًا عبر OpenAI Responses API عند ضبط
-`AI_MODE=openai` و`OPENAI_API_KEY` على الخادم. الوضع الافتراضي `reference`
+تدعم صفحة الصيانة نموذج `openai/gpt-oss-20b` عبر Groq عند ضبط
+`AI_MODE=groq` و`GROQ_API_KEY` على الخادم. تتوفر خطة Groq مجانية محدودة الحصة؛
+يجب إبقاء الحساب على Free دون ترقيته. عند بلوغ الحد يعود التطبيق إلى القواعد،
+ولا ينتقل تلقائيًا إلى مزوّد مدفوع. يدعم أيضًا OpenAI Responses API عبر
+`AI_MODE=openai` و`OPENAI_API_KEY` بفوترة مستقلة. الوضع الافتراضي `reference`
 يستخدم القواعد دون اتصال خارجي. يعيد النموذج تصنيف البلاغ وجهة مراجعة مقترحة،
 مع التحقق من المخرجات والحفاظ على أولوية الطوارئ؛ تبقى إجراءات الصيانة من المراجع.
 توضح الواجهة والسجل مصدر القرار وحالات الرجوع إلى القواعد.
