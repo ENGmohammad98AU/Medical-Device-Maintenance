@@ -16,8 +16,9 @@ export class LocalModelClient {
       this.armTimeout(15 * 60_000);
       try {
         this.worker ??= new Worker(new URL('./localModel.worker.ts', import.meta.url), {type: 'module'});
-        this.worker.onmessage = ({data}: MessageEvent<{id: number; result?: LocalResult; progress?: LocalProgress}>) => {
+        this.worker.onmessage = ({data}: MessageEvent<{id: number; result?: LocalResult; progress?: LocalProgress; diagnostic?: string}>) => {
           if (data.id !== this.pending?.id) return;
+          if (data.diagnostic) console.warn('Local model:', data.diagnostic);
           if (data.progress) {
             if (data.progress.stage === 'running') this.armTimeout(120_000);
             this.pending.progress(data.progress);

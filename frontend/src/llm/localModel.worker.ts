@@ -12,6 +12,7 @@ let generator: Promise<TextGenerationPipeline> | undefined;
 self.addEventListener('message', async (event: MessageEvent<{id: number; input: LocalInput}>) => {
   const {id, input} = event.data;
   const started = performance.now();
+  let loading = true;
   try {
     self.postMessage({id, progress: {stage: 'loading'}});
     generator ??= pipeline<'text-generation'>('text-generation', config.model, {
@@ -23,6 +24,7 @@ self.addEventListener('message', async (event: MessageEvent<{id: number; input: 
       },
     });
     const loaded = await generator;
+    loading = false;
     self.postMessage({id, progress: {stage: 'running'}});
     const output_token = await classifyLocally(loaded, input);
     self.postMessage({id, result: {
@@ -32,6 +34,11 @@ self.addEventListener('message', async (event: MessageEvent<{id: number; input: 
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
     const code: LocalError = message === 'input_too_long' || message === 'invalid_output' ? message : 'load_failed';
+    // Loading has no report text. Keep diagnostics local and strip resource URLs;
+    // inference failures expose only the exception name, never user input.
+    const diagnostic = loading ? message.replace(/https?:\/\/\S+/g, '[model asset]').slice(0, 500)
+      : error instanceof Error ? error.name : 'runtime error';
+    self.postMessage({id, diagnostic: `${loading ? 'load' : 'inference'}: ${diagnostic}`});
     self.postMessage({id, result: {...localFailure(code), latency_ms: Math.round(performance.now() - started)}});
   }
 });
