@@ -32,8 +32,10 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
     # AI Configuration
-    AI_MODE: str = "reference"  # reference (demo is a legacy alias), openai
+    AI_MODE: str = "reference"  # reference (demo is a legacy alias), groq, openai
     OPENAI_API_KEY: Optional[SecretStr] = None
+    GROQ_API_KEY: Optional[SecretStr] = None
+    GROQ_MODEL: str = "openai/gpt-oss-20b"
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     LLM_MODEL: str = "gpt-4.1-mini-2025-04-14"
     LLM_TIMEOUT_SECONDS: float = Field(default=30.0, gt=0, le=60)

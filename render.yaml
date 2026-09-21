@@ -26,6 +26,8 @@ services:
         value: reference
       - key: LLM_MODEL
         value: gpt-4.1-mini-2025-04-14
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-20b
       - key: LLM_TIMEOUT_SECONDS
         value: "30"
       - key: BOOTSTRAP_ADMIN_USERNAME

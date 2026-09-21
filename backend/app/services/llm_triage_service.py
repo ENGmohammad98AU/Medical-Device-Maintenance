@@ -1,4 +1,4 @@
-"""Real, opt-in LLM classification through the OpenAI Responses HTTP API.
+"""Opt-in LLM classification through Groq or OpenAI HTTP APIs.
 
 The model classifies and proposes a destination. It cannot author repair steps,
 create references, change device records, or automatically assign a person.
@@ -110,15 +110,16 @@ class LLMTriageService:
         mode = self.config.AI_MODE.strip().lower()
         if mode in {"reference", "demo"}:
             return LLMRun(status="disabled")
-        if mode != "openai":
+        if mode not in {"openai", "groq"}:
             return LLMRun(status="unavailable", error_code="unsupported_mode")
 
-        run = LLMRun(status="unavailable", provider="openai", requested_model=self.config.LLM_MODEL)
-        key = self.config.OPENAI_API_KEY
+        requested_model = self.config.GROQ_MODEL if mode == "groq" else self.config.LLM_MODEL
+        run = LLMRun(status="unavailable", provider=mode, requested_model=requested_model)
+        key = self.config.GROQ_API_KEY if mode == "groq" else self.config.OPENAI_API_KEY
         if not key or not key.get_secret_value().strip():
             run.error_code = "missing_api_key"
             return run
-        if not self.config.LLM_MODEL.strip():
+        if not requested_model.strip():
             run.error_code = "missing_model"
             return run
         if len(report_text) > 4500:
@@ -139,8 +140,9 @@ class LLMTriageService:
         }
         input_text = json.dumps(context, ensure_ascii=False, sort_keys=True)
         run.input_sha256 = hashlib.sha256(input_text.encode("utf-8")).hexdigest()
+        endpoint = "https://api.openai.com/v1/responses"
         payload = {
-            "model": self.config.LLM_MODEL,
+            "model": requested_model,
             "store": False,
             "instructions": SYSTEM_PROMPT,
             "input": [{"role": "user", "content": input_text}],
@@ -150,42 +152,80 @@ class LLMTriageService:
                 "schema": SCHEMA,
             }},
         }
+        if mode == "groq":
+            endpoint = "https://api.groq.com/openai/v1/chat/completions"
+            payload = {
+                "model": requested_model,
+                "messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": input_text},
+                ],
+                "max_completion_tokens": self.config.MAX_TOKENS,
+                "stream": False,
+                "response_format": {"type": "json_schema", "json_schema": {
+                    "name": "medical_device_triage", "strict": True, "schema": SCHEMA,
+                }},
+            }
+            if requested_model in {"openai/gpt-oss-20b", "openai/gpt-oss-120b"}:
+                payload.update(reasoning_effort="low", include_reasoning=False)
         started = time.perf_counter()
         try:
-            # The API endpoint is fixed; neither report text nor browser settings
-            # can redirect the API key to another host. No automatic paid retries.
+            # Fixed provider endpoints and separate keys. Never retry, switch
+            # providers, or upgrade a plan when the free quota is exhausted.
             with httpx.Client(timeout=self.config.LLM_TIMEOUT_SECONDS, transport=self.transport) as client:
                 response = client.post(
-                    "https://api.openai.com/v1/responses", json=payload,
+                    endpoint, json=payload,
                     headers={"Authorization": f"Bearer {key.get_secret_value()}"},
                 )
                 response.raise_for_status()
                 data = response.json()
-            if not isinstance(data, dict) or data.get("status") != "completed":
+            if not isinstance(data, dict):
                 run.status, run.error_code = "invalid_response", "incomplete_response"
                 return run
             if data.get("error"):
                 run.status, run.error_code = "error", "provider_error"
                 return run
-            run.model = str(data.get("model") or self.config.LLM_MODEL)[:200]
+            run.model = str(data.get("model") or requested_model)[:200]
             run.response_id = str(data.get("id") or "")[:200] or None
             usage = data.get("usage") or {}
+            token_fields = (
+                {"input_tokens": "prompt_tokens", "output_tokens": "completion_tokens", "total_tokens": "total_tokens"}
+                if mode == "groq" else {name: name for name in ("input_tokens", "output_tokens", "total_tokens")}
+            )
             run.usage = {
-                name: usage[name] for name in ("input_tokens", "output_tokens", "total_tokens")
-                if isinstance(usage.get(name), int) and not isinstance(usage[name], bool) and usage[name] >= 0
+                name: usage[field] for name, field in token_fields.items()
+                if isinstance(usage.get(field), int) and not isinstance(usage[field], bool) and usage[field] >= 0
             }
-            texts = []
-            for item in data.get("output", []):
-                if item.get("type") != "message" or item.get("role") != "assistant":
-                    continue
-                for part in item.get("content", []):
-                    if part.get("type") == "refusal":
-                        run.status, run.error_code = "refused", "model_refusal"
-                        return run
-                    if part.get("type") == "output_text":
-                        texts.append(part.get("text", ""))
-            output_text = "".join(texts)
-            if not output_text or len(output_text) > 8000:
+            if mode == "groq":
+                choices = data.get("choices")
+                if not isinstance(choices, list) or len(choices) != 1 or not isinstance(choices[0], dict):
+                    run.status, run.error_code = "invalid_response", "invalid_output"
+                    return run
+                choice = choices[0]
+                message = choice.get("message") or {}
+                if message.get("refusal") or choice.get("finish_reason") == "content_filter":
+                    run.status, run.error_code = "refused", "model_refusal"
+                    return run
+                if choice.get("finish_reason") != "stop" or message.get("role") != "assistant" or message.get("tool_calls"):
+                    run.status, run.error_code = "invalid_response", "incomplete_response"
+                    return run
+                output_text = message.get("content")
+            else:
+                if data.get("status") != "completed":
+                    run.status, run.error_code = "invalid_response", "incomplete_response"
+                    return run
+                texts = []
+                for item in data.get("output", []):
+                    if item.get("type") != "message" or item.get("role") != "assistant":
+                        continue
+                    for part in item.get("content", []):
+                        if part.get("type") == "refusal":
+                            run.status, run.error_code = "refused", "model_refusal"
+                            return run
+                        if part.get("type") == "output_text":
+                            texts.append(part.get("text", ""))
+                output_text = "".join(texts)
+            if not isinstance(output_text, str) or not output_text or len(output_text) > 8000:
                 run.status, run.error_code = "invalid_response", "invalid_output"
                 return run
             run.decision = LLMDecision.model_validate_json(output_text)
