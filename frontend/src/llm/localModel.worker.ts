@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 import { env, pipeline, type TextGenerationPipeline } from '@huggingface/transformers';
-import { classifyLocally } from './localModelEngine';
+import { classifyLocally, selectSupportLocally } from './localModelEngine';
+import type { SupportResult } from './supportModelContract';
 import { inputHash, localFailure, localModelConfig as config, type LocalInput, type LocalError } from './localModelContract';
 
 env.allowLocalModels = false;
@@ -28,10 +29,25 @@ self.addEventListener('message', async (event: MessageEvent<{id: number; input: 
     });
     const loaded = await generator;
     loading = false;
-    self.postMessage({id, progress: {stage: 'running'}});
+    self.postMessage({id, progress: {stage: 'running', task: 'classification'}});
     const output_token = await classifyLocally(loaded, input);
+    let support: SupportResult | undefined;
+    if (input.support_context) {
+      self.postMessage({id, progress: {stage: 'running', task: 'reference_selection'}});
+      const supportStarted = performance.now();
+      const context = input.support_context;
+      try {
+        support = {status: 'success', version: context.version, input_sha256: context.input_sha256,
+          output_token: await selectSupportLocally(loaded, context), latency_ms: Math.round(performance.now() - supportStarted)};
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '';
+        support = {status: 'error', version: context.version, input_sha256: context.input_sha256,
+          error_code: message === 'input_too_long' || message === 'invalid_output' ? message : 'load_failed',
+          latency_ms: Math.round(performance.now() - supportStarted)};
+      }
+    }
     self.postMessage({id, result: {
-      status: 'success', revision: config.revision, output_token,
+      status: 'success', revision: config.revision, output_token, support,
       input_sha256: await inputHash(input), latency_ms: Math.round(performance.now() - started),
     }});
   } catch (error) {

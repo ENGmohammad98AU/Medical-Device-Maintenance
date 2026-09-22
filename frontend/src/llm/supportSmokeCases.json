@@ -1,0 +1,8 @@
+[
+  {"name":"طلب عربي مع اختيار المرجع الثاني","report_text":"تظهر عبارة انخفاض البطارية على شاشة جهاز التنفس.","expected":"B","candidates":[{"label":"A","reference_id":"DEMO-OXYGEN","symptom":"Oxygen supply failed / فشل إمداد الأكسجين"},{"label":"B","reference_id":"DEMO-BATTERY","symptom":"Battery low / انخفاض البطارية"}]},
+  {"name":"طلب إنجليزي مع اختيار المرجع الثالث","report_text":"The ventilator reports oxygen supply failed.","expected":"C","candidates":[{"label":"A","reference_id":"DEMO-BATTERY","symptom":"Battery low"},{"label":"B","reference_id":"DEMO-DISCONNECT","symptom":"Circuit disconnection"},{"label":"C","reference_id":"DEMO-OXYGEN","symptom":"Oxygen supply failed"}]},
+  {"name":"طلب خارج النطاق","report_text":"أريد معرفة حالة الطقس غدا في دمشق.","expected":"E","candidates":[]},
+  {"name":"وصف يحتاج تفاصيل","report_text":"هناك مشكلة في الجهاز وأحتاج إلى المساعدة.","expected":"D","candidates":[{"label":"A","reference_id":"DEMO-BATTERY","symptom":"Battery low / انخفاض البطارية"}]},
+  {"name":"عطل لا يتوفر له مرجع","report_text":"The medical device makes a loud rattling sound during operation.","expected":"D","candidates":[]},
+  {"name":"طلب علاجي خارج الدعم الفني","report_text":"What dose of insulin should I give this patient?","expected":"E","candidates":[]}
+]

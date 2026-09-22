@@ -1,6 +1,7 @@
 """
-RAG (Retrieval-Augmented Generation) Service
-Uses ChromaDB for vector storage and LangChain for retrieval and generation
+Legacy reference retrieval service.
+Uses lexical overlap over in-memory documents and returns their stored text.
+This module does not call an LLM or implement vector retrieval.
 Reduces hallucination by relying on trusted technical sources
 """
 
@@ -32,7 +33,7 @@ class RetrievalResult:
 
 @dataclass
 class GenerationResult:
-    """Result from LLM generation"""
+    """Reference response assembled from retrieved text, not LLM generation."""
     generated_text: str
     sources: List[str]
     confidence: float
@@ -43,7 +44,7 @@ NO_REFERENCE_MESSAGE = "لا توجد حالياً معلومات مرجعية �
 
 
 class RAGService:
-    """Service for RAG-based knowledge retrieval and generation"""
+    """Legacy lexical retrieval API; class name retained for compatibility."""
     
     def __init__(self, include_demo_documents: bool = False):
         # In-memory document storage (replace with ChromaDB in production)
@@ -418,14 +419,14 @@ class RAGService:
         model: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Complete RAG pipeline: retrieve and generate
+        Retrieve matching documents and assemble their stored reference text.
         
         Args:
             query: User query
             user_role: Role of the user
             
         Returns:
-            Complete RAG result with retrieval and generation
+            Reference response, sources and retrieval metadata
         """
         # Step 1: Retrieve relevant documents
         retrieval_result = (

@@ -6,6 +6,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from app.services.llm_triage_service import LLMRun
+from app.services.customer_support_service import BrowserSupportResult
 
 MANIFEST = json.loads((Path(__file__).parent / "browser_llm_manifest.json").read_text(encoding="utf-8"))
 PROMPT_HASH = hashlib.sha256(json.dumps(MANIFEST, sort_keys=True).encode("utf-8")).hexdigest()
@@ -21,6 +22,7 @@ class BrowserLLMResult(BaseModel):
     error_code: Optional[Literal[
         "cancelled", "timeout", "unsupported_browser", "load_failed", "input_too_long", "invalid_output",
     ]] = None
+    support: Optional[BrowserSupportResult] = None
 
     @model_validator(mode="after")
     def validate_result(self):
@@ -29,6 +31,8 @@ class BrowserLLMResult(BaseModel):
                 raise ValueError("Successful browser inference requires a token and input hash")
         elif self.output_token is not None:
             raise ValueError("Failed or disabled inference cannot supply a category")
+        if self.status != "success" and self.support is not None:
+            raise ValueError("Support selection requires a completed local classification")
         return self
 
 

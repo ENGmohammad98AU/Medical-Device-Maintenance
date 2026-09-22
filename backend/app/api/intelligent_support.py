@@ -29,9 +29,10 @@ from app.services.rag_service import RAGService
 from app.services.duplicate_detection_service import DuplicateDetectionService
 from app.services.audit_trail_service import AuditTrailService
 from app.services.evaluation_service import EvaluationService
-from app.services.fault_reference_lookup_service import FaultReferenceLookupService
+from app.services.fault_reference_lookup_service import FaultReferenceLookupService, NO_MATCH
 from app.services.llm_triage_service import LLMTriageService, LLMRun, apply_triage, redact_report
 from app.services.browser_llm_service import BrowserLLMResult, browser_run
+from app.services.customer_support_service import prepare_support, resolve_support
 
 
 router = APIRouter(prefix="/api/intelligent-support", tags=["Intelligent Support"])
@@ -155,6 +156,7 @@ class FaultAnalysisResponse(BaseModel):
     routing_is_proposal: bool = True
     safety_guards: List[str] = Field(default_factory=list)
     llm: LLMRun = Field(default_factory=lambda: LLMRun(status="disabled"))
+    customer_support: Dict[str, Any] = Field(default_factory=dict)
 
 
 FAULT_INDICATORS = {
@@ -185,6 +187,20 @@ def _is_meaningful_fault(text: str) -> bool:
 NO_REFERENCE_MESSAGE = "لا توجد حالياً معلومات مرجعية كافية لتشخيص هذا العطل. يرجى إضافة المرجع الفني الخاص بالجهاز."
 
 
+@router.post("/prepare-support")
+def prepare_customer_support(
+    request: FaultAnalysisRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Read-only preparation; no model credentials, audit writes or cloud calls."""
+    device = db.query(Device).filter(Device.id == request.device_id).first()
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+    context, _ = prepare_support(request, device, db)
+    return context
+
+
 @router.post("/analyze-fault", response_model=FaultAnalysisResponse)
 def analyze_fault(
     request: FaultAnalysisRequest,
@@ -199,7 +215,8 @@ def analyze_fault(
     - Automatic classification based on severity, importance, and fault level
     - NLP entity extraction (device, error codes, department, etc.)
     - Knowledge base lookup (troubleshooting steps, safety precautions)
-    - RAG-based response generation with source attribution
+    - Local LLM scope assessment and selection among sourced references
+    - Reference text with source attribution (no generated repair instructions)
     - Safety layer enforcement (prevents unauthorized clinical advice)
     - Escalation path determination
     """
@@ -278,10 +295,34 @@ def analyze_fault(
                 manufacturer=manufacturer, model=model,
                 patient_connected=request.patient_connected, reference=reference_lookup,
             )
+        # Recompute candidates from authoritative device/source records. Model
+        # abstention suppresses all repair retrieval, including the legacy path.
+        baseline_reference_severity = reference_lookup.get("severity") if reference_lookup.get("matched") else None
+        support_context, support_references = prepare_support(request, device, db)
+        fallback_reference = (support_references[0] if support_references else dict(NO_MATCH)) if request.browser_llm else reference_lookup
+        reference_lookup, support_result, restrict_retrieval = resolve_support(
+            support_context, support_references,
+            request.browser_llm.support if request.browser_llm else None,
+            llm_run, fallback_reference,
+        )
+        # Local processing uses the same device/source boundaries during outages.
+        # A fallback must not reintroduce an excluded or unsourced repair.
+        restrict_retrieval = restrict_retrieval or request.browser_llm is not None
         classification, classification_source, routing_target, safety_guards = apply_triage(
             rule_classification, llm_run,
-            reference_lookup.get("severity") if reference_lookup.get("matched") else None,
+            baseline_reference_severity,
         )
+        # Selection/abstention cannot lower the severity of the original match.
+        classification, _, _, selected_guards = apply_triage(
+            classification, llm_run, reference_lookup.get("severity") if reference_lookup.get("matched") else None,
+        )
+        safety_guards = list(dict.fromkeys(safety_guards + selected_guards))
+        if classification.is_emergency:
+            support_result["guards"].append("EMERGENCY_PRIORITY")
+            support_result["message"] = "تستدعي الحالة مراجعة عاجلة وفق قواعد السلامة؛ اتبع إجراءات المنشأة ولا تنتظر اكتمال الدعم الآلي. " + support_result["message"]
+        if not classification.is_emergency and support_result["status"] in {"NEEDS_DETAILS", "NO_REFERENCE", "OUT_OF_SCOPE", "INVALID_RESULT"}:
+            routing_target = "REQUEST_CLARIFICATION" if support_result["status"] != "NO_REFERENCE" else "BIOMEDICAL_ENGINEERING"
+            classification.recommended_action = support_result["message"]
         
         # Step 2: Extract entities using NLP
         extracted_entities = nlp_service.extract_structured_data(cleaned_data.cleaned_text)
@@ -313,7 +354,7 @@ def analyze_fault(
         
         # Step 5: Generate RAG response
         rag_query = f"{device_name} {fault} {description}"
-        rag_result = rag_service.rag_pipeline(
+        rag_result = {"response": "", "sources": [], "confidence": 0.0, "retrieved_context": [], "requires_review": True} if restrict_retrieval else rag_service.rag_pipeline(
             rag_query,
             current_user.role.value,
             device_type=device_type,
@@ -354,7 +395,7 @@ def analyze_fault(
             ]
             rag_result['requires_review'] = True
         elif not rag_reference_found:
-            rag_result['response'] = NO_REFERENCE_MESSAGE
+            rag_result['response'] = support_result["message"] if restrict_retrieval else NO_REFERENCE_MESSAGE
 
         # LLM outcomes, refusals and outages all remain reviewable, even without
         # a matching manual. No model output populates technical repair fields.
@@ -419,6 +460,7 @@ def analyze_fault(
                     'requires_specialist': rule_classification.requires_specialist,
                 },
                 'llm': llm_run.model_dump(),
+                'customer_support': support_result,
             },
             retrieved_chunks=rag_result['retrieved_context'],
             retrieval_scores=[],
@@ -522,6 +564,7 @@ def analyze_fault(
             routing_target=routing_target,
             safety_guards=safety_guards,
             llm=llm_run,
+            customer_support=support_result,
         )
         
     except HTTPException:

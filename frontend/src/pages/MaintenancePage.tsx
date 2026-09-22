@@ -10,8 +10,9 @@ import { useAuth } from '../hooks/useAuth';
 import api from '../services/auth';
 import LLMTriageSummary, { TriageMetadata } from '../components/LLMTriageSummary';
 import { useLocalModel } from '../hooks/useLocalModel';
-import { localModelConfig } from '../llm/localModelContract';
+import { localModelConfig, localErrorText, type LocalError } from '../llm/localModelContract';
 import LocalModelProgress from '../components/LocalModelProgress';
+import type { SupportContext } from '../llm/supportModelContract';
 
 interface Device { id: number; name: string; type: string; manufacturer: string; model: string; serial_number: string; department: string; location?: string; }
 interface AnalysisResult extends TriageMetadata {
@@ -24,6 +25,8 @@ interface AnalysisResult extends TriageMetadata {
   device: string; matched_fault: string; meaning: string; possible_causes: string;
   immediate_safety_action: string; recommended_solution: string; verification_before_return_to_service: string;
   source: string; reference_url: string; reference_page: string; match_confidence: number; match_status: string;
+  customer_support?: { status: string; scope: string; method: string; message: string;
+    questions: string[]; selected_reference_id?: string; result?: {error_code?: string} };
 }
 
 const steps = ['وصف البلاغ والسياق', 'التحليل والتحقق', 'مراجعة المختص'];
@@ -81,9 +84,18 @@ export default function MaintenancePage() {
         device_location: selectedDevice.location || selectedDevice.department,
         patient_connected: patientConnected,
       };
+      let support_context: SupportContext | undefined;
+      if (useLocal) {
+        // A rolling deployment or a transient preparation failure still permits
+        // classification and an explicitly labelled reference-rule fallback.
+        try { support_context = (await api.post('/api/intelligent-support/prepare-support', requestData, {timeout: 90000})).data; }
+        catch { support_context = undefined; }
+      }
+      if (!mounted.current) return;
       const browser_llm = useLocal ? await localModel.run({
         report_text: requestData.description, device_type: selectedDevice.type.toUpperCase().replace(/[- ]/g, '_'),
         patient_connected: requestData.patient_connected,
+        support_context,
       }) : {status: 'disabled', revision: localModelConfig.revision, latency_ms: 0};
       if (!mounted.current) return;
       const response = await api.post('/api/intelligent-support/analyze-fault', {...requestData, browser_llm}, { timeout: 90000 });
@@ -121,7 +133,7 @@ export default function MaintenancePage() {
 
     {!analysis && <Card><CardContent>
       <Typography variant="h6" gutterBottom>1. إدخال البلاغ وبيانات الجهاز</Typography>
-      <Typography color="text.secondary" sx={{ mb: 3 }}>تُستخدم البيانات للتحقق من السلامة وتحديد مسار الإحالة المناسب.</Typography>
+      <Typography color="text.secondary" sx={{ mb: 3 }}>للعملاء ومستخدمي الأجهزة الطبية: صف العطل أو الإنذار أو مشكلة التشغيل. يساعد النموذج في التصنيف واختيار الحل المرجعي، أو يطلب توضيحًا عند نقص المعلومات. الطلبات الإدارية والعلاجية خارج نطاق هذه الخدمة.</Typography>
       <Alert severity="warning" sx={{mb: 2}}>في حالات الخطر الفوري، اتبع إجراءات المنشأة ولا تنتظر التحليل الآلي.</Alert>
       <Grid container spacing={2}>
         <Grid item xs={12}><TextField fullWidth disabled={busy} select label="الجهاز" value={deviceId} onChange={(event) => setDeviceId(Number(event.target.value))} required>{devices.map((device) => <MenuItem key={device.id} value={device.id}>{device.name} | {device.model} | {device.serial_number}</MenuItem>)}</TextField></Grid>
@@ -129,17 +141,26 @@ export default function MaintenancePage() {
         <Grid item xs={12} md={6}><TextField fullWidth disabled={busy} select label="خبرة مقدم البلاغ" value={expertise} onChange={(event) => setExpertise(event.target.value)}><MenuItem value="NOVICE">أساسية</MenuItem><MenuItem value="INTERMEDIATE">متوسطة</MenuItem><MenuItem value="ADVANCED">متقدمة</MenuItem><MenuItem value="EXPERT">خبير</MenuItem></TextField></Grid>
         <Grid item xs={12}><FormControlLabel control={<Switch disabled={busy} checked={patientConnected} onChange={(event) => setPatientConnected(event.target.checked)} />} label="المريض متصل بالجهاز حاليًا" /></Grid>
       </Grid>
-      <FormControlLabel control={<Switch checked={useLocal} disabled={busy} onChange={(event) => setUseLocal(event.target.checked)} />} label="اقتراح فئة العطل بنموذج محلي مجاني" />
-      <Alert severity="info" sx={{mt: 2}}>لا يحتاج النموذج إلى حساب خارجي أو مفتاح API. التنزيل الأول نحو 950 ميغابايت، ثم يعمل على جهازك. تبقى الخطورة وإجراءات الصيانة خاضعة للقواعد والمراجع ومراجعة المختص.</Alert>
+      <FormControlLabel control={<Switch checked={useLocal} disabled={busy} onChange={(event) => setUseLocal(event.target.checked)} />} label="معالجة الطلب واختيار المرجع بنموذج محلي مجاني" />
+      <Alert severity="info" sx={{mt: 2}}>لا يحتاج النموذج إلى حساب خارجي أو مفتاح API. التنزيل الأول نحو 950 ميغابايت، ثم يعمل على جهازك. يصنّف الطلب ويقترح المرجع المناسب؛ تحدد قواعد الخادم الخطورة وتبقى الإجراءات خاضعة لمراجعة المختص.</Alert>
       {localModel.progress && <LocalModelProgress progress={localModel.progress} cancel={localModel.cancel} cancelLabel="متابعة بالقواعد دون انتظار النموذج" />}
       <Button variant="contained" onClick={runAnalysis} disabled={busy} startIcon={busy ? <CircularProgress size={18} /> : <PsychologyIcon />} sx={{ mt: 3 }}>التحقق والتحليل</Button>
     </CardContent></Card>}
 
-    {analysis && !analysis.reference_found && <Card><CardContent>
+    {analysis && !analysis.reference_found && !analysis.customer_support && <Card><CardContent>
       <Alert severity="info">لا توجد حالياً معلومات مرجعية كافية لتشخيص هذا العطل. يرجى إضافة المرجع الفني الخاص بالجهاز.</Alert>
     </CardContent></Card>}
 
     {analysis && <>
+      {analysis.customer_support && <Card sx={{mb: 3}}><CardContent>
+        <Typography variant="h6" gutterBottom>نتيجة معالجة طلبك</Typography>
+        <Alert severity={analysis.customer_support.status === 'SELECTED' ? 'success' : 'info'}>{analysis.customer_support.message}</Alert>
+        {analysis.customer_support.result?.error_code && <Typography sx={{mt: 1}}>{localErrorText[analysis.customer_support.result.error_code as LocalError] || 'تعذر إكمال اختيار المرجع محليًا.'}</Typography>}
+        {analysis.customer_support.status === 'FALLBACK' && !analysis.reference_found && <Typography sx={{mt: 2}}>لا يوجد مرجع مطابق حاليًا. أضف رمز الإنذار ووصف الأعراض، أو اطلب مراجعة مهندس الأجهزة الطبية.</Typography>}
+        {analysis.customer_support.questions.map((question) => <Typography key={question} sx={{mt: 1}}>• {question}</Typography>)}
+        {analysis.customer_support.selected_reference_id && <Typography variant="body2" sx={{mt: 2}}>المرجع الذي اقترحه النموذج: {analysis.customer_support.selected_reference_id} — يحتاج اعتماد المختص.</Typography>}
+        {analysis.customer_support.status !== 'SELECTED' && <Button onClick={() => {setAnalysis(null); setActiveStep(0); setDecision(''); setComments(''); setSuccess('');}} sx={{mt: 2}}>استكمال تفاصيل الطلب وإعادة التحليل</Button>}
+      </CardContent></Card>}
       <Grid container spacing={3}>
         <Grid item xs={12} md={5}><Card><CardContent>
           <Typography variant="h6" gutterBottom><SecurityIcon sx={{ verticalAlign: 'middle', mr: 1 }} />نتيجة التحقق والتصنيف</Typography>

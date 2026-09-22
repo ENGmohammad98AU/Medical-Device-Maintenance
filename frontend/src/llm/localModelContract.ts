@@ -1,8 +1,9 @@
 import config from './localModelConfig.json';
+import type { SupportContext, SupportResult } from './supportModelContract';
 
 export { config as localModelConfig };
 export type CategoryToken = keyof typeof config.categories;
-export interface LocalInput { report_text: string; device_type: string; patient_connected: boolean }
+export interface LocalInput { report_text: string; device_type: string; patient_connected: boolean; support_context?: SupportContext }
 export type LocalError = 'cancelled' | 'timeout' | 'unsupported_browser' | 'load_failed' | 'input_too_long' | 'invalid_output';
 export interface LocalResult {
   status: 'success' | 'error' | 'disabled';
@@ -11,8 +12,9 @@ export interface LocalResult {
   input_sha256?: string;
   latency_ms: number;
   error_code?: LocalError;
+  support?: SupportResult;
 }
-export interface LocalProgress { stage: 'loading' | 'running'; percent?: number }
+export interface LocalProgress { stage: 'loading' | 'running'; percent?: number; task?: 'classification' | 'reference_selection' }
 
 // The server uses the same ordering. This detects stale input, not tampering.
 export function serializeInput(input: LocalInput): string {
@@ -34,8 +36,8 @@ export const localErrorText: Record<LocalError, string> = {
   timeout: 'استغرق تشغيل النموذج وقتًا طويلًا. جرّب جهازًا أسرع أو تابع بالقواعد.',
   unsupported_browser: 'يحتاج التشغيل المحلي إلى متصفح حديث يدعم WebAssembly واتصال HTTPS.',
   load_failed: 'تعذر تحميل النموذج أو تشغيله. تحقق من الاتصال والذاكرة المتاحة ثم أعد المحاولة.',
-  input_too_long: 'الوصف أطول من سعة النموذج المحلي. اختصره أو تابع بالقواعد؛ لم يُحذف جزء منه للتحليل.',
-  invalid_output: 'لم يُرجع النموذج فئة صالحة.',
+  input_too_long: 'الوصف والسياق أكبر من سعة النموذج المحلي. اختصر الوصف أو تابع بالقواعد؛ لم يُحذف جزء منه للتحليل.',
+  invalid_output: 'لم يُرجع النموذج اختيارًا صالحًا لهذه الخطوة.',
 };
 export const categoryLabels: Record<string, string> = {
   POWER: 'الطاقة والبطارية', SENSOR: 'الحساسات والقياس', CIRCUIT: 'الدارات الكهربائية',
