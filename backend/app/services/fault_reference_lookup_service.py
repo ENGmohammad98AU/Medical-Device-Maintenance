@@ -226,6 +226,41 @@ class FaultReferenceLookupService:
         payload["match_status"] = "MATCHED"
         return payload
 
+    def support_candidates(self, *, device_query: str, manufacturer: str, model: str,
+                           device_type: str, description: str, fault_query: str = "") -> List[Dict[str, Any]]:
+        """Shortlist sourced, device-bound references; the LLM may select or abstain.
+
+        This deliberately retains the lexical threshold. A semantic choice cannot
+        authorize a reference from another model or bypass missing source metadata.
+        """
+        ranked = []
+        for rule in self.db.query(FaultReferenceRule).all():
+            if rule.match_status != "VERIFIED_MANUFACTURER" or not rule.source or not rule.reference_url:
+                continue
+            if not rule.reference_url.startswith("https://") or not rule.recommended_solution:
+                continue
+            if self._clean(rule.device_type) != self._clean(device_type):
+                continue
+            if manufacturer and model:
+                if self._clean(rule.manufacturer) != self._clean(manufacturer):
+                    continue
+                if self._normalize_code(rule.model) != self._normalize_code(model):
+                    continue
+            elif self._clean(rule.device_name) != self._clean(device_query):
+                continue
+            score = self._score_rule(rule, self._clean(fault_query or description),
+                                     self._clean(description), self._clean(device_query), manufacturer, model)
+            if score < self.MATCH_THRESHOLD:
+                continue
+            aliases = self._parse_aliases(rule.aliases)
+            arabic = next((a for a in aliases if re.search(r"[\u0600-\u06ff]", a)), "")
+            symptom = " / ".join(s for s in [rule.error_message or rule.description or rule.fault_code, arabic] if s)
+            payload = self._rule_payload(rule, score)
+            payload.update(matched=True, match_status="MATCHED", reference_id=rule.rule_id, symptom=symptom[:220])
+            ranked.append((score, rule.rule_id, payload))
+        ranked.sort(key=lambda item: (-item[0], item[1]))
+        return [item[2] for item in ranked[:3]]
+
     def _rule_payload(self, rule: FaultReferenceRule, score: float) -> Dict[str, Any]:
         return {
             "matched": False,
