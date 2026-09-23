@@ -26,6 +26,7 @@ from app.services.fault_reference_lookup_service import FaultReferenceLookupServ
 from app.models.user import User
 from app.models.maintenance import MaintenanceRecord
 from app.models.fault_report import FaultReport
+from app.models.fault_resolution_workflow import FaultResolutionWorkflow
 from app.models.device import Device
 from app.models.fault_reference_rule import FaultReferenceRule
 from app.models.audit_log import AuditLog
