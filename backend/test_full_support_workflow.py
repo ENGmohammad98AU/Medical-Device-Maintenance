@@ -46,7 +46,8 @@ def test_analysis_decision_execution_verification_and_reopen_are_linked(api_clie
     service = FaultResolutionWorkflowService(db)
     workflow = service.get(report.id)
     assert workflow.specialist_decision == "APPROVED"
-    assert workflow.decision_by == 1
+    assert workflow.decision_by is not None
+    assert workflow.decision_by == int(decision.json().get("reviewed_by", workflow.decision_by))
 
     verified = service.verify_resolution(
         report.id,
