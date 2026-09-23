@@ -25,6 +25,11 @@ class FaultReportCreate(FaultReportBase):
 
 class FaultReportUpdate(BaseModel):
     """Fault report update schema"""
+    device_id: Optional[int] = None
+    alarm_code: Optional[str] = None
+    error_message: Optional[str] = Field(None, min_length=1, max_length=500)
+    description: Optional[str] = Field(None, min_length=0, max_length=2000)
+    severity: Optional[FaultSeverity] = None
     status: Optional[FaultStatus] = None
     engineer_notes: Optional[str] = None
     ai_analysis: Optional[str] = None
