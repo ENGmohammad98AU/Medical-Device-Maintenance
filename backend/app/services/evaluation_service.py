@@ -39,6 +39,17 @@ class ClassificationMetrics:
 
 
 @dataclass
+class CategoryClassificationMetrics:
+    """Multiclass metrics for the actual LLM fault categories."""
+    accuracy: float
+    macro_precision: float
+    macro_recall: float
+    macro_f1: float
+    support: int
+    per_class: Dict[str, Dict[str, float]]
+
+
+@dataclass
 class SolutionQualityMetrics:
     """Solution quality evaluation metrics"""
     average_quality_score: float
@@ -96,6 +107,7 @@ class EvaluationService:
     def __init__(self, db: Session):
         self.db = db
         self.labeled_reports: List[Dict[str, Any]] = []
+        self.category_labels: List[Dict[str, Any]] = []
         self.evaluation_results: Dict[str, Any] = {}
         self.solution_evaluations: List[Dict[str, Any]] = []
         self.user_surveys: List[Dict[str, Any]] = []
@@ -109,6 +121,8 @@ class EvaluationService:
             payload['timestamp'] = event.timestamp
             if event.event_type == 'labeled_report':
                 self.labeled_reports.append(payload)
+            elif event.event_type == 'category_label':
+                self.category_labels.append(payload)
             elif event.event_type == 'solution_evaluation':
                 self.solution_evaluations.append(payload)
             elif event.event_type == 'user_survey':
@@ -189,6 +203,72 @@ class EvaluationService:
             false_negatives=false_negatives
         )
     
+    def add_category_label(self, report_id: str, true_category: str, predicted_category: str):
+        """Persist one held-out/expert-labeled LLM category observation."""
+        allowed = {"POWER", "SENSOR", "CIRCUIT", "MECHANICAL", "SOFTWARE", "ALARM", "OTHER", "UNKNOWN"}
+        truth = true_category.strip().upper()
+        predicted = predicted_category.strip().upper()
+        if truth not in allowed or predicted not in allowed:
+            raise ValueError("Category must be one of the supported LLM fault categories")
+        item = {
+            "report_id": report_id,
+            "true_category": truth,
+            "predicted_category": predicted,
+            "timestamp": datetime.utcnow(),
+        }
+        self.category_labels.append(item)
+        self._persist("category_label", {k: v for k, v in item.items() if k != "timestamp"})
+
+    def calculate_category_metrics(self) -> CategoryClassificationMetrics:
+        """Calculate one-vs-rest precision/recall/F1 per class and macro averages."""
+        if not self.category_labels:
+            return CategoryClassificationMetrics(
+                accuracy=0.0, macro_precision=0.0, macro_recall=0.0,
+                macro_f1=0.0, support=0, per_class={}
+            )
+
+        labels = sorted({
+            item["true_category"] for item in self.category_labels
+        } | {
+            item["predicted_category"] for item in self.category_labels
+        })
+        per_class: Dict[str, Dict[str, float]] = {}
+        correct = 0
+        precisions: List[float] = []
+        recalls: List[float] = []
+        f1s: List[float] = []
+
+        for item in self.category_labels:
+            if item["true_category"] == item["predicted_category"]:
+                correct += 1
+
+        for label in labels:
+            tp = sum(1 for item in self.category_labels if item["true_category"] == label and item["predicted_category"] == label)
+            fp = sum(1 for item in self.category_labels if item["true_category"] != label and item["predicted_category"] == label)
+            fn = sum(1 for item in self.category_labels if item["true_category"] == label and item["predicted_category"] != label)
+            class_support = sum(1 for item in self.category_labels if item["true_category"] == label)
+            precision = tp / (tp + fp) if tp + fp else 0.0
+            recall = tp / (tp + fn) if tp + fn else 0.0
+            f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+            precisions.append(precision)
+            recalls.append(recall)
+            f1s.append(f1)
+            per_class[label] = {
+                "precision": precision, "recall": recall, "f1": f1,
+                "support": float(class_support), "tp": float(tp), "fp": float(fp), "fn": float(fn),
+            }
+
+        count = len(labels)
+        total = len(self.category_labels)
+        return CategoryClassificationMetrics(
+            accuracy=correct / total,
+            macro_precision=sum(precisions) / count if count else 0.0,
+            macro_recall=sum(recalls) / count if count else 0.0,
+            macro_f1=sum(f1s) / count if count else 0.0,
+            support=total,
+            per_class=per_class,
+        )
+
     def add_solution_evaluation(
         self,
         report_id: str,
@@ -399,7 +479,8 @@ class EvaluationService:
     def get_comprehensive_evaluation(self) -> Dict[str, Any]:
         """Get comprehensive evaluation report"""
         return {
-            'classification_metrics': self.calculate_classification_metrics(),
+            'classification_metrics': self.calculate_category_metrics(),
+            'severity_metrics': self.calculate_classification_metrics(),
             'solution_quality_metrics': self.calculate_solution_quality_metrics(),
             'response_time_metrics': self.calculate_response_time_metrics(),
             'user_satisfaction_metrics': self.calculate_user_satisfaction_metrics(),
