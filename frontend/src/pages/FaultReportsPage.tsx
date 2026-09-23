@@ -181,6 +181,7 @@ export default function FaultReportsPage() {
       const submitData = {
         ...formData,
         device_id: parseInt(formData.device_id),
+        description: formData.error_message.trim(),
       };
 
       if (editingReport) {
@@ -495,7 +496,7 @@ export default function FaultReportsPage() {
                     <Button size="small" onClick={() => handleOpenDialog(report)} startIcon={<EditIcon />}>
                       تعديل / Edit
                     </Button>
-                    {normalizeEnumValue(report.status) === 'open' && (
+                    {['open', 'in_progress'].includes(normalizeEnumValue(report.status)) && (
                       <Button size="small" color="success" onClick={() => handleResolve(report.id)} startIcon={<CheckCircleIcon />}>
                         حل / Resolve
                       </Button>
