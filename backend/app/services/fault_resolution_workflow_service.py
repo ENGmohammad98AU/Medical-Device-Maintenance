@@ -61,6 +61,18 @@ class FaultResolutionWorkflowService:
             raise ValueError("Fault report not found")
 
         workflow = self._get_or_create(report_id)
+        previous_audit_log_id = workflow.audit_log_id
+        if previous_audit_log_id and previous_audit_log_id != audit_log_id:
+            # A new analysis supersedes the old recommendation. Human approval,
+            # execution evidence and verification must be collected again.
+            workflow.specialist_decision = None
+            workflow.specialist_comments = None
+            workflow.decision_by = None
+            workflow.decision_at = None
+            workflow.action_taken = None
+            workflow.verification_result = None
+            workflow.verified_by = None
+            workflow.verified_at = None
         workflow.audit_log_id = audit_log_id
         workflow.classification_source = classification_source
         workflow.fault_category = fault_category
