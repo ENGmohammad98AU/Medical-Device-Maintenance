@@ -848,6 +848,7 @@ def add_engineer_decision(
         "log_id": log_id,
         "decision": decision,
         "comments": comments,
+        "reviewed_by": current_user.id,
         "decision_timestamp": entry.decision_timestamp.isoformat()
     }
 
