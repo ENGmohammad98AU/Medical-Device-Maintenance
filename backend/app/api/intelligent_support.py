@@ -939,6 +939,24 @@ def add_labeled_report(
     return {"message": "Labeled report added successfully"}
 
 
+@router.post("/evaluation/category-label")
+def add_category_label(
+    report_id: str,
+    true_category: str,
+    predicted_category: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Add an expert/held-out label for the actual LLM fault category."""
+    if current_user.role not in {UserRole.ADMINISTRATOR, UserRole.BIOMEDICAL_ENGINEER}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only administrators and biomedical engineers can add category labels")
+    try:
+        EvaluationService(db).add_category_label(report_id, true_category, predicted_category)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+    return {"message": "Category label added successfully"}
+
+
 @router.post("/evaluation/solution-quality")
 def add_solution_evaluation(
     report_id: str,
@@ -1036,13 +1054,21 @@ def get_comprehensive_evaluation(
     return {
         "classification_metrics": {
             "accuracy": evaluation['classification_metrics'].accuracy,
-            "precision": evaluation['classification_metrics'].precision,
-            "recall": evaluation['classification_metrics'].recall,
-            "f1_score": evaluation['classification_metrics'].f1_score,
-            "true_positives": evaluation['classification_metrics'].true_positives,
-            "false_positives": evaluation['classification_metrics'].false_positives,
-            "true_negatives": evaluation['classification_metrics'].true_negatives,
-            "false_negatives": evaluation['classification_metrics'].false_negatives
+            "macro_precision": evaluation['classification_metrics'].macro_precision,
+            "macro_recall": evaluation['classification_metrics'].macro_recall,
+            "macro_f1": evaluation['classification_metrics'].macro_f1,
+            "support": evaluation['classification_metrics'].support,
+            "per_class": evaluation['classification_metrics'].per_class,
+        },
+        "severity_metrics": {
+            "accuracy": evaluation['severity_metrics'].accuracy,
+            "precision": evaluation['severity_metrics'].precision,
+            "recall": evaluation['severity_metrics'].recall,
+            "f1_score": evaluation['severity_metrics'].f1_score,
+            "true_positives": evaluation['severity_metrics'].true_positives,
+            "false_positives": evaluation['severity_metrics'].false_positives,
+            "true_negatives": evaluation['severity_metrics'].true_negatives,
+            "false_negatives": evaluation['severity_metrics'].false_negatives,
         },
         "solution_quality_metrics": {
             "average_quality_score": evaluation['solution_quality_metrics'].average_quality_score,
