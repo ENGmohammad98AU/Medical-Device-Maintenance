@@ -27,9 +27,10 @@ interface AnalysisResult extends TriageMetadata {
   source: string; reference_url: string; reference_page: string; match_confidence: number; match_status: string;
   customer_support?: { status: string; scope: string; method: string; message: string;
     questions: string[]; selected_reference_id?: string; result?: {error_code?: string} };
+  workflow?: { fault_report_id: number; outcome: string; total_processing_time_ms?: number } | null;
 }
 
-const steps = ['وصف البلاغ والسياق', 'التحليل والتحقق', 'مراجعة المختص'];
+const steps = ['وصف البلاغ والسياق', 'التحليل والتحقق', 'مراجعة المختص', 'تنفيذ الحل والتحقق من النتيجة'];
 
 export default function MaintenancePage() {
   const navigate = useNavigate();
@@ -43,6 +44,11 @@ export default function MaintenancePage() {
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [decision, setDecision] = useState('');
   const [comments, setComments] = useState('');
+  const [reportId, setReportId] = useState<number | null>(null);
+  const [decisionSaved, setDecisionSaved] = useState(false);
+  const [actionTaken, setActionTaken] = useState('');
+  const [verificationResult, setVerificationResult] = useState('');
+  const [outcome, setOutcome] = useState('RESOLVED');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -70,8 +76,20 @@ export default function MaintenancePage() {
     }
     setBusy(true); setError('');
     try {
+      let currentReportId = reportId;
+      if (!currentReportId) {
+        const created = await api.post('/api/fault-reports/', {
+          device_id: selectedDevice.id,
+          error_message: description.trim(),
+          description: description.trim(),
+          severity: 'medium',
+        });
+        currentReportId = created.data.id;
+        setReportId(currentReportId);
+      }
       const requestData = {
         device_id: selectedDevice.id,
+        report_id: currentReportId,
         device_name: selectedDevice.name,
         manufacturer: selectedDevice.manufacturer,
         model: selectedDevice.model,
@@ -99,7 +117,9 @@ export default function MaintenancePage() {
       }) : {status: 'disabled', revision: localModelConfig.revision, latency_ms: 0};
       if (!mounted.current) return;
       const response = await api.post('/api/intelligent-support/analyze-fault', {...requestData, browser_llm}, { timeout: 90000 });
-      setAnalysis(response.data); setActiveStep(1);
+      setAnalysis(response.data);
+      if (response.data.workflow?.fault_report_id) setReportId(response.data.workflow.fault_report_id);
+      setActiveStep(1);
     } catch (err: any) {
       const detail = err.response?.data?.detail;
       setError(typeof detail === 'string' ? detail : 'تعذر تحليل البلاغ. تحقق من الوصف وأعد المحاولة.');
@@ -112,14 +132,37 @@ export default function MaintenancePage() {
     setBusy(true); setError('');
     try {
       await api.post(`/api/intelligent-support/audit-logs/${analysis.audit_log_id}/decision`, null, { params: { decision, comments: comments || undefined } });
-      setSuccess('تم حفظ قرار المختص وسجل التعديلات بنجاح'); setActiveStep(2);
+      setSuccess('تم حفظ قرار المختص وسجل التعديلات بنجاح');
+      setDecisionSaved(true);
+      setActiveStep(2);
     } catch (err: any) { setError(err.response?.data?.detail || 'تعذر حفظ قرار المختص'); }
     finally { setBusy(false); }
   };
 
+  const verifyOutcome = async () => {
+    if (!reportId || !actionTaken.trim() || !verificationResult.trim()) {
+      setError('أدخل الإجراء المنفذ ونتيجة التحقق قبل إنهاء دورة الطلب'); return;
+    }
+    setBusy(true); setError('');
+    try {
+      await api.post(`/api/fault-reports/${reportId}/verify-resolution`, {
+        action_taken: actionTaken.trim(),
+        verification_result: verificationResult.trim(),
+        outcome,
+      });
+      setSuccess(outcome === 'RESOLVED'
+        ? 'تم توثيق تنفيذ الحل والتحقق من نجاحه وإغلاق البلاغ.'
+        : 'تم توثيق نتيجة التنفيذ، وسيبقى البلاغ قيد المتابعة.');
+      setActiveStep(3);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'تعذر حفظ نتيجة تنفيذ الحل');
+    } finally { setBusy(false); }
+  };
+
   const reset = () => {
     setAnalysis(null); setDecision(''); setComments(''); setSuccess(''); setActiveStep(0);
-    setDeviceId(''); setDescription(''); setPatientConnected(false);
+    setDeviceId(''); setDescription(''); setPatientConnected(false); setReportId(null);
+    setDecisionSaved(false); setActionTaken(''); setVerificationResult(''); setOutcome('RESOLVED');
   };
 
   return <Container maxWidth="lg"><Box sx={{ mt: 4, mb: 5 }}>
@@ -198,7 +241,22 @@ export default function MaintenancePage() {
       </Grid>
       <Card sx={{ mt: 3 }}><CardContent><Typography variant="h6" gutterBottom>3. مراجعة المختص وحفظ القرار</Typography>
         <Grid container spacing={2}><Grid item xs={12} md={5}><TextField fullWidth select label="قرار المختص" value={decision} onChange={(event) => setDecision(event.target.value)}><MenuItem value="APPROVED">اعتماد التوصية</MenuItem><MenuItem value="MODIFIED">اعتماد بعد التعديل</MenuItem><MenuItem value="ESCALATED">إحالة لمختص</MenuItem><MenuItem value="REJECTED">رفض التوصية</MenuItem></TextField></Grid><Grid item xs={12} md={7}><TextField fullWidth label="ملاحظات القرار" value={comments} onChange={(event) => setComments(event.target.value)} /></Grid></Grid>
-        <Button variant="contained" onClick={saveDecision} disabled={busy} startIcon={<CheckCircleIcon />} sx={{ mt: 3 }}>حفظ القرار وسجل التعديلات</Button><Button onClick={reset} sx={{ mt: 3, ml: 2 }}>بلاغ جديد</Button>
+        <Button variant="contained" onClick={saveDecision} disabled={busy || decisionSaved} startIcon={<CheckCircleIcon />} sx={{ mt: 3 }}>حفظ القرار وسجل التعديلات</Button>
+        {decisionSaved && <Box sx={{ mt: 4 }}>
+          <Typography variant="h6" gutterBottom>4. تنفيذ الحل والتحقق من النتيجة</Typography>
+          <Alert severity="info" sx={{ mb: 2 }}>لا يُغلق البلاغ لمجرد اقتراح حل؛ سجّل ما نُفذ فعليًا ونتيجة التحقق بعد التنفيذ.</Alert>
+          <Grid container spacing={2}>
+            <Grid item xs={12}><TextField fullWidth multiline minRows={2} label="الإجراء الذي تم تنفيذه فعليًا" value={actionTaken} onChange={(e) => setActionTaken(e.target.value)} /></Grid>
+            <Grid item xs={12}><TextField fullWidth multiline minRows={2} label="نتيجة التحقق بعد التنفيذ" value={verificationResult} onChange={(e) => setVerificationResult(e.target.value)} /></Grid>
+            <Grid item xs={12} md={5}><TextField fullWidth select label="نتيجة الطلب" value={outcome} onChange={(e) => setOutcome(e.target.value)}>
+              <MenuItem value="RESOLVED">تم الحل والتحقق</MenuItem>
+              <MenuItem value="FAILED">لم ينجح الحل</MenuItem>
+              <MenuItem value="FOLLOW_UP">يحتاج متابعة إضافية</MenuItem>
+            </TextField></Grid>
+          </Grid>
+          <Button variant="contained" color="success" onClick={verifyOutcome} disabled={busy || activeStep === 3} sx={{ mt: 3 }}>حفظ التنفيذ ونتيجة التحقق</Button>
+        </Box>}
+        <Button onClick={reset} sx={{ mt: 3, ml: 2 }}>بلاغ جديد</Button>
       </CardContent></Card>
     </>}
   </Box></Container>;
