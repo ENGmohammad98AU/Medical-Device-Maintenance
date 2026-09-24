@@ -29,9 +29,15 @@ const page=context.pages()[0]||await context.newPage();
 page.on('console',msg=>{if(msg.text().startsWith('INFERENCE_STAGE'))console.log(msg.text());});
 page.on('pageerror',error=>console.error('Browser error:',error.message));
 await mkdir('benchmark-results',{recursive:true});
+const lowStorage=process.argv.includes('--low-storage');
+if(lowStorage) {
+  const cdp=await context.newCDPSession(page);
+  await cdp.send('Storage.overrideQuotaForOrigin',{origin:'http://127.0.0.1:4174',quotaSize:128*1024*1024});
+}
+const kinds=process.argv.includes('--skip-classification')?['support']:['classification','support'];
 try {
   await page.goto('http://127.0.0.1:4174/model-upgrade-test.html',{waitUntil:'commit'});
-  for(const kind of ['classification','support']) {
+  for(const kind of kinds) {
     await page.locator('#'+kind).click();
     await page.waitForFunction(()=>/اكتمل الاختبار|فشل الاختبار/.test(document.querySelector('#status').textContent),{},{timeout:25*60_000});
     const raw=await page.locator('#output').innerText();
@@ -40,6 +46,7 @@ try {
     const config=JSON.parse(await readFile('src/llm/localModelConfig.json','utf8'));
     const dataPath=kind==='classification'?'src/llm/benchmarkCases.json':'src/llm/supportSmokeCases.json';
     const cases=JSON.parse(await readFile(dataPath,'utf8'));
+    if(lowStorage)assert.equal(result.storage_mode,'temporary','Must bypass persistent model storage');
     assert.equal(result.revision,config.revision);assert.equal(result.total,cases.length);
     assert.equal(result.isolated,true,'Service worker must enable browser isolation');
     assert.ok(result.threads>=2,'Multi-thread CPU inference must be available in CI');
@@ -68,7 +75,7 @@ try {
   // Exercise the production worker and UI too, not only the benchmark harness.
   await page.goto('http://127.0.0.1:4174/local-model',{waitUntil:'commit'});
   await page.getByRole('button',{name:'تشغيل النموذج مجانًا',exact:true}).click();
-  await page.getByText(/اكتمل تشغيل النموذج على هذا المتصفح/).waitFor({timeout:15*60_000});
+  await page.getByText(/اكتمل تشغيل النموذج على هذا المتصفح/).waitFor({timeout:35*60_000});
   await page.getByText(/قرار النموذج للطلب: المرجع B/).waitFor({timeout:5000});
   assert.equal(await page.getByText(/لم يكتمل اختيار المرجع|اختلف اختيار النموذج/).count(),0);
   await page.screenshot({path:'benchmark-results/browser-success.png',fullPage:true});

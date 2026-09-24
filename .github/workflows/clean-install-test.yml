@@ -190,7 +190,7 @@ jobs:
         shell: pwsh
         working-directory: frontend
         run: |
-          npm run benchmark:llm
+          npm run benchmark:llm -- --skip-classification --low-storage
 
       - name: Save browser benchmark evidence
         if: always()

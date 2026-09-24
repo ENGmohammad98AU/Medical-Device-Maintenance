@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 import { Wllama } from '@wllama/wllama';
 import { inferenceThreads } from './browserIsolation.js';
+import { loadGgufModel, type StorageMode } from './modelStorage.js';
 import { classifyLocally, selectSupportLocally } from './localModelEngine';
 import type { SupportResult } from './supportModelContract';
 import { inputHash, localFailure, localModelConfig as config, type LocalInput, type LocalError } from './localModelContract';
@@ -9,32 +10,36 @@ import { inputHash, localFailure, localModelConfig as config, type LocalInput, t
 // provide only that URL base. The runtime itself starts a dedicated worker.
 Object.defineProperty(globalThis, 'document', {value: {baseURI: self.location.href}});
 let generator: Promise<Wllama> | undefined;
+let storageMode: StorageMode | undefined;
 self.addEventListener('message', async (event: MessageEvent<{id: number; input: LocalInput}>) => {
   const {id, input} = event.data;
   const started = performance.now();
   let loading = true;
   try {
-    self.postMessage({id, progress: {stage: 'loading'}});
+    self.postMessage({id, progress: {stage: 'loading', storage_mode: storageMode}});
     if (!WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,5,3,1,4,1]))) throw new Error('unsupported_browser');
     generator ??= (async () => {
       const model = new Wllama({
         'single-thread/wllama.wasm': new URL(`${import.meta.env.BASE_URL}llm/wllama.wasm`, self.location.origin).href,
         'multi-thread/wllama.wasm': new URL(`${import.meta.env.BASE_URL}llm/wllama-multi.wasm`, self.location.origin).href},
       {suppressNativeLog: true, logger: {debug() {}, log() {}, warn() {}, error() {}}});
-      await model.loadModelFromUrl(`https://huggingface.co/${config.model}/resolve/${config.revision}/${config.model_file}`, {
+      await loadGgufModel(model, `https://huggingface.co/${config.model}/resolve/${config.revision}/${config.model_file}`, {
         n_ctx: config.context_tokens, n_batch: config.batch_tokens, n_threads: inferenceThreads(), seed: 0,
-        progressCallback: ({loaded, total}) => self.postMessage({id, progress: {stage: 'loading',
+        progressCallback: ({loaded, total}) => self.postMessage({id, progress: {stage: 'loading', storage_mode: storageMode,
           percent: total ? Math.min(100, 100 * loaded / total) : undefined}}),
+      }, config.model_file_bytes, mode => {
+        storageMode = mode;
+        self.postMessage({id, progress: {stage: 'loading', storage_mode: mode}});
       });
       return model;
     })();
     const loaded = await generator;
     loading = false;
-    self.postMessage({id, progress: {stage: 'running', task: 'classification'}});
+    self.postMessage({id, progress: {stage: 'running', task: 'classification', storage_mode: storageMode}});
     const output_token = await classifyLocally(loaded, input);
     let support: SupportResult | undefined;
     if (input.support_context) {
-      self.postMessage({id, progress: {stage: 'running', task: 'reference_selection'}});
+      self.postMessage({id, progress: {stage: 'running', task: 'reference_selection', storage_mode: storageMode}});
       const supportStarted = performance.now();
       const context = input.support_context;
       try {

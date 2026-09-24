@@ -7,6 +7,7 @@ await copyFile(new URL('../node_modules/@wllama/wllama/esm/single-thread/wllama.
 await copyFile(new URL('../node_modules/@wllama/wllama/esm/multi-thread/wllama.wasm', import.meta.url), new URL('wllama-multi.wasm', out));
 await copyFile(new URL('../src/llm/ggufChoice.js', import.meta.url), new URL('choice.js', out));
 await copyFile(new URL('../src/llm/browserIsolation.js', import.meta.url), new URL('isolation.js', out));
+await copyFile(new URL('../src/llm/modelStorage.js', import.meta.url), new URL('storage.js', out));
 const read = async (path) => JSON.parse(await readFile(new URL(path, import.meta.url), 'utf8'));
 const config = await read('../src/llm/localModelConfig.json');
 const support = await read('../src/llm/supportModelConfig.json');

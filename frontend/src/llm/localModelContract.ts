@@ -14,7 +14,7 @@ export interface LocalResult {
   error_code?: LocalError;
   support?: SupportResult;
 }
-export interface LocalProgress { stage: 'loading' | 'running'; percent?: number; task?: 'classification' | 'reference_selection' }
+export interface LocalProgress { stage: 'loading' | 'running'; percent?: number; task?: 'classification' | 'reference_selection'; storage_mode?: 'persistent' | 'temporary' }
 
 // The server uses the same ordering. This detects stale input, not tampering.
 export function serializeInput(input: LocalInput): string {

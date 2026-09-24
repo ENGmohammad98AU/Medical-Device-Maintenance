@@ -7,6 +7,7 @@
 <script type="module">
 import {Wllama} from './llm/wllama.js';
 import {chooseGgufToken} from './llm/choice.js';
+import {loadGgufModel} from './llm/storage.js';
 import {prepareIsolation,inferenceThreads} from './llm/isolation.js';
 await prepareIsolation(new URL('./llm-isolation-worker.js',location.href).href);
 const {config,cases,supportCases}=await fetch('./llm/candidate.json').then(r=>r.json());
@@ -15,16 +16,16 @@ const threads=inferenceThreads();
 const model=new Wllama({'single-thread/wllama.wasm':'./llm/wllama.wasm','multi-thread/wllama.wasm':'./llm/wllama-multi.wasm'},{suppressNativeLog:true,logger:{debug(){},log(){},warn:console.warn,error:console.error}});
 status.textContent=`جاهز للاختبار؛ عدد خيوط المعالجة: ${threads}`;
 document.querySelectorAll('button').forEach(b=>b.disabled=false);
-let loaded=false;
+let loaded=false,storageMode;
 async function run(kind){
  document.querySelectorAll('button').forEach(b=>b.disabled=true);
  const start=performance.now();const rows=[];output.textContent='';
  try {
   if(!loaded){
-   await model.loadModelFromUrl(`https://huggingface.co/${config.model}/resolve/${config.revision}/${config.model_file}`,{
+   storageMode=await loadGgufModel(model,`https://huggingface.co/${config.model}/resolve/${config.revision}/${config.model_file}`,{
     n_ctx:config.context_tokens,n_batch:config.batch_tokens,n_threads:threads,seed:0,
     progressCallback:({loaded,total})=>status.textContent=`تحميل النموذج: ${Math.round(100*loaded/total)}%`
-   });loaded=true;
+   },config.model_file_bytes);loaded=true;
   }
   const loadMs=Math.round(performance.now()-start);
   const tests=kind==='support'?supportCases:kind==='smoke'?cases.slice(0,1):cases;
@@ -32,13 +33,13 @@ async function run(kind){
    status.textContent=`تشغيل الحالة ${rows.length+1} من ${tests.length}`;
    const t=performance.now();
    const token=await chooseGgufToken(model,c.prompt,c.labels,config.max_input_tokens,kind==='support',step=>{
-     status.textContent=`تشغيل الحالة ${rows.length+1} من ${tests.length}: ${step}`;console.log('INFERENCE_STAGE',rows.length+1,step);
+     status.textContent=`تشغيل الحالة ${rows.length+1} من ${tests.length}: ${step}`;console.log('INFERENCE_STAGE',kind,rows.length+1,step);
    });
    const predicted=kind==='support'?token:config.categories[token];
    const row={name:c.name,expected:c.expected,predicted,correct:predicted===c.expected,inference_ms:Math.round(performance.now()-t)};
    rows.push(row);output.textContent+=JSON.stringify(row)+'\n';
   }
-  const result={model:config.model,revision:config.revision,dtype:config.dtype,runtime:config.runtime,prompt_version:config.prompt_version,threads:model.getNumThreads(),isolated:crossOriginIsolated,kind,load_ms:loadMs,total:rows.length,correct:rows.filter(r=>r.correct).length,rows};
+  const result={model:config.model,revision:config.revision,dtype:config.dtype,runtime:config.runtime,prompt_version:config.prompt_version,threads:model.getNumThreads(),isolated:crossOriginIsolated,storage_mode:storageMode,kind,load_ms:loadMs,total:rows.length,correct:rows.filter(r=>r.correct).length,rows};
   output.textContent=JSON.stringify(result,null,2);status.textContent=`اكتمل الاختبار: ${result.correct}/${result.total}`;
  }catch(e){status.textContent='فشل الاختبار';output.textContent+='\n'+String(e);console.error(e);}
  finally{document.querySelectorAll('button').forEach(b=>b.disabled=false);}
