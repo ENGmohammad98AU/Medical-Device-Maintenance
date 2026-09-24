@@ -27,9 +27,10 @@ interface AnalysisResult extends TriageMetadata {
   source: string; reference_url: string; reference_page: string; match_confidence: number; match_status: string;
   customer_support?: { status: string; scope: string; method: string; message: string;
     questions: string[]; selected_reference_id?: string; result?: {error_code?: string} };
+  workflow?: { fault_report_id: number; outcome: string; total_processing_time_ms?: number } | null;
 }
 
-const steps = ['وصف البلاغ والسياق', 'التحليل والتحقق', 'مراجعة المختص'];
+const steps = ['وصف البلاغ والسياق', 'التحليل والتحقق', 'مراجعة المختص', 'تنفيذ الحل والتحقق من النتيجة'];
 
 export default function MaintenancePage() {
   const navigate = useNavigate();
@@ -43,6 +44,11 @@ export default function MaintenancePage() {
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [decision, setDecision] = useState('');
   const [comments, setComments] = useState('');
+  const [reportId, setReportId] = useState<number | null>(null);
+  const [decisionSaved, setDecisionSaved] = useState(false);
+  const [actionTaken, setActionTaken] = useState('');
+  const [verificationResult, setVerificationResult] = useState('');
+  const [outcome, setOutcome] = useState('RESOLVED');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -68,10 +74,24 @@ export default function MaintenancePage() {
     if (description.trim().length < 10) {
       setError('يرجى إدخال وصف أكثر تفصيلًا للعطل'); return;
     }
-    setBusy(true); setError('');
+    setBusy(true); setError(''); setSuccess('');
+    setDecisionSaved(false); setDecision(''); setComments('');
+    setActionTaken(''); setVerificationResult(''); setOutcome('RESOLVED');
     try {
+      let currentReportId = reportId;
+      if (!currentReportId) {
+        const created = await api.post('/api/fault-reports/', {
+          device_id: selectedDevice.id,
+          error_message: description.trim(),
+          description: description.trim(),
+          severity: 'medium',
+        });
+        currentReportId = created.data.id;
+        setReportId(currentReportId);
+      }
       const requestData = {
         device_id: selectedDevice.id,
+        report_id: currentReportId,
         device_name: selectedDevice.name,
         manufacturer: selectedDevice.manufacturer,
         model: selectedDevice.model,
@@ -99,7 +119,9 @@ export default function MaintenancePage() {
       }) : {status: 'disabled', revision: localModelConfig.revision, latency_ms: 0};
       if (!mounted.current) return;
       const response = await api.post('/api/intelligent-support/analyze-fault', {...requestData, browser_llm}, { timeout: 90000 });
-      setAnalysis(response.data); setActiveStep(1);
+      setAnalysis(response.data);
+      if (response.data.workflow?.fault_report_id) setReportId(response.data.workflow.fault_report_id);
+      setActiveStep(1);
     } catch (err: any) {
       const detail = err.response?.data?.detail;
       setError(typeof detail === 'string' ? detail : 'تعذر تحليل البلاغ. تحقق من الوصف وأعد المحاولة.');
@@ -112,14 +134,38 @@ export default function MaintenancePage() {
     setBusy(true); setError('');
     try {
       await api.post(`/api/intelligent-support/audit-logs/${analysis.audit_log_id}/decision`, null, { params: { decision, comments: comments || undefined } });
-      setSuccess('تم حفظ قرار المختص وسجل التعديلات بنجاح'); setActiveStep(2);
-    } catch (err: any) { setError(err.response?.data?.detail || 'تعذر حفظ قرار المختص'); }
+      setSuccess('تم حفظ قرار المختص وسجل التعديلات بنجاح');
+      setDecisionSaved(true);
+      setOutcome(['APPROVED', 'MODIFIED'].includes(decision) ? 'RESOLVED' : 'FOLLOW_UP');
+      setActiveStep(2);
+    } catch (err: any) { setError(typeof err.response?.data?.detail === 'string' ? err.response.data.detail : 'تعذر حفظ قرار المختص'); }
     finally { setBusy(false); }
+  };
+
+  const verifyOutcome = async () => {
+    if (!reportId || actionTaken.trim().length < 3 || verificationResult.trim().length < 3) {
+      setError('أدخل الإجراء المنفذ ونتيجة التحقق قبل إنهاء دورة الطلب'); return;
+    }
+    setBusy(true); setError('');
+    try {
+      await api.post(`/api/fault-reports/${reportId}/verify-resolution`, {
+        action_taken: actionTaken.trim(),
+        verification_result: verificationResult.trim(),
+        outcome,
+      });
+      setSuccess(outcome === 'RESOLVED'
+        ? 'تم توثيق تنفيذ الحل والتحقق من نجاحه وإغلاق البلاغ.'
+        : 'تم توثيق نتيجة التنفيذ، وسيبقى البلاغ قيد المتابعة.');
+      setActiveStep(3);
+    } catch (err: any) {
+      setError(typeof err.response?.data?.detail === 'string' ? err.response.data.detail : 'تعذر حفظ نتيجة تنفيذ الحل؛ أدخل من 3 إلى 4000 محرف لكل حقل');
+    } finally { setBusy(false); }
   };
 
   const reset = () => {
     setAnalysis(null); setDecision(''); setComments(''); setSuccess(''); setActiveStep(0);
-    setDeviceId(''); setDescription(''); setPatientConnected(false);
+    setDeviceId(''); setDescription(''); setPatientConnected(false); setReportId(null);
+    setDecisionSaved(false); setActionTaken(''); setVerificationResult(''); setOutcome('RESOLVED');
   };
 
   return <Container maxWidth="lg"><Box sx={{ mt: 4, mb: 5 }}>
@@ -136,7 +182,7 @@ export default function MaintenancePage() {
       <Typography color="text.secondary" sx={{ mb: 3 }}>للعملاء ومستخدمي الأجهزة الطبية: صف العطل أو الإنذار أو مشكلة التشغيل. يساعد النموذج في التصنيف واختيار الحل المرجعي، أو يطلب توضيحًا عند نقص المعلومات. الطلبات الإدارية والعلاجية خارج نطاق هذه الخدمة.</Typography>
       <Alert severity="warning" sx={{mb: 2}}>في حالات الخطر الفوري، اتبع إجراءات المنشأة ولا تنتظر التحليل الآلي.</Alert>
       <Grid container spacing={2}>
-        <Grid item xs={12}><TextField fullWidth disabled={busy} select label="الجهاز" value={deviceId} onChange={(event) => setDeviceId(Number(event.target.value))} required>{devices.map((device) => <MenuItem key={device.id} value={device.id}>{device.name} | {device.model} | {device.serial_number}</MenuItem>)}</TextField></Grid>
+        <Grid item xs={12}><TextField fullWidth disabled={busy || reportId !== null} select label="الجهاز" value={deviceId} onChange={(event) => setDeviceId(Number(event.target.value))} required>{devices.map((device) => <MenuItem key={device.id} value={device.id}>{device.name} | {device.model} | {device.serial_number}</MenuItem>)}</TextField></Grid>
         <Grid item xs={12}><TextField fullWidth disabled={busy} multiline minRows={3} label="وصف العطل" value={description} onChange={(event) => setDescription(event.target.value)} inputProps={{ maxLength: 4000 }} helperText="أدخل وصفًا فنيًا دون أسماء المرضى أو أرقام ملفاتهم أو بيانات الاتصال." required /></Grid>
         <Grid item xs={12} md={6}><TextField fullWidth disabled={busy} select label="خبرة مقدم البلاغ" value={expertise} onChange={(event) => setExpertise(event.target.value)}><MenuItem value="NOVICE">أساسية</MenuItem><MenuItem value="INTERMEDIATE">متوسطة</MenuItem><MenuItem value="ADVANCED">متقدمة</MenuItem><MenuItem value="EXPERT">خبير</MenuItem></TextField></Grid>
         <Grid item xs={12}><FormControlLabel control={<Switch disabled={busy} checked={patientConnected} onChange={(event) => setPatientConnected(event.target.checked)} />} label="المريض متصل بالجهاز حاليًا" /></Grid>
@@ -159,7 +205,7 @@ export default function MaintenancePage() {
         {analysis.customer_support.status === 'FALLBACK' && !analysis.reference_found && <Typography sx={{mt: 2}}>لا يوجد مرجع مطابق حاليًا. أضف رمز الإنذار ووصف الأعراض، أو اطلب مراجعة مهندس الأجهزة الطبية.</Typography>}
         {analysis.customer_support.questions.map((question) => <Typography key={question} sx={{mt: 1}}>• {question}</Typography>)}
         {analysis.customer_support.selected_reference_id && <Typography variant="body2" sx={{mt: 2}}>المرجع الذي اقترحه النموذج: {analysis.customer_support.selected_reference_id} — يحتاج اعتماد المختص.</Typography>}
-        {analysis.customer_support.status !== 'SELECTED' && <Button onClick={() => {setAnalysis(null); setActiveStep(0); setDecision(''); setComments(''); setSuccess('');}} sx={{mt: 2}}>استكمال تفاصيل الطلب وإعادة التحليل</Button>}
+        {analysis.customer_support.status !== 'SELECTED' && activeStep < 3 && <Button disabled={busy} onClick={() => {setAnalysis(null); setActiveStep(0); setDecision(''); setComments(''); setSuccess(''); setDecisionSaved(false); setActionTaken(''); setVerificationResult('');}} sx={{mt: 2}}>استكمال تفاصيل الطلب وإعادة التحليل</Button>}
       </CardContent></Card>}
       <Grid container spacing={3}>
         <Grid item xs={12} md={5}><Card><CardContent>
@@ -197,8 +243,23 @@ export default function MaintenancePage() {
         </CardContent></Card></Grid>}
       </Grid>
       <Card sx={{ mt: 3 }}><CardContent><Typography variant="h6" gutterBottom>3. مراجعة المختص وحفظ القرار</Typography>
-        <Grid container spacing={2}><Grid item xs={12} md={5}><TextField fullWidth select label="قرار المختص" value={decision} onChange={(event) => setDecision(event.target.value)}><MenuItem value="APPROVED">اعتماد التوصية</MenuItem><MenuItem value="MODIFIED">اعتماد بعد التعديل</MenuItem><MenuItem value="ESCALATED">إحالة لمختص</MenuItem><MenuItem value="REJECTED">رفض التوصية</MenuItem></TextField></Grid><Grid item xs={12} md={7}><TextField fullWidth label="ملاحظات القرار" value={comments} onChange={(event) => setComments(event.target.value)} /></Grid></Grid>
-        <Button variant="contained" onClick={saveDecision} disabled={busy} startIcon={<CheckCircleIcon />} sx={{ mt: 3 }}>حفظ القرار وسجل التعديلات</Button><Button onClick={reset} sx={{ mt: 3, ml: 2 }}>بلاغ جديد</Button>
+        <Grid container spacing={2}><Grid item xs={12} md={5}><TextField fullWidth disabled={busy || decisionSaved} select label="قرار المختص" value={decision} onChange={(event) => setDecision(event.target.value)}><MenuItem value="APPROVED">اعتماد التوصية</MenuItem><MenuItem value="MODIFIED">اعتماد بعد التعديل</MenuItem><MenuItem value="ESCALATED">إحالة لمختص</MenuItem><MenuItem value="REJECTED">رفض التوصية</MenuItem></TextField></Grid><Grid item xs={12} md={7}><TextField fullWidth disabled={busy || decisionSaved} label="ملاحظات القرار" value={comments} onChange={(event) => setComments(event.target.value)} /></Grid></Grid>
+        <Button variant="contained" onClick={saveDecision} disabled={busy || decisionSaved} startIcon={<CheckCircleIcon />} sx={{ mt: 3 }}>حفظ القرار وسجل التعديلات</Button>
+        {decisionSaved && <Box sx={{ mt: 4 }}>
+          <Typography variant="h6" gutterBottom>4. تنفيذ الحل والتحقق من النتيجة</Typography>
+          <Alert severity="info" sx={{ mb: 2 }}>لا يُغلق البلاغ لمجرد اقتراح حل؛ سجّل ما نُفذ فعليًا ونتيجة التحقق بعد التنفيذ.</Alert>
+          <Grid container spacing={2}>
+            <Grid item xs={12}><TextField fullWidth multiline minRows={2} inputProps={{ maxLength: 4000 }} label="الإجراء الذي تم تنفيذه فعليًا" value={actionTaken} onChange={(e) => setActionTaken(e.target.value)} /></Grid>
+            <Grid item xs={12}><TextField fullWidth multiline minRows={2} inputProps={{ maxLength: 4000 }} label="نتيجة التحقق بعد التنفيذ" value={verificationResult} onChange={(e) => setVerificationResult(e.target.value)} /></Grid>
+            <Grid item xs={12} md={5}><TextField fullWidth select label="نتيجة الطلب" value={outcome} onChange={(e) => setOutcome(e.target.value)}>
+              {['APPROVED', 'MODIFIED'].includes(decision) && <MenuItem value="RESOLVED">تم الحل والتحقق</MenuItem>}
+              <MenuItem value="FAILED">لم ينجح الحل</MenuItem>
+              <MenuItem value="FOLLOW_UP">يحتاج متابعة إضافية</MenuItem>
+            </TextField></Grid>
+          </Grid>
+          <Button variant="contained" color="success" onClick={verifyOutcome} disabled={busy || activeStep === 3} sx={{ mt: 3 }}>حفظ التنفيذ ونتيجة التحقق</Button>
+        </Box>}
+        <Button disabled={busy} onClick={reset} sx={{ mt: 3, ml: 2 }}>بلاغ جديد</Button>
       </CardContent></Card>
     </>}
   </Box></Container>;

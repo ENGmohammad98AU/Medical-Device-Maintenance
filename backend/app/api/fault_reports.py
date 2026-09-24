@@ -5,20 +5,52 @@ Fault Reports API Endpoints
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from app.database.connection import get_db
 from app.api.dependencies import get_current_active_user, require_roles
 from app.models.user import User, UserRole
-from app.schemas.fault_report import FaultReportCreate, FaultReportUpdate, FaultReport, AIAnalysisResult
+from app.schemas.fault_report import FaultReportCreate, FaultReportUpdate, FaultReport
 from app.services.fault_report_service import FaultReportService
-from app.ai.pipeline.ai_service import AIService
+from app.services.fault_resolution_workflow_service import FaultResolutionWorkflowService
+from app.services.browser_llm_service import BrowserLLMResult
+from app.api.intelligent_support import (
+    FaultAnalysisRequest as IntelligentFaultAnalysisRequest,
+    FaultAnalysisResponse as IntelligentFaultAnalysisResponse,
+    analyze_fault as analyze_intelligent_fault,
+)
 
 
 class FaultAnalysisRequest(BaseModel):
-    """Fault analysis request"""
+    """Backward-compatible request routed through the unified intelligent-support pipeline."""
     device_id: int
+    report_id: Optional[int] = None
     alarm_code: Optional[str] = None
-    error_message: str
+    error_message: str = Field(..., min_length=10, max_length=4000)
+    patient_connected: bool = False
+    customer_expertise: str = "INTERMEDIATE"
+    browser_llm: Optional[BrowserLLMResult] = None
+
+
+class ResolutionVerificationRequest(BaseModel):
+    action_taken: str = Field(..., min_length=3, max_length=4000)
+    verification_result: str = Field(..., min_length=3, max_length=4000)
+    outcome: str = Field(..., description="RESOLVED, FAILED, or FOLLOW_UP")
+
+
+    @field_validator("action_taken", "verification_result", mode="before")
+    @classmethod
+    def strip_evidence(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
+
+class ReopenRequest(BaseModel):
+    reason: str = Field(..., min_length=3, max_length=2000)
+
+
+    @field_validator("reason", mode="before")
+    @classmethod
+    def strip_reason(cls, value):
+        return value.strip() if isinstance(value, str) else value
 
 
 router = APIRouter(prefix="/api/fault-reports", tags=["Fault Reports"])
@@ -67,6 +99,81 @@ def get_open_reports(
     return fault_service.get_open_reports()
 
 
+@router.post("/analyze", response_model=IntelligentFaultAnalysisResponse)
+def analyze_fault(
+    request: FaultAnalysisRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Compatibility endpoint: all report analysis now uses the same LLM/reference/safety pipeline."""
+    linked_report_id = request.report_id
+    if linked_report_id is None:
+        matching = (
+            FaultReportService(db).get_fault_reports_by_device(request.device_id, 0, 1000)
+        )
+        normalized = request.error_message.strip()
+        linked = next((item for item in matching if item.error_message.strip() == normalized and item.status.value != "resolved"), None)
+        linked_report_id = linked.id if linked else None
+    intelligent_request = IntelligentFaultAnalysisRequest(
+        device_id=request.device_id,
+        report_id=linked_report_id,
+        fault=request.alarm_code or "",
+        description=request.error_message,
+        patient_connected=request.patient_connected,
+        customer_expertise=request.customer_expertise,
+        browser_llm=request.browser_llm,
+    )
+    return analyze_intelligent_fault(intelligent_request, db=db, current_user=current_user)
+
+
+@router.get("/{report_id}/workflow")
+def get_fault_workflow(
+    report_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    workflow = FaultResolutionWorkflowService(db).get(report_id)
+    if workflow is None:
+        raise HTTPException(status_code=404, detail="Fault workflow not found")
+    return FaultResolutionWorkflowService.to_dict(workflow)
+
+
+@router.post("/{report_id}/verify-resolution")
+def verify_fault_resolution(
+    report_id: int,
+    payload: ResolutionVerificationRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.ADMINISTRATOR, UserRole.BIOMEDICAL_ENGINEER, UserRole.MEDICAL_TECHNICIAN)),
+):
+    try:
+        workflow = FaultResolutionWorkflowService(db).verify_resolution(
+            report_id,
+            action_taken=payload.action_taken,
+            verification_result=payload.verification_result,
+            outcome=payload.outcome,
+            user_id=current_user.id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return FaultResolutionWorkflowService.to_dict(workflow)
+
+
+@router.post("/{report_id}/reopen")
+def reopen_fault_report(
+    report_id: int,
+    payload: ReopenRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.ADMINISTRATOR, UserRole.BIOMEDICAL_ENGINEER, UserRole.MEDICAL_TECHNICIAN)),
+):
+    if FaultReportService(db).get_fault_report(report_id) is None:
+        raise HTTPException(status_code=404, detail="Fault report not found")
+    try:
+        workflow = FaultResolutionWorkflowService(db).reopen(report_id, reason=payload.reason, user_id=current_user.id)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    return FaultResolutionWorkflowService.to_dict(workflow)
+
+
 @router.get("/{report_id}", response_model=FaultReport)
 def get_fault_report(
     report_id: int,
@@ -103,7 +210,10 @@ def update_fault_report(
 ):
     """Update fault report"""
     fault_service = FaultReportService(db)
-    report = fault_service.update_fault_report(report_id, report_data)
+    try:
+        report = fault_service.update_fault_report(report_id, report_data)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
     if not report:
         raise HTTPException(status_code=404, detail="Fault report not found")
     return report
@@ -115,11 +225,14 @@ def resolve_fault_report(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(UserRole.ADMINISTRATOR, UserRole.BIOMEDICAL_ENGINEER, UserRole.MEDICAL_TECHNICIAN))
 ):
-    """Resolve fault report"""
+    """Return an already verified resolved report; direct unverified closure is prohibited."""
     fault_service = FaultReportService(db)
-    report = fault_service.resolve_fault_report(report_id, current_user.id)
+    report = fault_service.get_fault_report(report_id)
     if not report:
         raise HTTPException(status_code=404, detail="Fault report not found")
+    workflow = FaultResolutionWorkflowService(db).get(report_id)
+    if workflow is None or workflow.outcome != "RESOLVED" or report.status.value != "resolved":
+        raise HTTPException(status_code=409, detail="Record the executed action and verification result through /verify-resolution before closing the report")
     return report
 
 
@@ -135,19 +248,3 @@ def delete_fault_report(
         raise HTTPException(status_code=404, detail="Fault report not found")
 
 
-@router.post("/analyze", response_model=AIAnalysisResult)
-def analyze_fault(
-    request: FaultAnalysisRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
-):
-    """Analyze fault using AI"""
-    ai_service = AIService(db)
-    try:
-        return ai_service.analyze_fault(
-            request.device_id,
-            request.alarm_code,
-            request.error_message
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))

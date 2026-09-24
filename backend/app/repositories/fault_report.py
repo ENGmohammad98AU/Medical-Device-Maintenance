@@ -4,9 +4,9 @@ Fault Report Repository
 
 from sqlalchemy.orm import Session
 from typing import Optional, List
-from datetime import datetime
 from app.models.fault_report import FaultReport, FaultSeverity, FaultStatus
 from app.schemas.fault_report import FaultReportCreate, FaultReportUpdate
+from app.services.fault_resolution_workflow_service import FaultResolutionWorkflowService
 
 
 class FaultReportRepository:
@@ -61,6 +61,7 @@ class FaultReportRepository:
             return None
         
         update_data = report_data.model_dump(exclude_unset=True)
+        FaultResolutionWorkflowService(self.db).prepare_report_update(db_report, update_data)
         for field, value in update_data.items():
             setattr(db_report, field, value)
         
@@ -74,11 +75,9 @@ class FaultReportRepository:
         if not db_report:
             return None
         
-        db_report.status = FaultStatus.RESOLVED
-        db_report.resolved_at = datetime.utcnow()
-        db_report.resolved_by = resolved_by
-        self.db.commit()
-        self.db.refresh(db_report)
+        workflow = FaultResolutionWorkflowService(self.db).get(report_id)
+        if not workflow or workflow.outcome != "RESOLVED" or db_report.status != FaultStatus.RESOLVED:
+            raise ValueError("وثّق الإجراء المنفذ ونتيجة التحقق قبل إغلاق البلاغ.")
         return db_report
     
     def delete(self, report_id: int) -> bool:

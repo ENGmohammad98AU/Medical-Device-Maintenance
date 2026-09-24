@@ -1,0 +1,282 @@
+[
+  {
+    "name": "power_en_01",
+    "report_text": "The ventilator shuts down seconds after AC power is unplugged because the battery cannot sustain it.",
+    "device_type": "VENTILATOR",
+    "patient_connected": false,
+    "expected": "POWER"
+  },
+  {
+    "name": "power_en_02",
+    "report_text": "The pump will not start on battery power even though the battery pack is installed.",
+    "device_type": "SYRINGE_PUMP",
+    "patient_connected": false,
+    "expected": "POWER"
+  },
+  {
+    "name": "power_en_03",
+    "report_text": "Battery percentage falls from 80% to 10% within a few minutes of normal operation.",
+    "device_type": "PATIENT_MONITOR",
+    "patient_connected": false,
+    "expected": "POWER"
+  },
+  {
+    "name": "power_ar_01",
+    "report_text": "الجهاز لا يعمل عند فصل الكهرباء الرئيسية وتظهر البطارية فارغة مباشرة.",
+    "device_type": "VENTILATOR",
+    "patient_connected": false,
+    "expected": "POWER"
+  },
+  {
+    "name": "power_ar_02",
+    "report_text": "مؤشر التغذية الكهربائية مطفأ والبطارية لا تقبل الشحن رغم توصيل الجهاز بالمقبس.",
+    "device_type": "SYRINGE_PUMP",
+    "patient_connected": false,
+    "expected": "POWER"
+  },
+  {
+    "name": "sensor_en_01",
+    "report_text": "The flow measurement remains at zero while gas is clearly moving through the breathing circuit.",
+    "device_type": "VENTILATOR",
+    "patient_connected": false,
+    "expected": "SENSOR"
+  },
+  {
+    "name": "sensor_en_02",
+    "report_text": "The SpO2 value jumps between 40 and 99 percent with the probe and patient remaining still.",
+    "device_type": "PATIENT_MONITOR",
+    "patient_connected": false,
+    "expected": "SENSOR"
+  },
+  {
+    "name": "sensor_en_03",
+    "report_text": "The temperature channel displays an impossible negative value when a valid probe is connected.",
+    "device_type": "PATIENT_MONITOR",
+    "patient_connected": false,
+    "expected": "SENSOR"
+  },
+  {
+    "name": "sensor_ar_01",
+    "report_text": "قراءة حساس الضغط ثابتة ولا تتغير رغم تغير الضغط الفعلي في الدارة.",
+    "device_type": "VENTILATOR",
+    "patient_connected": false,
+    "expected": "SENSOR"
+  },
+  {
+    "name": "sensor_ar_02",
+    "report_text": "الجهاز يعطي قياسات غير منطقية من مجس الحرارة مع أن التوصيل سليم.",
+    "device_type": "PATIENT_MONITOR",
+    "patient_connected": false,
+    "expected": "SENSOR"
+  },
+  {
+    "name": "circuit_en_01",
+    "report_text": "There is a burnt smell from the power board and a visibly charred component on the PCB.",
+    "device_type": "PATIENT_MONITOR",
+    "patient_connected": false,
+    "expected": "CIRCUIT"
+  },
+  {
+    "name": "circuit_en_02",
+    "report_text": "The internal fuse blows again immediately after replacement, suggesting an electrical short.",
+    "device_type": "SYRINGE_PUMP",
+    "patient_connected": false,
+    "expected": "CIRCUIT"
+  },
+  {
+    "name": "circuit_en_03",
+    "report_text": "A connector on the main electronics board sparks when the device is powered on.",
+    "device_type": "VENTILATOR",
+    "patient_connected": false,
+    "expected": "CIRCUIT"
+  },
+  {
+    "name": "circuit_ar_01",
+    "report_text": "توجد آثار احتراق واضحة على اللوحة الإلكترونية الرئيسية للجهاز.",
+    "device_type": "PATIENT_MONITOR",
+    "patient_connected": false,
+    "expected": "CIRCUIT"
+  },
+  {
+    "name": "circuit_ar_02",
+    "report_text": "يحدث قصر كهربائي داخل الجهاز ويتكرر فصل المصهر فور تشغيله.",
+    "device_type": "SYRINGE_PUMP",
+    "patient_connected": false,
+    "expected": "CIRCUIT"
+  },
+  {
+    "name": "mechanical_en_01",
+    "report_text": "The syringe drive mechanism is physically jammed and cannot move forward by hand.",
+    "device_type": "SYRINGE_PUMP",
+    "patient_connected": false,
+    "expected": "MECHANICAL"
+  },
+  {
+    "name": "mechanical_en_02",
+    "report_text": "The enclosure hinge is cracked and the cover no longer closes securely.",
+    "device_type": "PATIENT_MONITOR",
+    "patient_connected": false,
+    "expected": "MECHANICAL"
+  },
+  {
+    "name": "mechanical_en_03",
+    "report_text": "A pneumatic connector is leaking around its seal even after the tubing is reseated.",
+    "device_type": "VENTILATOR",
+    "patient_connected": false,
+    "expected": "MECHANICAL"
+  },
+  {
+    "name": "mechanical_ar_01",
+    "report_text": "قفل حامل المحقنة مكسور ولا يثبت المحقنة في مكانها.",
+    "device_type": "SYRINGE_PUMP",
+    "patient_connected": false,
+    "expected": "MECHANICAL"
+  },
+  {
+    "name": "mechanical_ar_02",
+    "report_text": "يوجد تسريب هواء واضح من وصلة ميكانيكية متشققة في دائرة التنفس.",
+    "device_type": "VENTILATOR",
+    "patient_connected": false,
+    "expected": "MECHANICAL"
+  },
+  {
+    "name": "software_en_01",
+    "report_text": "The touchscreen freezes on the startup menu while the hardware remains powered.",
+    "device_type": "PATIENT_MONITOR",
+    "patient_connected": false,
+    "expected": "SOFTWARE"
+  },
+  {
+    "name": "software_en_02",
+    "report_text": "The user interface repeatedly restarts after login without any power interruption.",
+    "device_type": "PATIENT_MONITOR",
+    "patient_connected": false,
+    "expected": "SOFTWARE"
+  },
+  {
+    "name": "software_en_03",
+    "report_text": "After a firmware update the device is stuck in a continuous reboot loop.",
+    "device_type": "SYRINGE_PUMP",
+    "patient_connected": false,
+    "expected": "SOFTWARE"
+  },
+  {
+    "name": "software_ar_01",
+    "report_text": "الشاشة تعمل لكن واجهة البرنامج متجمدة ولا تستجيب لأي ضغط على الأزرار.",
+    "device_type": "VENTILATOR",
+    "patient_connected": false,
+    "expected": "SOFTWARE"
+  },
+  {
+    "name": "software_ar_02",
+    "report_text": "بعد تحديث البرنامج أصبح الجهاز يعيد التشغيل بشكل متكرر ولا يصل إلى القائمة الرئيسية.",
+    "device_type": "PATIENT_MONITOR",
+    "patient_connected": false,
+    "expected": "SOFTWARE"
+  },
+  {
+    "name": "alarm_en_01",
+    "report_text": "A high-priority alarm tone sounds repeatedly but no cause or error code appears on the display.",
+    "device_type": "VENTILATOR",
+    "patient_connected": false,
+    "expected": "ALARM"
+  },
+  {
+    "name": "alarm_en_02",
+    "report_text": "The red alarm indicator flashes intermittently and the screen provides no diagnostic message.",
+    "device_type": "PATIENT_MONITOR",
+    "patient_connected": false,
+    "expected": "ALARM"
+  },
+  {
+    "name": "alarm_en_03",
+    "report_text": "The pump keeps beeping an alarm with no identifiable symptom or displayed reason.",
+    "device_type": "SYRINGE_PUMP",
+    "patient_connected": false,
+    "expected": "ALARM"
+  },
+  {
+    "name": "alarm_ar_01",
+    "report_text": "يصدر الجهاز إنذاراً صوتياً متكرراً من دون ظهور سبب أو رمز خطأ على الشاشة.",
+    "device_type": "VENTILATOR",
+    "patient_connected": false,
+    "expected": "ALARM"
+  },
+  {
+    "name": "alarm_ar_02",
+    "report_text": "ضوء الإنذار الأحمر يومض لكن الجهاز لا يعرض أي رسالة توضح سبب الإنذار.",
+    "device_type": "PATIENT_MONITOR",
+    "patient_connected": false,
+    "expected": "ALARM"
+  },
+  {
+    "name": "other_en_01",
+    "report_text": "The ventilator cannot receive oxygen because the external oxygen supply is unavailable.",
+    "device_type": "VENTILATOR",
+    "patient_connected": false,
+    "expected": "OTHER"
+  },
+  {
+    "name": "other_en_02",
+    "report_text": "The pump reports that service calibration is required before it can be returned to use.",
+    "device_type": "SYRINGE_PUMP",
+    "patient_connected": false,
+    "expected": "OTHER"
+  },
+  {
+    "name": "other_en_03",
+    "report_text": "Communication between the pump and its docking station is lost although both devices remain powered.",
+    "device_type": "SYRINGE_PUMP",
+    "patient_connected": false,
+    "expected": "OTHER"
+  },
+  {
+    "name": "other_ar_01",
+    "report_text": "فشل اختبار التشغيل الذاتي للجهاز من دون تحديد حساس أو دارة أو جزء ميكانيكي بعينه.",
+    "device_type": "PATIENT_MONITOR",
+    "patient_connected": false,
+    "expected": "OTHER"
+  },
+  {
+    "name": "other_ar_02",
+    "report_text": "الجهاز يحتاج إلى معايرة خدمة قبل السماح بإعادته إلى الاستخدام.",
+    "device_type": "SYRINGE_PUMP",
+    "patient_connected": false,
+    "expected": "OTHER"
+  },
+  {
+    "name": "unknown_en_01",
+    "report_text": "Please tell me the purchase price of this device.",
+    "device_type": "PATIENT_MONITOR",
+    "patient_connected": false,
+    "expected": "UNKNOWN"
+  },
+  {
+    "name": "unknown_en_02",
+    "report_text": "The device is bad and something is wrong, but I cannot describe any symptom.",
+    "device_type": "VENTILATOR",
+    "patient_connected": false,
+    "expected": "UNKNOWN"
+  },
+  {
+    "name": "unknown_en_03",
+    "report_text": "What medication dose should I give the patient?",
+    "device_type": "SYRINGE_PUMP",
+    "patient_connected": false,
+    "expected": "UNKNOWN"
+  },
+  {
+    "name": "unknown_ar_01",
+    "report_text": "أريد معرفة موعد دورة التدريب القادمة على الجهاز.",
+    "device_type": "PATIENT_MONITOR",
+    "patient_connected": false,
+    "expected": "UNKNOWN"
+  },
+  {
+    "name": "unknown_ar_02",
+    "report_text": "الجهاز فيه مشكلة لكن لا أستطيع وصف أي عرض أو رسالة خطأ.",
+    "device_type": "VENTILATOR",
+    "patient_connected": false,
+    "expected": "UNKNOWN"
+  }
+]

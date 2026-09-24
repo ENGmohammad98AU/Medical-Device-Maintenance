@@ -15,6 +15,7 @@ from app.database.connection import get_db
 from app.api.dependencies import get_current_active_user
 from app.models.user import User, UserRole
 from app.models.device import Device
+from app.models.fault_report import FaultReport, FaultStatus
 from app.services.fault_classification_service import (
     FaultClassificationService,
     SeverityLevel,
@@ -33,6 +34,7 @@ from app.services.fault_reference_lookup_service import FaultReferenceLookupServ
 from app.services.llm_triage_service import LLMTriageService, LLMRun, apply_triage, redact_report
 from app.services.browser_llm_service import BrowserLLMResult, browser_run
 from app.services.customer_support_service import prepare_support, resolve_support
+from app.services.fault_resolution_workflow_service import FaultResolutionWorkflowService
 
 
 router = APIRouter(prefix="/api/intelligent-support", tags=["Intelligent Support"])
@@ -51,6 +53,7 @@ llm_service = LLMTriageService()
 class FaultAnalysisRequest(BaseModel):
     """Request for intelligent fault analysis"""
     device_id: int = Field(..., description="Database device identifier")
+    report_id: Optional[int] = Field(default=None, description="Fault report identifier for end-to-end tracking")
     device_name: Optional[str] = Field(None, description="Displayed device name")
     manufacturer: Optional[str] = Field(None, description="Displayed manufacturer")
     model: Optional[str] = Field(None, description="Displayed device model")
@@ -157,6 +160,7 @@ class FaultAnalysisResponse(BaseModel):
     safety_guards: List[str] = Field(default_factory=list)
     llm: LLMRun = Field(default_factory=lambda: LLMRun(status="disabled"))
     customer_support: Dict[str, Any] = Field(default_factory=dict)
+    workflow: Optional[Dict[str, Any]] = None
 
 
 FAULT_INDICATORS = {
@@ -197,6 +201,12 @@ def prepare_customer_support(
     device = db.query(Device).filter(Device.id == request.device_id).first()
     if not device:
         raise HTTPException(status_code=404, detail="Device not found")
+    if request.report_id is not None:
+        report = db.query(FaultReport).filter(FaultReport.id == request.report_id).first()
+        if not report or report.device_id != device.id:
+            raise HTTPException(status_code=422, detail="Fault report does not belong to the selected device")
+        if report.status == FaultStatus.RESOLVED:
+            raise HTTPException(status_code=409, detail="أعد فتح البلاغ مع ذكر السبب قبل إجراء تحليل جديد.")
     context, _ = prepare_support(request, device, db)
     return context
 
@@ -233,6 +243,14 @@ def analyze_fault(
     device = db.query(Device).filter(Device.id == request.device_id).first()
     if not device:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
+    if request.report_id is not None:
+        report = db.query(FaultReport).filter(FaultReport.id == request.report_id).first()
+        if not report:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fault report not found")
+        if report.device_id != device.id:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Fault report does not belong to the selected device")
+        if report.status == FaultStatus.RESOLVED:
+            raise HTTPException(status_code=409, detail="أعد فتح البلاغ مع ذكر السبب قبل إجراء تحليل جديد.")
 
     device_type = device.type.value.upper().replace('-', '_').replace(' ', '_')
     device_name = device.name
@@ -430,8 +448,10 @@ def analyze_fault(
         # Calculate processing time
         processing_time_ms = (time.time() - start_time) * 1000
         
-        # Record response time for evaluation
-        evaluation_service.add_response_time(processing_time_ms)
+        # Browser-local inference happens before the HTTP analysis request, so add
+        # its client-reported latency once to obtain an end-to-end observation.
+        end_to_end_processing_time_ms = processing_time_ms + (llm_run.latency_ms if llm_run.client_reported else 0.0)
+        evaluation_service.add_response_time(end_to_end_processing_time_ms)
         
         # Step 8: Create persistent audit log entry
         audit_trail_service = AuditTrailService(db)
@@ -472,9 +492,34 @@ def analyze_fault(
                 'requires_clinical_approval': safety_check.requires_clinical_approval,
                 'requires_specialist_escalation': safety_check.requires_specialist_escalation
             },
-            processing_time_ms=processing_time_ms,
+            processing_time_ms=end_to_end_processing_time_ms,
             requires_review=rag_result['requires_review']
         )
+
+        workflow_payload = None
+        if request.report_id is not None:
+            report.error_message = description
+            report.description = description
+            report.alarm_code = fault or None
+            workflow = FaultResolutionWorkflowService(db).record_analysis(
+                request.report_id,
+                audit_log_id=audit_entry.id,
+                classification_source=classification_source,
+                fault_category=llm_run.browser_category or (llm_run.decision.fault_category if llm_run.decision else None),
+                routing_target=routing_target,
+                llm_status=llm_run.status,
+                llm_provider=llm_run.provider,
+                llm_model=llm_run.model or llm_run.requested_model,
+                llm_revision=llm_run.model_revision,
+                llm_latency_ms=llm_run.latency_ms,
+                total_processing_time_ms=end_to_end_processing_time_ms,
+                selected_reference_id=support_result.get('selected_reference_id'),
+                reference_source=reference_lookup.get('source', ''),
+                recommended_solution=reference_lookup.get('recommended_solution', ''),
+                verification_instructions=reference_lookup.get('verification_before_return_to_service', ''),
+                severity=classification.severity.value,
+            )
+            workflow_payload = FaultResolutionWorkflowService.to_dict(workflow)
         
         # Add to duplicate detection if not duplicate
         if not duplicate_check:
@@ -565,6 +610,7 @@ def analyze_fault(
             safety_guards=safety_guards,
             llm=llm_run,
             customer_support=support_result,
+            workflow=workflow_payload,
         )
         
     except HTTPException:
@@ -796,19 +842,27 @@ def add_engineer_decision(
             detail="Only administrators and biomedical engineers can add decisions"
         )
     
-    entry = AuditTrailService(db).add_engineer_decision(log_id, decision, comments)
-    
+    audit_service = AuditTrailService(db)
+    entry = audit_service.get_log_entry(log_id)
     if not entry:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Audit log entry not found: {log_id}"
         )
     
+    try:
+        FaultResolutionWorkflowService(db).record_specialist_decision_by_audit(
+            log_id, decision=decision, comments=comments, user_id=current_user.id
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    entry = audit_service.add_engineer_decision(log_id, decision, comments)
     return {
         "message": "Decision added successfully",
         "log_id": log_id,
         "decision": decision,
         "comments": comments,
+        "reviewed_by": current_user.id,
         "decision_timestamp": entry.decision_timestamp.isoformat()
     }
 
@@ -898,6 +952,24 @@ def add_labeled_report(
     )
     
     return {"message": "Labeled report added successfully"}
+
+
+@router.post("/evaluation/category-label")
+def add_category_label(
+    report_id: str,
+    true_category: str,
+    predicted_category: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Add an expert/held-out label for the actual LLM fault category."""
+    if current_user.role not in {UserRole.ADMINISTRATOR, UserRole.BIOMEDICAL_ENGINEER}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only administrators and biomedical engineers can add category labels")
+    try:
+        EvaluationService(db).add_category_label(report_id, true_category, predicted_category)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+    return {"message": "Category label added successfully"}
 
 
 @router.post("/evaluation/solution-quality")
@@ -997,13 +1069,21 @@ def get_comprehensive_evaluation(
     return {
         "classification_metrics": {
             "accuracy": evaluation['classification_metrics'].accuracy,
-            "precision": evaluation['classification_metrics'].precision,
-            "recall": evaluation['classification_metrics'].recall,
-            "f1_score": evaluation['classification_metrics'].f1_score,
-            "true_positives": evaluation['classification_metrics'].true_positives,
-            "false_positives": evaluation['classification_metrics'].false_positives,
-            "true_negatives": evaluation['classification_metrics'].true_negatives,
-            "false_negatives": evaluation['classification_metrics'].false_negatives
+            "macro_precision": evaluation['classification_metrics'].macro_precision,
+            "macro_recall": evaluation['classification_metrics'].macro_recall,
+            "macro_f1": evaluation['classification_metrics'].macro_f1,
+            "support": evaluation['classification_metrics'].support,
+            "per_class": evaluation['classification_metrics'].per_class,
+        },
+        "severity_metrics": {
+            "accuracy": evaluation['severity_metrics'].accuracy,
+            "precision": evaluation['severity_metrics'].precision,
+            "recall": evaluation['severity_metrics'].recall,
+            "f1_score": evaluation['severity_metrics'].f1_score,
+            "true_positives": evaluation['severity_metrics'].true_positives,
+            "false_positives": evaluation['severity_metrics'].false_positives,
+            "true_negatives": evaluation['severity_metrics'].true_negatives,
+            "false_negatives": evaluation['severity_metrics'].false_negatives,
         },
         "solution_quality_metrics": {
             "average_quality_score": evaluation['solution_quality_metrics'].average_quality_score,

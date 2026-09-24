@@ -66,13 +66,13 @@ jobs:
         shell: pwsh
         working-directory: backend
         run: |
-          & ".\.venv\Scripts\python.exe" -c "from pathlib import Path; from app.database.base import Base; from app.database.connection import engine, SessionLocal; import app.models.user, app.models.device, app.models.fault_report, app.models.maintenance, app.models.fault_reference_rule, app.models.audit_log, app.models.analysis_event; from app.database.seed import seed_database; from app.services.fault_reference_lookup_service import FaultReferenceLookupService; Base.metadata.create_all(bind=engine); seed_database(); db=SessionLocal(); p=Path('reference_data/medical_device_fault_reference.json'); n=FaultReferenceLookupService(db).load_rules_from_json(str(p)); print('reference_rules_imported=' + str(n)); db.close()"
+          & ".\.venv\Scripts\python.exe" -c "from pathlib import Path; from app.database.base import Base; from app.database.connection import engine, SessionLocal; import app.models.user, app.models.device, app.models.fault_report, app.models.fault_resolution_workflow, app.models.maintenance, app.models.fault_reference_rule, app.models.audit_log, app.models.analysis_event; from app.database.seed import seed_database; from app.services.fault_reference_lookup_service import FaultReferenceLookupService; Base.metadata.create_all(bind=engine); seed_database(); db=SessionLocal(); p=Path('reference_data/medical_device_fault_reference.json'); n=FaultReferenceLookupService(db).load_rules_from_json(str(p)); print('reference_rules_imported=' + str(n)); db.close()"
 
       - name: Verify clean database contents
         shell: pwsh
         working-directory: backend
         run: |
-          & ".\.venv\Scripts\python.exe" -c "from app.database.connection import SessionLocal; from app.models.user import User; from app.models.device import Device; from app.models.fault_reference_rule import FaultReferenceRule; import app.models.maintenance, app.models.fault_report; db=SessionLocal(); u=db.query(User).count(); d=db.query(Device).count(); r=db.query(FaultReferenceRule).count(); print(f'users={u}, devices={d}, reference_rules={r}'); db.close(); assert u >= 5; assert d >= 3; assert r == 39"
+          & ".\.venv\Scripts\python.exe" -c "from app.database.connection import SessionLocal; from app.models.user import User; from app.models.device import Device; from app.models.fault_reference_rule import FaultReferenceRule; import app.models.maintenance, app.models.fault_report, app.models.fault_resolution_workflow; db=SessionLocal(); u=db.query(User).count(); d=db.query(Device).count(); r=db.query(FaultReferenceRule).count(); print(f'users={u}, devices={d}, reference_rules={r}'); db.close(); assert u >= 5; assert d >= 3; assert r == 39"
 
       - name: Start backend and verify API
         shell: pwsh
@@ -181,6 +181,12 @@ jobs:
         working-directory: frontend
         run: |
           npm test -- --run --passWithNoTests
+
+      - name: Run development local LLM benchmark
+        shell: pwsh
+        working-directory: frontend
+        run: |
+          npm run benchmark:llm
 
       - name: Start built frontend preview
         id: frontend_start

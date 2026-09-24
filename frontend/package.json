@@ -13,7 +13,8 @@
     "predev": "node scripts/prepare-onnx.mjs",
     "smoke:llm": "vite-node scripts/smoke-local-llm.ts",
     "smoke:llm:wasm": "vite-node scripts/smoke-wasm-llm.ts",
-    "smoke:llm:support": "vite-node scripts/smoke-support-llm.ts"
+    "smoke:llm:support": "vite-node scripts/smoke-support-llm.ts",
+    "benchmark:llm": "vite-node scripts/benchmark-local-llm.ts"
   },
   "dependencies": {
     "@emotion/react": "^11.13.3",

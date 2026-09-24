@@ -36,6 +36,9 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import api from '../services/auth';
 import { filterFaultReports, normalizeEnumValue } from '../utils/faultReportFilters';
+import { useLocalModel } from '../hooks/useLocalModel';
+import { localModelConfig } from '../llm/localModelContract';
+import type { SupportContext } from '../llm/supportModelContract';
 
 interface FaultReport {
   id: number;
@@ -56,6 +59,7 @@ interface FaultReport {
 interface DeviceSummary {
   id: number;
   name: string;
+  type: string;
   manufacturer: string;
   model: string;
   serial_number: string;
@@ -100,6 +104,9 @@ export default function FaultReportsPage() {
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [editingReport, setEditingReport] = useState<FaultReport | null>(null);
   const [aiAnalysis, setAiAnalysis] = useState<any>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [decisionSaved, setDecisionSaved] = useState(false);
+  const localModel = useLocalModel();
   const [filterSeverity, setFilterSeverity] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterDevice, setFilterDevice] = useState('');
@@ -142,6 +149,7 @@ export default function FaultReportsPage() {
   };
 
   const handleOpenDialog = (report?: FaultReport) => {
+    setAiAnalysis(null); setDecisionSaved(false);
     if (report) {
       setEditingReport(report);
       setFormData({
@@ -159,21 +167,25 @@ export default function FaultReportsPage() {
   };
 
   const handleCloseDialog = () => {
+    if (analyzing) return;
     setDialogOpen(false);
     setEditingReport(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (analyzing) return;
     if (!formData.device_id || !formData.error_message.trim()) {
       setError('Please select a device and enter an error message');
       return;
     }
 
+    setAnalyzing(true);
     try {
       const submitData = {
         ...formData,
         device_id: parseInt(formData.device_id),
+        description: formData.error_message.trim(),
       };
 
       if (editingReport) {
@@ -181,38 +193,129 @@ export default function FaultReportsPage() {
       } else {
         await api.post('/api/fault-reports/', submitData);
       }
-      handleCloseDialog();
+      setDialogOpen(false);
+      setEditingReport(null);
       fetchReports();
     } catch (err: any) {
-      setError('Failed to save fault report');
+      setError(typeof err.response?.data?.detail === 'string' ? err.response.data.detail : 'تعذر حفظ البلاغ؛ تحقق من الوصف وحالة الطلب.');
+    } finally {
+      setAnalyzing(false);
     }
   };
 
   const handleAnalyze = async () => {
-    if (!formData.device_id || !formData.error_message) {
-      setError('Please select a device and enter an error message');
+    if (analyzing) return;
+    if (!formData.device_id || formData.error_message.trim().length < 10) {
+      setError('اختر الجهاز وأدخل وصفًا فنيًا لا يقل عن 10 محارف');
       return;
     }
-    
+    const selectedDevice = devices.find((device) => device.id === parseInt(formData.device_id));
+    if (!selectedDevice) {
+      setError('تعذر تحديد الجهاز');
+      return;
+    }
+
+    setAnalyzing(true);
+    setError('');
     try {
-      const response = await api.post('/api/fault-reports/analyze', {
-        device_id: parseInt(formData.device_id),
-        alarm_code: '',
-        error_message: formData.error_message,
+      let linkedReportId = editingReport?.id;
+      if (!linkedReportId) {
+        const created = await api.post('/api/fault-reports/', {
+          device_id: selectedDevice.id,
+          error_message: formData.error_message.trim(),
+          description: formData.error_message.trim(),
+          severity: 'medium',
+        });
+        linkedReportId = created.data.id;
+        setEditingReport(created.data);
+      } else if (editingReport && editingReport.device_id !== selectedDevice.id) {
+        const updated = await api.put(`/api/fault-reports/${linkedReportId}`, {
+          device_id: selectedDevice.id,
+          error_message: formData.error_message.trim(),
+          description: formData.error_message.trim(),
+        });
+        setEditingReport(updated.data);
+      }
+
+      const supportRequest = {
+        device_id: selectedDevice.id,
+        report_id: linkedReportId,
+        fault: '',
+        description: formData.error_message.trim(),
+        customer_expertise: 'INTERMEDIATE',
+        patient_connected: false,
+      };
+      let support_context: SupportContext | undefined;
+      try {
+        support_context = (await api.post('/api/intelligent-support/prepare-support', supportRequest, { timeout: 90000 })).data;
+      } catch {
+        support_context = undefined;
+      }
+
+      const browser_llm = await localModel.run({
+        report_text: supportRequest.description,
+        device_type: selectedDevice.type.toUpperCase().replace(/[- ]/g, '_'),
+        patient_connected: false,
+        support_context,
       });
+
+      const response = await api.post('/api/fault-reports/analyze', {
+        device_id: selectedDevice.id,
+        report_id: linkedReportId,
+        alarm_code: '',
+        error_message: formData.error_message.trim(),
+        browser_llm: browser_llm || { status: 'disabled', revision: localModelConfig.revision, latency_ms: 0 },
+      }, { timeout: 90000 });
       setAiAnalysis(response.data);
+      setDecisionSaved(false);
       setAiDialogOpen(true);
+      await fetchReports();
     } catch (err: any) {
-      setError('Failed to analyze fault');
+      setError(typeof err.response?.data?.detail === 'string' ? err.response.data.detail : 'تعذر تحليل البلاغ بالنموذج المحلي؛ تحقق من طول الوصف وأعد المحاولة.');
+    } finally {
+      setAnalyzing(false);
     }
   };
 
   const handleResolve = async (id: number) => {
+    const action = window.prompt('اكتب الإجراء الذي تم تنفيذه فعليًا:');
+    if (!action?.trim()) return;
+    const verification = window.prompt('اكتب نتيجة التحقق بعد تنفيذ الإجراء:');
+    if (!verification?.trim()) return;
+    const resolved = window.confirm('هل تم حل العطل والتحقق من نجاح الحل؟ اضغط موافق للحل، أو إلغاء لإبقائه قيد المتابعة.');
     try {
-      await api.post(`/api/fault-reports/${id}/resolve`);
+      await api.post(`/api/fault-reports/${id}/verify-resolution`, {
+        action_taken: action.trim(),
+        verification_result: verification.trim(),
+        outcome: resolved ? 'RESOLVED' : 'FOLLOW_UP',
+      });
       fetchReports();
     } catch (err: any) {
-      setError('Failed to resolve fault report');
+      setError(typeof err.response?.data?.detail === 'string' ? err.response.data.detail : 'يجب اعتماد قرار المختص وإدخال إجراء ونتيجة تحقق من 3 محارف على الأقل');
+    }
+  };
+
+  const handleReopen = async (report: FaultReport) => {
+    const reason = window.prompt('ما سبب إعادة فتح البلاغ؟');
+    if (!reason?.trim()) return;
+    try {
+      await api.post(`/api/fault-reports/${report.id}/reopen`, { reason: reason.trim() });
+      await fetchReports();
+      handleOpenDialog({ ...report, status: 'in_progress', resolved_at: null });
+    } catch (err: any) {
+      setError(typeof err.response?.data?.detail === 'string' ? err.response.data.detail : 'تعذر إعادة فتح البلاغ؛ أدخل سببًا واضحًا.');
+    }
+  };
+
+  const approveAnalysis = async () => {
+    if (!aiAnalysis?.audit_log_id) return;
+    try {
+      await api.post(`/api/intelligent-support/audit-logs/${aiAnalysis.audit_log_id}/decision`, null, {
+        params: { decision: 'APPROVED', comments: 'Approved from fault report analysis view' },
+      });
+      setDecisionSaved(true);
+    } catch (err: any) {
+      setError(typeof err.response?.data?.detail === 'string' ? err.response.data.detail : 'تعذر حفظ قرار المختص');
     }
   };
 
@@ -284,7 +387,8 @@ export default function FaultReportsPage() {
             <InputLabel>الجهاز / Device</InputLabel>
             <Select
               value={filterDevice}
-              label="الجهاز / Device"
+              disabled={analyzing}
+                    label="الجهاز / Device"
               onChange={(e) => setFilterDevice(e.target.value)}
             >
               <MenuItem value="">الكل / All</MenuItem>
@@ -421,10 +525,13 @@ export default function FaultReportsPage() {
                     <Button size="small" onClick={() => handleOpenDialog(report)} startIcon={<EditIcon />}>
                       تعديل / Edit
                     </Button>
-                    {normalizeEnumValue(report.status) === 'open' && (
+                    {['open', 'in_progress'].includes(normalizeEnumValue(report.status)) && (
                       <Button size="small" color="success" onClick={() => handleResolve(report.id)} startIcon={<CheckCircleIcon />}>
                         حل / Resolve
                       </Button>
+                    )}
+                    {normalizeEnumValue(report.status) === 'resolved' && (
+                      <Button size="small" onClick={() => handleReopen(report)}>إعادة الفتح والمتابعة</Button>
                     )}
                     <Button size="small" color="error" onClick={() => handleDelete(report.id)} startIcon={<DeleteIcon />}>
                       حذف / Delete
@@ -447,6 +554,7 @@ export default function FaultReportsPage() {
                   <TextField
                     fullWidth
                     select
+                    disabled={analyzing}
                     label="الجهاز / Device"
                     value={formData.device_id}
                     onChange={(e) => setFormData({ ...formData, device_id: e.target.value })}
@@ -465,6 +573,8 @@ export default function FaultReportsPage() {
                     fullWidth
                     multiline
                     rows={3}
+                    disabled={analyzing}
+                    inputProps={{ maxLength: 4000 }}
                     label="رسالة الخطأ / Error Message"
                     value={formData.error_message}
                     onChange={(e) => setFormData({ ...formData, error_message: e.target.value })}
@@ -478,16 +588,17 @@ export default function FaultReportsPage() {
                 variant="outlined"
                 startIcon={<PsychologyIcon />}
                 onClick={handleAnalyze}
+                disabled={analyzing}
                 sx={{ mt: 2 }}
                 fullWidth
               >
-                تحليل بالذكاء الاصطناعي / AI Analysis
+                {analyzing ? 'جاري تشغيل النموذج المحلي...' : 'تحليل بالنموذج اللغوي المحلي / Local LLM Analysis'}
               </Button>
             </Box>
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleCloseDialog}>إلغاء / Cancel</Button>
-            <Button onClick={handleSubmit} variant="contained">
+            <Button disabled={analyzing} onClick={handleCloseDialog}>إلغاء / Cancel</Button>
+            <Button disabled={analyzing} onClick={handleSubmit} variant="contained">
               {editingReport ? 'حفظ التعديلات / Save Changes' : 'إضافة / Add'}
             </Button>
           </DialogActions>
@@ -569,6 +680,12 @@ export default function FaultReportsPage() {
             )}
           </DialogContent>
           <DialogActions>
+            {aiAnalysis?.workflow?.fault_report_id && !decisionSaved && (
+              <Button color="success" variant="contained" onClick={approveAnalysis}>
+                اعتماد التوصية كمختص
+              </Button>
+            )}
+            {decisionSaved && <Chip color="success" label="تم حفظ قرار المختص" />}
             <Button onClick={() => setAiDialogOpen(false)}>إغلاق / Close</Button>
           </DialogActions>
         </Dialog>
