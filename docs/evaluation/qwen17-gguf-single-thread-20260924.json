@@ -1,0 +1,379 @@
+{
+  "measured_at": "2026-09-24T17:18:38.176Z",
+  "source_commit": "5e3c85bc169034e8479f3701e55ca59391572c84",
+  "test_url": "https://medical-app-frontend-8iiq.onrender.com/model-upgrade-test.html",
+  "environment": "Cloud Chromium browser; original single-thread canary",
+  "threads": 1,
+  "dataset_purpose": "Fixed development set previously used during prompt tuning; not independent holdout",
+  "dataset_sha256": "9a12156d75ada164a0bd46a87ec56afeb24ad49c1ba1a11e9dbfba87cfab5d5d",
+  "candidate_config_sha256": "4287483f951cb7d2e03f63bd53252a2c55df394db454e51198b67484ea500888",
+  "model": "unsloth/Qwen3-1.7B-GGUF",
+  "revision": "d7f544eead698dbd1f15126ef60b45a1e1933222",
+  "dtype": "Q4_K_M",
+  "runtime": "wllama-2.4.0/wasm",
+  "prompt_version": "browser-device-category-v2-qwen3-1.7b",
+  "kind": "classification",
+  "load_ms": 42306,
+  "total": 40,
+  "correct": 36,
+  "rows": [
+    {
+      "name": "power_en_01",
+      "expected": "POWER",
+      "predicted": "POWER",
+      "correct": true,
+      "inference_ms": 528190
+    },
+    {
+      "name": "power_en_02",
+      "expected": "POWER",
+      "predicted": "CIRCUIT",
+      "correct": false,
+      "inference_ms": 23587
+    },
+    {
+      "name": "power_en_03",
+      "expected": "POWER",
+      "predicted": "POWER",
+      "correct": true,
+      "inference_ms": 28372
+    },
+    {
+      "name": "power_ar_01",
+      "expected": "POWER",
+      "predicted": "UNKNOWN",
+      "correct": false,
+      "inference_ms": 31576
+    },
+    {
+      "name": "power_ar_02",
+      "expected": "POWER",
+      "predicted": "OTHER",
+      "correct": false,
+      "inference_ms": 37435
+    },
+    {
+      "name": "sensor_en_01",
+      "expected": "SENSOR",
+      "predicted": "SENSOR",
+      "correct": true,
+      "inference_ms": 25245
+    },
+    {
+      "name": "sensor_en_02",
+      "expected": "SENSOR",
+      "predicted": "SENSOR",
+      "correct": true,
+      "inference_ms": 29627
+    },
+    {
+      "name": "sensor_en_03",
+      "expected": "SENSOR",
+      "predicted": "SENSOR",
+      "correct": true,
+      "inference_ms": 22601
+    },
+    {
+      "name": "sensor_ar_01",
+      "expected": "SENSOR",
+      "predicted": "SENSOR",
+      "correct": true,
+      "inference_ms": 31997
+    },
+    {
+      "name": "sensor_ar_02",
+      "expected": "SENSOR",
+      "predicted": "SENSOR",
+      "correct": true,
+      "inference_ms": 33975
+    },
+    {
+      "name": "circuit_en_01",
+      "expected": "CIRCUIT",
+      "predicted": "CIRCUIT",
+      "correct": true,
+      "inference_ms": 26624
+    },
+    {
+      "name": "circuit_en_02",
+      "expected": "CIRCUIT",
+      "predicted": "CIRCUIT",
+      "correct": true,
+      "inference_ms": 21141
+    },
+    {
+      "name": "circuit_en_03",
+      "expected": "CIRCUIT",
+      "predicted": "CIRCUIT",
+      "correct": true,
+      "inference_ms": 22744
+    },
+    {
+      "name": "circuit_ar_01",
+      "expected": "CIRCUIT",
+      "predicted": "CIRCUIT",
+      "correct": true,
+      "inference_ms": 28227
+    },
+    {
+      "name": "circuit_ar_02",
+      "expected": "CIRCUIT",
+      "predicted": "CIRCUIT",
+      "correct": true,
+      "inference_ms": 32092
+    },
+    {
+      "name": "mechanical_en_01",
+      "expected": "MECHANICAL",
+      "predicted": "MECHANICAL",
+      "correct": true,
+      "inference_ms": 23360
+    },
+    {
+      "name": "mechanical_en_02",
+      "expected": "MECHANICAL",
+      "predicted": "MECHANICAL",
+      "correct": true,
+      "inference_ms": 19784
+    },
+    {
+      "name": "mechanical_en_03",
+      "expected": "MECHANICAL",
+      "predicted": "MECHANICAL",
+      "correct": true,
+      "inference_ms": 25872
+    },
+    {
+      "name": "mechanical_ar_01",
+      "expected": "MECHANICAL",
+      "predicted": "MECHANICAL",
+      "correct": true,
+      "inference_ms": 27608
+    },
+    {
+      "name": "mechanical_ar_02",
+      "expected": "MECHANICAL",
+      "predicted": "MECHANICAL",
+      "correct": true,
+      "inference_ms": 31587
+    },
+    {
+      "name": "software_en_01",
+      "expected": "SOFTWARE",
+      "predicted": "SOFTWARE",
+      "correct": true,
+      "inference_ms": 20417
+    },
+    {
+      "name": "software_en_02",
+      "expected": "SOFTWARE",
+      "predicted": "SOFTWARE",
+      "correct": true,
+      "inference_ms": 19795
+    },
+    {
+      "name": "software_en_03",
+      "expected": "SOFTWARE",
+      "predicted": "SOFTWARE",
+      "correct": true,
+      "inference_ms": 22203
+    },
+    {
+      "name": "software_ar_01",
+      "expected": "SOFTWARE",
+      "predicted": "SOFTWARE",
+      "correct": true,
+      "inference_ms": 30829
+    },
+    {
+      "name": "software_ar_02",
+      "expected": "SOFTWARE",
+      "predicted": "SOFTWARE",
+      "correct": true,
+      "inference_ms": 28946
+    },
+    {
+      "name": "alarm_en_01",
+      "expected": "ALARM",
+      "predicted": "ALARM",
+      "correct": true,
+      "inference_ms": 25574
+    },
+    {
+      "name": "alarm_en_02",
+      "expected": "ALARM",
+      "predicted": "ALARM",
+      "correct": true,
+      "inference_ms": 22317
+    },
+    {
+      "name": "alarm_en_03",
+      "expected": "ALARM",
+      "predicted": "ALARM",
+      "correct": true,
+      "inference_ms": 21777
+    },
+    {
+      "name": "alarm_ar_01",
+      "expected": "ALARM",
+      "predicted": "ALARM",
+      "correct": true,
+      "inference_ms": 42009
+    },
+    {
+      "name": "alarm_ar_02",
+      "expected": "ALARM",
+      "predicted": "ALARM",
+      "correct": true,
+      "inference_ms": 33016
+    },
+    {
+      "name": "other_en_01",
+      "expected": "OTHER",
+      "predicted": "OTHER",
+      "correct": true,
+      "inference_ms": 21670
+    },
+    {
+      "name": "other_en_02",
+      "expected": "OTHER",
+      "predicted": "OTHER",
+      "correct": true,
+      "inference_ms": 22638
+    },
+    {
+      "name": "other_en_03",
+      "expected": "OTHER",
+      "predicted": "OTHER",
+      "correct": true,
+      "inference_ms": 23606
+    },
+    {
+      "name": "other_ar_01",
+      "expected": "OTHER",
+      "predicted": "UNKNOWN",
+      "correct": false,
+      "inference_ms": 40060
+    },
+    {
+      "name": "other_ar_02",
+      "expected": "OTHER",
+      "predicted": "OTHER",
+      "correct": true,
+      "inference_ms": 29657
+    },
+    {
+      "name": "unknown_en_01",
+      "expected": "UNKNOWN",
+      "predicted": "UNKNOWN",
+      "correct": true,
+      "inference_ms": 18141
+    },
+    {
+      "name": "unknown_en_02",
+      "expected": "UNKNOWN",
+      "predicted": "UNKNOWN",
+      "correct": true,
+      "inference_ms": 24082
+    },
+    {
+      "name": "unknown_en_03",
+      "expected": "UNKNOWN",
+      "predicted": "UNKNOWN",
+      "correct": true,
+      "inference_ms": 18229
+    },
+    {
+      "name": "unknown_ar_01",
+      "expected": "UNKNOWN",
+      "predicted": "UNKNOWN",
+      "correct": true,
+      "inference_ms": 24593
+    },
+    {
+      "name": "unknown_ar_02",
+      "expected": "UNKNOWN",
+      "predicted": "UNKNOWN",
+      "correct": true,
+      "inference_ms": 29077
+    }
+  ],
+  "accuracy": 0.9,
+  "macro_precision": 0.918452380952381,
+  "macro_recall": 0.9,
+  "macro_f1": 0.8892316017316018,
+  "per_class": [
+    {
+      "label": "POWER",
+      "tp": 2,
+      "fp": 0,
+      "fn": 3,
+      "precision": 1,
+      "recall": 0.4,
+      "f1": 0.5714285714285715
+    },
+    {
+      "label": "SENSOR",
+      "tp": 5,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "label": "CIRCUIT",
+      "tp": 5,
+      "fp": 1,
+      "fn": 0,
+      "precision": 0.8333333333333334,
+      "recall": 1,
+      "f1": 0.9090909090909091
+    },
+    {
+      "label": "MECHANICAL",
+      "tp": 5,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "label": "SOFTWARE",
+      "tp": 5,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "label": "ALARM",
+      "tp": 5,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "label": "OTHER",
+      "tp": 4,
+      "fp": 1,
+      "fn": 1,
+      "precision": 0.8,
+      "recall": 0.8,
+      "f1": 0.8000000000000002
+    },
+    {
+      "label": "UNKNOWN",
+      "tp": 5,
+      "fp": 2,
+      "fn": 0,
+      "precision": 0.7142857142857143,
+      "recall": 1,
+      "f1": 0.8333333333333333
+    }
+  ]
+}
