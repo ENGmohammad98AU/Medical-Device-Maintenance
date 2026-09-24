@@ -20,7 +20,7 @@ class BrowserLLMResult(BaseModel):
     input_sha256: Optional[str] = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     latency_ms: float = Field(default=0, ge=0, le=2700000, allow_inf_nan=False)
     error_code: Optional[Literal[
-        "cancelled", "timeout", "unsupported_browser", "load_failed", "input_too_long", "invalid_output",
+        "cancelled", "timeout", "unsupported_browser", "insufficient_storage", "load_failed", "input_too_long", "invalid_output",
     ]] = None
     support: Optional[BrowserSupportResult] = None
 

@@ -53,7 +53,8 @@ self.addEventListener('message', async (event: MessageEvent<{id: number; input: 
     }});
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
-    const code: LocalError = message === 'input_too_long' || message === 'invalid_output' || message === 'unsupported_browser' ? message : 'load_failed';
+    const code: LocalError = error instanceof Error && error.name === 'QuotaExceededError' ? 'insufficient_storage'
+      : message === 'input_too_long' || message === 'invalid_output' || message === 'unsupported_browser' ? message : 'load_failed';
     // Loading has no report text. Keep diagnostics local and strip resource URLs;
     // inference failures expose only the exception name, never user input.
     const diagnostic = loading ? message.replace(/https?:\/\/\S+/g, '[model asset]').slice(0, 500)
