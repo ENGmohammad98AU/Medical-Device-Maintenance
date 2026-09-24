@@ -9,12 +9,13 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "test": "vitest",
-    "prebuild": "node scripts/prepare-onnx.mjs && node scripts/prepare-wllama.mjs",
-    "predev": "node scripts/prepare-onnx.mjs && node scripts/prepare-wllama.mjs",
+    "prebuild": "node scripts/prepare-wllama.mjs",
+    "predev": "node scripts/prepare-wllama.mjs",
     "smoke:llm": "vite-node scripts/smoke-local-llm.ts",
     "smoke:llm:wasm": "vite-node scripts/smoke-wasm-llm.ts",
     "smoke:llm:support": "vite-node scripts/smoke-support-llm.ts",
-    "benchmark:llm": "vite-node scripts/benchmark-local-llm.ts"
+    "benchmark:llm": "node scripts/benchmark-browser.mjs",
+    "benchmark:onnx-baseline": "vite-node scripts/benchmark-local-llm.ts"
   },
   "dependencies": {
     "@emotion/react": "^11.13.3",
@@ -44,6 +45,7 @@
     "eslint": "^9.12.0",
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.12",
+    "playwright": "1.59.1",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.13",
     "typescript": "^5.6.3",

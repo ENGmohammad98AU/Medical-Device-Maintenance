@@ -20,7 +20,7 @@ export class LocalModelClient {
           if (data.id !== this.pending?.id) return;
           if (data.diagnostic) console.warn('Local model:', data.diagnostic);
           if (data.progress) {
-            if (data.progress.stage === 'running') this.armTimeout(120_000);
+            if (data.progress.stage === 'running') this.armTimeout(15 * 60_000);
             this.pending.progress(data.progress);
           }
           if (data.result) this.finish(data.result);

@@ -145,7 +145,7 @@ jobs:
   frontend-clean-install:
     name: Frontend clean install on Windows
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
 
     steps:
       - name: Checkout fresh repository
@@ -182,11 +182,23 @@ jobs:
         run: |
           npm test -- --run --passWithNoTests
 
+      - name: Install Chromium for real browser inference
+        working-directory: frontend
+        run: npx playwright install chromium
+
       - name: Run development local LLM benchmark
         shell: pwsh
         working-directory: frontend
         run: |
-          npm run benchmark:llm
+          npm run benchmark:llm -- --skip-classification --low-storage
+
+      - name: Save browser benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qwen17-browser-evaluation
+          path: frontend/benchmark-results/
+          if-no-files-found: warn
 
       - name: Start built frontend preview
         id: frontend_start

@@ -78,3 +78,5 @@ coverage/
 # Temporary
 *.tmp
 *.temp
+
+frontend/benchmark-results/

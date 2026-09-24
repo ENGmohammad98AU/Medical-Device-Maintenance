@@ -1,0 +1,369 @@
+{
+  "model": "unsloth/Qwen3-1.7B-GGUF",
+  "revision": "d7f544eead698dbd1f15126ef60b45a1e1933222",
+  "dtype": "Q4_K_M",
+  "runtime": "wllama-2.4.0/wasm",
+  "prompt_version": "browser-device-category-v2-qwen3-1.7b",
+  "threads": 4,
+  "isolated": true,
+  "kind": "classification",
+  "load_ms": 60242,
+  "total": 40,
+  "correct": 36,
+  "rows": [
+    {
+      "name": "power_en_01",
+      "expected": "POWER",
+      "predicted": "POWER",
+      "correct": true,
+      "inference_ms": 256116
+    },
+    {
+      "name": "power_en_02",
+      "expected": "POWER",
+      "predicted": "CIRCUIT",
+      "correct": false,
+      "inference_ms": 11059
+    },
+    {
+      "name": "power_en_03",
+      "expected": "POWER",
+      "predicted": "POWER",
+      "correct": true,
+      "inference_ms": 13634
+    },
+    {
+      "name": "power_ar_01",
+      "expected": "POWER",
+      "predicted": "UNKNOWN",
+      "correct": false,
+      "inference_ms": 15216
+    },
+    {
+      "name": "power_ar_02",
+      "expected": "POWER",
+      "predicted": "OTHER",
+      "correct": false,
+      "inference_ms": 17184
+    },
+    {
+      "name": "sensor_en_01",
+      "expected": "SENSOR",
+      "predicted": "SENSOR",
+      "correct": true,
+      "inference_ms": 11381
+    },
+    {
+      "name": "sensor_en_02",
+      "expected": "SENSOR",
+      "predicted": "SENSOR",
+      "correct": true,
+      "inference_ms": 14110
+    },
+    {
+      "name": "sensor_en_03",
+      "expected": "SENSOR",
+      "predicted": "SENSOR",
+      "correct": true,
+      "inference_ms": 10489
+    },
+    {
+      "name": "sensor_ar_01",
+      "expected": "SENSOR",
+      "predicted": "SENSOR",
+      "correct": true,
+      "inference_ms": 15414
+    },
+    {
+      "name": "sensor_ar_02",
+      "expected": "SENSOR",
+      "predicted": "SENSOR",
+      "correct": true,
+      "inference_ms": 16285
+    },
+    {
+      "name": "circuit_en_01",
+      "expected": "CIRCUIT",
+      "predicted": "CIRCUIT",
+      "correct": true,
+      "inference_ms": 12817
+    },
+    {
+      "name": "circuit_en_02",
+      "expected": "CIRCUIT",
+      "predicted": "CIRCUIT",
+      "correct": true,
+      "inference_ms": 10506
+    },
+    {
+      "name": "circuit_en_03",
+      "expected": "CIRCUIT",
+      "predicted": "CIRCUIT",
+      "correct": true,
+      "inference_ms": 18097
+    },
+    {
+      "name": "circuit_ar_01",
+      "expected": "CIRCUIT",
+      "predicted": "CIRCUIT",
+      "correct": true,
+      "inference_ms": 28279
+    },
+    {
+      "name": "circuit_ar_02",
+      "expected": "CIRCUIT",
+      "predicted": "CIRCUIT",
+      "correct": true,
+      "inference_ms": 22611
+    },
+    {
+      "name": "mechanical_en_01",
+      "expected": "MECHANICAL",
+      "predicted": "MECHANICAL",
+      "correct": true,
+      "inference_ms": 11888
+    },
+    {
+      "name": "mechanical_en_02",
+      "expected": "MECHANICAL",
+      "predicted": "MECHANICAL",
+      "correct": true,
+      "inference_ms": 9599
+    },
+    {
+      "name": "mechanical_en_03",
+      "expected": "MECHANICAL",
+      "predicted": "MECHANICAL",
+      "correct": true,
+      "inference_ms": 12275
+    },
+    {
+      "name": "mechanical_ar_01",
+      "expected": "MECHANICAL",
+      "predicted": "MECHANICAL",
+      "correct": true,
+      "inference_ms": 13213
+    },
+    {
+      "name": "mechanical_ar_02",
+      "expected": "MECHANICAL",
+      "predicted": "MECHANICAL",
+      "correct": true,
+      "inference_ms": 15297
+    },
+    {
+      "name": "software_en_01",
+      "expected": "SOFTWARE",
+      "predicted": "SOFTWARE",
+      "correct": true,
+      "inference_ms": 10132
+    },
+    {
+      "name": "software_en_02",
+      "expected": "SOFTWARE",
+      "predicted": "SOFTWARE",
+      "correct": true,
+      "inference_ms": 9542
+    },
+    {
+      "name": "software_en_03",
+      "expected": "SOFTWARE",
+      "predicted": "SOFTWARE",
+      "correct": true,
+      "inference_ms": 10467
+    },
+    {
+      "name": "software_ar_01",
+      "expected": "SOFTWARE",
+      "predicted": "SOFTWARE",
+      "correct": true,
+      "inference_ms": 15129
+    },
+    {
+      "name": "software_ar_02",
+      "expected": "SOFTWARE",
+      "predicted": "SOFTWARE",
+      "correct": true,
+      "inference_ms": 14100
+    },
+    {
+      "name": "alarm_en_01",
+      "expected": "ALARM",
+      "predicted": "ALARM",
+      "correct": true,
+      "inference_ms": 13225
+    },
+    {
+      "name": "alarm_en_02",
+      "expected": "ALARM",
+      "predicted": "ALARM",
+      "correct": true,
+      "inference_ms": 11616
+    },
+    {
+      "name": "alarm_en_03",
+      "expected": "ALARM",
+      "predicted": "ALARM",
+      "correct": true,
+      "inference_ms": 10515
+    },
+    {
+      "name": "alarm_ar_01",
+      "expected": "ALARM",
+      "predicted": "ALARM",
+      "correct": true,
+      "inference_ms": 19843
+    },
+    {
+      "name": "alarm_ar_02",
+      "expected": "ALARM",
+      "predicted": "ALARM",
+      "correct": true,
+      "inference_ms": 15821
+    },
+    {
+      "name": "other_en_01",
+      "expected": "OTHER",
+      "predicted": "OTHER",
+      "correct": true,
+      "inference_ms": 10463
+    },
+    {
+      "name": "other_en_02",
+      "expected": "OTHER",
+      "predicted": "OTHER",
+      "correct": true,
+      "inference_ms": 10926
+    },
+    {
+      "name": "other_en_03",
+      "expected": "OTHER",
+      "predicted": "OTHER",
+      "correct": true,
+      "inference_ms": 14056
+    },
+    {
+      "name": "other_ar_01",
+      "expected": "OTHER",
+      "predicted": "UNKNOWN",
+      "correct": false,
+      "inference_ms": 19411
+    },
+    {
+      "name": "other_ar_02",
+      "expected": "OTHER",
+      "predicted": "OTHER",
+      "correct": true,
+      "inference_ms": 14474
+    },
+    {
+      "name": "unknown_en_01",
+      "expected": "UNKNOWN",
+      "predicted": "UNKNOWN",
+      "correct": true,
+      "inference_ms": 8654
+    },
+    {
+      "name": "unknown_en_02",
+      "expected": "UNKNOWN",
+      "predicted": "UNKNOWN",
+      "correct": true,
+      "inference_ms": 11355
+    },
+    {
+      "name": "unknown_en_03",
+      "expected": "UNKNOWN",
+      "predicted": "UNKNOWN",
+      "correct": true,
+      "inference_ms": 9010
+    },
+    {
+      "name": "unknown_ar_01",
+      "expected": "UNKNOWN",
+      "predicted": "UNKNOWN",
+      "correct": true,
+      "inference_ms": 12152
+    },
+    {
+      "name": "unknown_ar_02",
+      "expected": "UNKNOWN",
+      "predicted": "UNKNOWN",
+      "correct": true,
+      "inference_ms": 14302
+    }
+  ],
+  "dataset_sha256": "1c7159e1caf343db832d728f7efa4517b2d5d3015fd472d62ad3abd6a79093bc",
+  "manifest_sha256": "68bc953d51ad4fa653317ae5ad82ac533fdf323497f9f5cce51947b2b700e80a",
+  "browser": "147.0.7727.15",
+  "measured_at": "2026-09-24T17:32:22.115Z",
+  "accuracy": 0.9,
+  "per_class": {
+    "POWER": {
+      "tp": 2,
+      "fp": 0,
+      "fn": 3,
+      "precision": 1,
+      "recall": 0.4,
+      "f1": 0.5714285714285715
+    },
+    "SENSOR": {
+      "tp": 5,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "CIRCUIT": {
+      "tp": 5,
+      "fp": 1,
+      "fn": 0,
+      "precision": 0.8333333333333334,
+      "recall": 1,
+      "f1": 0.9090909090909091
+    },
+    "MECHANICAL": {
+      "tp": 5,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "SOFTWARE": {
+      "tp": 5,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "ALARM": {
+      "tp": 5,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    "OTHER": {
+      "tp": 4,
+      "fp": 1,
+      "fn": 1,
+      "precision": 0.8,
+      "recall": 0.8,
+      "f1": 0.8000000000000002
+    },
+    "UNKNOWN": {
+      "tp": 5,
+      "fp": 2,
+      "fn": 0,
+      "precision": 0.7142857142857143,
+      "recall": 1,
+      "f1": 0.8333333333333333
+    }
+  },
+  "macro_precision": 0.918452380952381,
+  "macro_recall": 0.9,
+  "macro_f1": 0.8892316017316018
+}

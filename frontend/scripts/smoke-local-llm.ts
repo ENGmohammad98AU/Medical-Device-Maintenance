@@ -1,10 +1,11 @@
+// Historical Qwen3-0.6B ONNX baseline, not the current deployed model.
 /** Optional real inference check. Downloads public weights; no key or API fees.
  * Runs the shared classification engine on native CPU, not browser WASM.
  * LOCAL_MODEL_PATH can point to a verified offline copy of the pinned revision.
  */
 import { env, pipeline } from '@huggingface/transformers';
-import { classifyLocally } from '../src/llm/localModelEngine';
-import config from '../src/llm/localModelConfig.json';
+import { classifyLocally } from '../src/llm/onnxBaselineEngine';
+import config from '../src/llm/onnxBaselineConfig.json';
 import cases from '../src/llm/smokeCases.json';
 
 const path = process.env.LOCAL_MODEL_PATH;

@@ -2,44 +2,44 @@
 <style>body{max-width:900px;margin:32px auto;padding:16px;font:18px system-ui;background:#fafafa;color:#17243c}button{padding:12px;margin:8px;font:inherit}pre{white-space:pre-wrap;overflow-wrap:anywhere;text-align:left;font:14px monospace}#status{padding:16px;background:#e8f0ff}</style>
 <h1>اختبار ترقية Qwen3‑1.7B</h1>
 <p>صفحة تحقق بأوصاف اصطناعية. لا تحفظ بلاغات ولا تتصل بخدمة ذكاء اصطناعي مدفوعة. التنزيل الأول نحو 1.1 غيغابايت. تتطلب Chrome أو Edge حديثًا وذاكرة متاحة.</p>
-<button id="smoke">تشغيل مثال البطارية</button><button id="classification">قياس التصنيف: 40 حالة</button><button id="support">اختبار اختيار المرجع: 6 حالات</button>
-<p id="status">جاهز للاختبار</p><pre id="output" dir="ltr"></pre>
+<button id="smoke" disabled>تشغيل مثال البطارية</button><button id="classification" disabled>قياس التصنيف: 40 حالة</button><button id="support" disabled>اختبار اختيار المرجع: 6 حالات</button>
+<p id="status">جارٍ تجهيز المتصفح</p><pre id="output" dir="ltr"></pre>
 <script type="module">
 import {Wllama} from './llm/wllama.js';
+import {chooseGgufToken} from './llm/choice.js';
+import {loadGgufModel} from './llm/storage.js';
+import {prepareIsolation,inferenceThreads} from './llm/isolation.js';
+await prepareIsolation(new URL('./llm-isolation-worker.js',location.href).href);
 const {config,cases,supportCases}=await fetch('./llm/candidate.json').then(r=>r.json());
 const output=document.querySelector('#output'), status=document.querySelector('#status');
-const model=new Wllama({'single-thread/wllama.wasm':'./llm/wllama.wasm'},{suppressNativeLog:true,logger:{debug(){},log(){},warn:console.warn,error:console.error}});
-let loaded=false;
+const threads=inferenceThreads();
+const model=new Wllama({'single-thread/wllama.wasm':'./llm/wllama.wasm','multi-thread/wllama.wasm':'./llm/wllama-multi.wasm'},{suppressNativeLog:true,logger:{debug(){},log(){},warn:console.warn,error:console.error}});
+status.textContent=`جاهز للاختبار؛ عدد خيوط المعالجة: ${threads}`;
+document.querySelectorAll('button').forEach(b=>b.disabled=false);
+let loaded=false,storageMode;
 async function run(kind){
  document.querySelectorAll('button').forEach(b=>b.disabled=true);
  const start=performance.now();const rows=[];output.textContent='';
  try {
   if(!loaded){
-   await model.loadModelFromUrl(`https://huggingface.co/${config.model}/resolve/${config.revision}/${config.model_file}`,{
-    n_ctx:config.context_tokens,n_batch:config.batch_tokens,n_threads:1,seed:0,
+   storageMode=await loadGgufModel(model,`https://huggingface.co/${config.model}/resolve/${config.revision}/${config.model_file}`,{
+    n_ctx:config.context_tokens,n_batch:config.batch_tokens,n_threads:threads,seed:0,
     progressCallback:({loaded,total})=>status.textContent=`تحميل النموذج: ${Math.round(100*loaded/total)}%`
-   });loaded=true;
+   },config.model_file_bytes);loaded=true;
   }
   const loadMs=Math.round(performance.now()-start);
   const tests=kind==='support'?supportCases:kind==='smoke'?cases.slice(0,1):cases;
   for(const c of tests){
    status.textContent=`تشغيل الحالة ${rows.length+1} من ${tests.length}`;
-   const t=performance.now();const tokens=await model.tokenize(c.prompt,true);
-   if(tokens.length>config.max_input_tokens)throw Error('input_too_long');
-   const allowed=new Set();
-   for(const label of c.labels){
-    const ids=await model.tokenize(label,false);if(ids.length!==1)throw Error('invalid_output');allowed.add(ids[0]);
-    if(kind==='support'){const spaced=await model.tokenize(' '+label,false);if(spaced.length===1)allowed.add(spaced[0]);}
-   }
-   await model.createCompletion(c.prompt,{nPredict:0,useCache:true,sampling:{temp:0,penalty_repeat:1}});
-   const choices=(await model.getLogits(-1)).filter(x=>allowed.has(x.token)&&Number.isFinite(x.p)&&x.p>0);
-   choices.sort((a,b)=>b.p-a.p);if(!choices.length)throw Error('invalid_output');
-   const token=(await model.detokenize([choices[0].token],true)).trim();
+   const t=performance.now();
+   const token=await chooseGgufToken(model,c.prompt,c.labels,config.max_input_tokens,kind==='support',step=>{
+     status.textContent=`تشغيل الحالة ${rows.length+1} من ${tests.length}: ${step}`;console.log('INFERENCE_STAGE',kind,rows.length+1,step);
+   });
    const predicted=kind==='support'?token:config.categories[token];
    const row={name:c.name,expected:c.expected,predicted,correct:predicted===c.expected,inference_ms:Math.round(performance.now()-t)};
    rows.push(row);output.textContent+=JSON.stringify(row)+'\n';
   }
-  const result={model:config.model,revision:config.revision,dtype:config.dtype,runtime:config.runtime,prompt_version:config.prompt_version,kind,load_ms:loadMs,total:rows.length,correct:rows.filter(r=>r.correct).length,rows};
+  const result={model:config.model,revision:config.revision,dtype:config.dtype,runtime:config.runtime,prompt_version:config.prompt_version,threads:model.getNumThreads(),isolated:crossOriginIsolated,storage_mode:storageMode,kind,load_ms:loadMs,total:rows.length,correct:rows.filter(r=>r.correct).length,rows};
   output.textContent=JSON.stringify(result,null,2);status.textContent=`اكتمل الاختبار: ${result.correct}/${result.total}`;
  }catch(e){status.textContent='فشل الاختبار';output.textContent+='\n'+String(e);console.error(e);}
  finally{document.querySelectorAll('button').forEach(b=>b.disabled=false);}
