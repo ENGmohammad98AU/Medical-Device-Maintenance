@@ -1,9 +1,10 @@
+// Historical Qwen3-0.6B ONNX baseline, not the current deployed model.
 /** Fixed development benchmark for the pinned local Qwen classifier.
  * This is a research-development benchmark, not a clinical validation dataset.
  */
 import { env, pipeline } from '@huggingface/transformers';
-import { classifyLocally } from '../src/llm/localModelEngine';
-import config from '../src/llm/localModelConfig.json';
+import { classifyLocally } from '../src/llm/onnxBaselineEngine';
+import config from '../src/llm/onnxBaselineConfig.json';
 import cases from '../src/llm/benchmarkCases.json';
 
 type Row = {name:string; report_text:string; device_type:string; patient_connected:boolean; expected:string};

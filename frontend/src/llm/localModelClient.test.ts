@@ -39,7 +39,7 @@ describe('local inference lifecycle', () => {
   it('bounds inference time and terminates computation', async () => {
     const client = new LocalModelClient(); const result = client.run(input, vi.fn());
     FakeWorker.instances[0].message({id: 1, progress: {stage: 'running'}});
-    vi.advanceTimersByTime(120_000);
+    vi.advanceTimersByTime(15 * 60_000);
     expect((await result).error_code).toBe('timeout'); expect(FakeWorker.instances[0].terminate).toHaveBeenCalledOnce();
   });
   it('handles runtime crashes without an unresolved request', async () => {

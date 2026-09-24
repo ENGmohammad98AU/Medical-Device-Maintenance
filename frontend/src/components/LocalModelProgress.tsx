@@ -9,6 +9,7 @@ export default function LocalModelProgress({progress, cancel, cancelLabel = 'إ�
       ? progress.task === 'reference_selection' ? 'النموذج يتحقق من نطاق الطلب ويختار المرجع المناسب…' : 'النموذج يصنّف الوصف على جهازك…'
       : `تحميل النموذج وتجهيزه${progress.percent === undefined ? '…' : `: ${Math.floor(progress.percent)}%`}`}</Typography>
     <LinearProgress variant={progress.stage === 'loading' && progress.percent !== undefined ? 'determinate' : 'indeterminate'} value={progress.percent} />
+    <Typography variant="caption">قد يستغرق التحليل الأول عدة دقائق بحسب جهازك. يمكنك إلغاؤه في أي وقت.</Typography>
     <Button onClick={cancel} sx={{mt: 1}}>{cancelLabel}</Button>
   </Box>;
 }

@@ -33,8 +33,8 @@ export default function LocalModelPage() {
     <Typography component="h1" variant="h4" gutterBottom>تجربة النموذج المجاني</Typography>
     <Typography sx={{mb: 3}}>تجربة مباشرة دون حساب أو مفتاح API، باستخدام أوصاف اصطناعية فقط.</Typography>
     <Card><CardContent>
-      <Typography variant="h6">Qwen3‑0.6B المحلي</Typography>
-      <Typography variant="body2" color="text.secondary" sx={{mb: 2}}>يعمل داخل المتصفح. التنزيل الأول نحو 950 ميغابايت. يحتاج إلى اتصال جيد وذاكرة متاحة؛ وقد يحتفظ المتصفح بالملفات للاستخدام التالي.</Typography>
+      <Typography variant="h6">Qwen3‑1.7B المحلي</Typography>
+      <Typography variant="body2" color="text.secondary" sx={{mb: 2}}>يعمل داخل المتصفح. التنزيل الأول نحو 1.1 غيغابايت. يحتاج إلى Chrome أو Edge حديث واتصال جيد وذاكرة متاحة؛ وقد يحتفظ المتصفح بالملفات للاستخدام التالي.</Typography>
       <TextField fullWidth select label="نوع التجربة" value={mode} disabled={busy} sx={{mb: 2}} onChange={(e) => {setMode(e.target.value); setSelected(0); setResult(null);}}>
         <MenuItem value="support">معالجة الطلب واختيار المرجع</MenuItem><MenuItem value="classification">تصنيف العطل فقط</MenuItem>
       </TextField>

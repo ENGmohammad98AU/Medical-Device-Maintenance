@@ -1,13 +1,14 @@
+// Historical Qwen3-0.6B ONNX baseline, not the current deployed model.
 /** Opt-in real WASM inference. Synthetic development cases, not a clinical benchmark. */
 import * as ort from 'onnxruntime-web';
-import config from '../src/llm/localModelConfig.json';
+import config from '../src/llm/onnxBaselineConfig.json';
 import supportConfig from '../src/llm/supportModelConfig.json';
 import cases from '../src/llm/supportSmokeCases.json';
 import type { SupportCandidate } from '../src/llm/supportModelContract';
 
 (globalThis as unknown as Record<symbol, unknown>)[Symbol.for('onnxruntime')] = ort;
 const {env, pipeline} = await import('@huggingface/transformers');
-const {selectSupportLocally} = await import('../src/llm/localModelEngine');
+const {selectSupportLocally} = await import('../src/llm/onnxBaselineEngine');
 ort.env.wasm.numThreads = 1;
 ort.env.wasm.wasmPaths = new URL('../node_modules/onnxruntime-web/dist/', import.meta.url).href;
 const path = process.env.LOCAL_MODEL_PATH;

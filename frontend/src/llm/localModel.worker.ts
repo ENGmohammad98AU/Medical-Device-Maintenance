@@ -1,32 +1,33 @@
 /// <reference lib="webworker" />
-import { env, pipeline, type TextGenerationPipeline } from '@huggingface/transformers';
+import { Wllama } from '@wllama/wllama';
+import { inferenceThreads } from './browserIsolation.js';
 import { classifyLocally, selectSupportLocally } from './localModelEngine';
 import type { SupportResult } from './supportModelContract';
 import { inputHash, localFailure, localModelConfig as config, type LocalInput, type LocalError } from './localModelContract';
 
-env.allowLocalModels = false;
-// CPU/WASM requires neither WebGPU nor cross-origin isolation.
-env.backends.onnx.wasm!.numThreads = 1;
-env.backends.onnx.wasm!.proxy = false;
-env.backends.onnx.wasm!.wasmPaths = new URL(`${import.meta.env.BASE_URL}onnx/`, self.location.origin).href;
-let generator: Promise<TextGenerationPipeline> | undefined;
+// wllama 2.4 resolves assets against document.baseURI. In this outer worker,
+// provide only that URL base. The runtime itself starts a dedicated worker.
+Object.defineProperty(globalThis, 'document', {value: {baseURI: self.location.href}});
+let generator: Promise<Wllama> | undefined;
 self.addEventListener('message', async (event: MessageEvent<{id: number; input: LocalInput}>) => {
   const {id, input} = event.data;
   const started = performance.now();
   let loading = true;
   try {
     self.postMessage({id, progress: {stage: 'loading'}});
-    generator ??= pipeline<'text-generation'>('text-generation', config.model, {
-      dtype: 'q4', device: 'wasm', revision: config.revision,
-      // The default graph optimizations abort for this pinned q4 model on WASM.
-      // Avoid optimizer/prepacking copies and arena growth in the browser.
-      session_options: {...config.wasm_session_options, graphOptimizationLevel: 'disabled'},
-      progress_callback: (event) => {
-        if (event.status === 'progress' && event.file.endsWith('.onnx')) {
-          self.postMessage({id, progress: {stage: 'loading', percent: Math.min(100, event.progress)}});
-        }
-      },
-    });
+    if (!WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,5,3,1,4,1]))) throw new Error('unsupported_browser');
+    generator ??= (async () => {
+      const model = new Wllama({
+        'single-thread/wllama.wasm': new URL(`${import.meta.env.BASE_URL}llm/wllama.wasm`, self.location.origin).href,
+        'multi-thread/wllama.wasm': new URL(`${import.meta.env.BASE_URL}llm/wllama-multi.wasm`, self.location.origin).href},
+      {suppressNativeLog: true, logger: {debug() {}, log() {}, warn() {}, error() {}}});
+      await model.loadModelFromUrl(`https://huggingface.co/${config.model}/resolve/${config.revision}/${config.model_file}`, {
+        n_ctx: config.context_tokens, n_batch: config.batch_tokens, n_threads: inferenceThreads(), seed: 0,
+        progressCallback: ({loaded, total}) => self.postMessage({id, progress: {stage: 'loading',
+          percent: total ? Math.min(100, 100 * loaded / total) : undefined}}),
+      });
+      return model;
+    })();
     const loaded = await generator;
     loading = false;
     self.postMessage({id, progress: {stage: 'running', task: 'classification'}});
@@ -52,7 +53,7 @@ self.addEventListener('message', async (event: MessageEvent<{id: number; input: 
     }});
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
-    const code: LocalError = message === 'input_too_long' || message === 'invalid_output' ? message : 'load_failed';
+    const code: LocalError = message === 'input_too_long' || message === 'invalid_output' || message === 'unsupported_browser' ? message : 'load_failed';
     // Loading has no report text. Keep diagnostics local and strip resource URLs;
     // inference failures expose only the exception name, never user input.
     const diagnostic = loading ? message.replace(/https?:\/\/\S+/g, '[model asset]').slice(0, 500)

@@ -34,7 +34,7 @@ export function localFailure(error_code: LocalError): LocalResult {
 export const localErrorText: Record<LocalError, string> = {
   cancelled: 'أُلغي تشغيل النموذج المحلي.',
   timeout: 'استغرق تشغيل النموذج وقتًا طويلًا. جرّب جهازًا أسرع أو تابع بالقواعد.',
-  unsupported_browser: 'يحتاج التشغيل المحلي إلى متصفح حديث يدعم WebAssembly واتصال HTTPS.',
+  unsupported_browser: 'يحتاج هذا النموذج إلى متصفح حديث يدعم WebAssembly Memory64 واتصال HTTPS. جرّب إصدارًا حديثًا من Chrome أو Edge.',
   load_failed: 'تعذر تحميل النموذج أو تشغيله. تحقق من الاتصال والذاكرة المتاحة ثم أعد المحاولة.',
   input_too_long: 'الوصف والسياق أكبر من سعة النموذج المحلي. اختصر الوصف أو تابع بالقواعد؛ لم يُحذف جزء منه للتحليل.',
   invalid_output: 'لم يُرجع النموذج اختيارًا صالحًا لهذه الخطوة.',
