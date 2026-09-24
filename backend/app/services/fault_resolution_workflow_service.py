@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models.fault_report import FaultReport, FaultSeverity, FaultStatus
 from app.models.fault_resolution_workflow import FaultResolutionWorkflow
+from app.models.audit_log import AuditLog
 
 
 ALLOWED_DECISIONS = {"APPROVED", "MODIFIED", "ESCALATED", "REJECTED"}
@@ -36,6 +37,52 @@ class FaultResolutionWorkflowService:
         self.db.flush()
         return workflow
 
+    @staticmethod
+    def _clear_review(workflow):
+        for field in ("specialist_decision", "specialist_comments", "decision_by", "decision_at",
+                      "action_taken", "verification_result", "verified_by", "verified_at"):
+            setattr(workflow, field, None)
+
+    def _record_event(self, workflow, event: str, user_id=None, reason=None):
+        """Preserve earlier execution evidence before replacing the current cycle."""
+        if not workflow.audit_log_id:
+            return
+        audit = self.db.get(AuditLog, workflow.audit_log_id)
+        if audit is None:
+            return
+        snapshot = {key: value.isoformat() if isinstance(value, datetime) else value
+                    for key, value in self.to_dict(workflow).items()}
+        metadata = dict(audit.classification_result or {})
+        metadata["resolution_events"] = [*metadata.get("resolution_events", []), {
+            "event": event, "user_id": user_id, "reason": reason,
+            "timestamp": datetime.utcnow().isoformat(), "workflow": snapshot,
+        }]
+        audit.classification_result = metadata
+
+    def prepare_report_update(self, report, changes):
+        """Apply lifecycle guards to the generic report-update API as well."""
+        if changes.get("status") == FaultStatus.RESOLVED:
+            raise ValueError("وثّق الإجراء المنفذ ونتيجة التحقق عبر مسار الحل قبل الإغلاق.")
+        changed = {key for key, value in changes.items() if getattr(report, key) != value}
+        context_changed = bool(changed & {"device_id", "alarm_code", "error_message", "description"})
+        if report.status == FaultStatus.RESOLVED and (context_changed or "status" in changed):
+            raise ValueError("أعد فتح البلاغ مع ذكر السبب قبل تغيير بياناته أو حالته.")
+        workflow = self.get(report.id)
+        if workflow is not None and "status" in changed:
+            raise ValueError("تُحدّث حالة هذا البلاغ عبر قرار المختص والتحقق أو إعادة الفتح.")
+        if context_changed and workflow is not None:
+            self._record_event(workflow, "REPORT_EDITED")
+            self._clear_review(workflow)
+            workflow.audit_log_id = None
+            workflow.outcome = "NEEDS_ANALYSIS"
+            workflow.selected_reference_id = None
+            workflow.reference_source = ""
+            workflow.recommended_solution = ""
+            workflow.verification_instructions = ""
+            report.status = FaultStatus.IN_PROGRESS
+            report.resolved_at = None
+            report.resolved_by = None
+
     def record_analysis(
         self,
         report_id: int,
@@ -59,20 +106,16 @@ class FaultResolutionWorkflowService:
         report = self._get_report(report_id)
         if report is None:
             raise ValueError("Fault report not found")
+        if report.status == FaultStatus.RESOLVED:
+            raise ValueError("أعد فتح البلاغ مع ذكر السبب قبل إجراء تحليل جديد.")
 
         workflow = self._get_or_create(report_id)
         previous_audit_log_id = workflow.audit_log_id
         if previous_audit_log_id and previous_audit_log_id != audit_log_id:
             # A new analysis supersedes the old recommendation. Human approval,
             # execution evidence and verification must be collected again.
-            workflow.specialist_decision = None
-            workflow.specialist_comments = None
-            workflow.decision_by = None
-            workflow.decision_at = None
-            workflow.action_taken = None
-            workflow.verification_result = None
-            workflow.verified_by = None
-            workflow.verified_at = None
+            self._record_event(workflow, "ANALYSIS_SUPERSEDED")
+        self._clear_review(workflow)
         workflow.audit_log_id = audit_log_id
         workflow.classification_source = classification_source
         workflow.fault_category = fault_category
@@ -92,8 +135,9 @@ class FaultResolutionWorkflowService:
         normalized_severity = (severity or "").lower()
         if normalized_severity in FaultSeverity._value2member_map_:
             report.severity = FaultSeverity(normalized_severity)
-        if report.status == FaultStatus.OPEN:
-            report.status = FaultStatus.IN_PROGRESS
+        report.status = FaultStatus.IN_PROGRESS
+        report.resolved_at = None
+        report.resolved_by = None
 
         self.db.commit()
         self.db.refresh(workflow)
@@ -111,12 +155,26 @@ class FaultResolutionWorkflowService:
         if decision not in ALLOWED_DECISIONS:
             raise ValueError("Invalid specialist decision")
         workflow = self.get(report_id)
-        if workflow is None:
+        if workflow is None or not workflow.audit_log_id or workflow.outcome == "NEEDS_ANALYSIS":
             raise ValueError("Analyze the fault report before recording a decision")
+        report = self._get_report(report_id)
+        if report is None or report.status == FaultStatus.RESOLVED:
+            raise ValueError("أعد فتح البلاغ قبل تغيير قرار المختص.")
+        if workflow.specialist_decision:
+            self._record_event(workflow, "DECISION_SUPERSEDED", user_id)
+        self._clear_review(workflow)
+        workflow.outcome = "PENDING"
         workflow.specialist_decision = decision
         workflow.specialist_comments = comments
         workflow.decision_by = user_id
         workflow.decision_at = datetime.utcnow()
+        if decision == "ESCALATED":
+            report.status = FaultStatus.ESCALATED
+        elif decision == "REJECTED":
+            report.status = FaultStatus.REJECTED
+        else:
+            report.status = FaultStatus.IN_PROGRESS
+        self._record_event(workflow, "SPECIALIST_DECISION", user_id)
         self.db.commit()
         self.db.refresh(workflow)
         return workflow
@@ -155,17 +213,23 @@ class FaultResolutionWorkflowService:
         outcome = outcome.strip().upper()
         if outcome not in ALLOWED_OUTCOMES:
             raise ValueError("Invalid resolution outcome")
+        action_taken = action_taken.strip()
+        verification_result = verification_result.strip()
+        if not 3 <= len(action_taken) <= 4000 or not 3 <= len(verification_result) <= 4000:
+            raise ValueError("أدخل إجراءً منفذًا ونتيجة تحقق من 3 إلى 4000 محرف لكل حقل.")
         workflow = self.get(report_id)
         report = self._get_report(report_id)
-        if workflow is None or report is None:
+        if workflow is None or report is None or not workflow.audit_log_id or workflow.outcome == "NEEDS_ANALYSIS":
             raise ValueError("Analyze the fault report before verifying the outcome")
+        if report.status == FaultStatus.RESOLVED:
+            raise ValueError("أعد فتح البلاغ قبل تسجيل نتيجة تحقق جديدة.")
         if not workflow.specialist_decision:
             raise ValueError("A specialist decision is required before recording the executed solution")
-        if workflow.specialist_decision == "REJECTED" and outcome == "RESOLVED":
-            raise ValueError("A rejected recommendation cannot be marked resolved without a new analysis or decision")
+        if outcome == "RESOLVED" and workflow.specialist_decision not in {"APPROVED", "MODIFIED"}:
+            raise ValueError("يلزم اعتماد المختص للتوصية قبل تسجيل نجاح الحل.")
 
-        workflow.action_taken = action_taken.strip()
-        workflow.verification_result = verification_result.strip()
+        workflow.action_taken = action_taken
+        workflow.verification_result = verification_result
         workflow.outcome = outcome
         workflow.verified_by = user_id
         workflow.verified_at = datetime.utcnow()
@@ -179,17 +243,30 @@ class FaultResolutionWorkflowService:
             report.resolved_at = None
             report.resolved_by = None
 
+        self._record_event(workflow, "RESOLUTION_VERIFIED", user_id)
         self.db.commit()
         self.db.refresh(workflow)
         return workflow
 
     def reopen(self, report_id: int, *, reason: str, user_id: int) -> FaultResolutionWorkflow:
-        workflow = self.get(report_id)
+        reason = reason.strip()
+        if not 3 <= len(reason) <= 2000:
+            raise ValueError("أدخل سبب إعادة الفتح من 3 إلى 2000 محرف.")
         report = self._get_report(report_id)
-        if workflow is None or report is None:
-            raise ValueError("Fault workflow not found")
-        workflow.outcome = "FOLLOW_UP"
-        workflow.reopen_reason = reason.strip()
+        if report is None:
+            raise ValueError("Fault report not found")
+        if report.status != FaultStatus.RESOLVED:
+            raise ValueError("يمكن إعادة فتح البلاغات المغلقة فقط.")
+        workflow = self._get_or_create(report_id)
+        self._record_event(workflow, "REOPENED", user_id, reason)
+        self._clear_review(workflow)
+        workflow.audit_log_id = None
+        workflow.outcome = "NEEDS_ANALYSIS"
+        workflow.selected_reference_id = None
+        workflow.reference_source = ""
+        workflow.recommended_solution = ""
+        workflow.verification_instructions = ""
+        workflow.reopen_reason = reason
         workflow.reopened_by = user_id
         workflow.reopened_at = datetime.utcnow()
         report.status = FaultStatus.IN_PROGRESS

@@ -1,4 +1,4 @@
-/** Empirical held-out benchmark for the pinned local Qwen classifier.
+/** Fixed development benchmark for the pinned local Qwen classifier.
  * This is a research-development benchmark, not a clinical validation dataset.
  */
 import { env, pipeline } from '@huggingface/transformers';

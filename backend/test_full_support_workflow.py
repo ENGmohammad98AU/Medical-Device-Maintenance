@@ -63,7 +63,7 @@ def test_analysis_decision_execution_verification_and_reopen_are_linked(api_clie
 
     reopened = service.reopen(report.id, reason="Symptom recurred during follow-up", user_id=1)
     db.refresh(report)
-    assert reopened.outcome == "FOLLOW_UP"
+    assert reopened.outcome == "NEEDS_ANALYSIS"
     assert report.status == FaultStatus.IN_PROGRESS
     assert report.resolved_at is None
 

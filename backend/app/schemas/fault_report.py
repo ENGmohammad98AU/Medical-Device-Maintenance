@@ -2,7 +2,7 @@
 Fault Report Schemas
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from datetime import datetime
 from app.models.fault_report import FaultSeverity, FaultStatus
@@ -12,28 +12,39 @@ class FaultReportBase(BaseModel):
     """Base fault report schema"""
     device_id: int
     alarm_code: Optional[str] = None
-    error_message: str = Field(..., min_length=1, max_length=500)
-    description: str = Field(default="", min_length=0, max_length=2000)
+    error_message: str = Field(..., min_length=1, max_length=4000)
+    description: str = Field(default="", min_length=0, max_length=4000)
     severity: FaultSeverity = FaultSeverity.MEDIUM
     image_url: Optional[str] = None
 
 
 class FaultReportCreate(FaultReportBase):
     """Fault report creation schema"""
-    pass
+    @field_validator("error_message", "description", mode="before")
+    @classmethod
+    def strip_text(cls, value):
+        return value.strip() if isinstance(value, str) else value
 
 
 class FaultReportUpdate(BaseModel):
     """Fault report update schema"""
     device_id: Optional[int] = None
     alarm_code: Optional[str] = None
-    error_message: Optional[str] = Field(None, min_length=1, max_length=500)
-    description: Optional[str] = Field(None, min_length=0, max_length=2000)
+    error_message: Optional[str] = Field(None, min_length=1, max_length=4000)
+    description: Optional[str] = Field(None, min_length=0, max_length=4000)
     severity: Optional[FaultSeverity] = None
     status: Optional[FaultStatus] = None
     engineer_notes: Optional[str] = None
     ai_analysis: Optional[str] = None
     ai_confidence: Optional[int] = Field(None, ge=0, le=100)
+
+
+    @field_validator("device_id", "error_message", "description", "severity", "status", mode="before")
+    @classmethod
+    def validate_supplied_value(cls, value):
+        if value is None:
+            raise ValueError("Supplied report fields cannot be null")
+        return value.strip() if isinstance(value, str) else value
 
 
 class FaultReportInDB(FaultReportBase):

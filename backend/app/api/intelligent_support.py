@@ -15,7 +15,7 @@ from app.database.connection import get_db
 from app.api.dependencies import get_current_active_user
 from app.models.user import User, UserRole
 from app.models.device import Device
-from app.models.fault_report import FaultReport
+from app.models.fault_report import FaultReport, FaultStatus
 from app.services.fault_classification_service import (
     FaultClassificationService,
     SeverityLevel,
@@ -201,6 +201,12 @@ def prepare_customer_support(
     device = db.query(Device).filter(Device.id == request.device_id).first()
     if not device:
         raise HTTPException(status_code=404, detail="Device not found")
+    if request.report_id is not None:
+        report = db.query(FaultReport).filter(FaultReport.id == request.report_id).first()
+        if not report or report.device_id != device.id:
+            raise HTTPException(status_code=422, detail="Fault report does not belong to the selected device")
+        if report.status == FaultStatus.RESOLVED:
+            raise HTTPException(status_code=409, detail="أعد فتح البلاغ مع ذكر السبب قبل إجراء تحليل جديد.")
     context, _ = prepare_support(request, device, db)
     return context
 
@@ -243,6 +249,8 @@ def analyze_fault(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fault report not found")
         if report.device_id != device.id:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Fault report does not belong to the selected device")
+        if report.status == FaultStatus.RESOLVED:
+            raise HTTPException(status_code=409, detail="أعد فتح البلاغ مع ذكر السبب قبل إجراء تحليل جديد.")
 
     device_type = device.type.value.upper().replace('-', '_').replace(' ', '_')
     device_name = device.name
@@ -490,6 +498,9 @@ def analyze_fault(
 
         workflow_payload = None
         if request.report_id is not None:
+            report.error_message = description
+            report.description = description
+            report.alarm_code = fault or None
             workflow = FaultResolutionWorkflowService(db).record_analysis(
                 request.report_id,
                 audit_log_id=audit_entry.id,
@@ -831,18 +842,21 @@ def add_engineer_decision(
             detail="Only administrators and biomedical engineers can add decisions"
         )
     
-    entry = AuditTrailService(db).add_engineer_decision(log_id, decision, comments)
-    if entry:
-        FaultResolutionWorkflowService(db).record_specialist_decision_by_audit(
-            log_id, decision=decision, comments=comments, user_id=current_user.id
-        )
-    
+    audit_service = AuditTrailService(db)
+    entry = audit_service.get_log_entry(log_id)
     if not entry:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Audit log entry not found: {log_id}"
         )
     
+    try:
+        FaultResolutionWorkflowService(db).record_specialist_decision_by_audit(
+            log_id, decision=decision, comments=comments, user_id=current_user.id
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    entry = audit_service.add_engineer_decision(log_id, decision, comments)
     return {
         "message": "Decision added successfully",
         "log_id": log_id,

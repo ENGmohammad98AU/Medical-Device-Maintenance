@@ -5,7 +5,7 @@ Fault Reports API Endpoints
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from app.database.connection import get_db
 from app.api.dependencies import get_current_active_user, require_roles
 from app.models.user import User, UserRole
@@ -37,8 +37,20 @@ class ResolutionVerificationRequest(BaseModel):
     outcome: str = Field(..., description="RESOLVED, FAILED, or FOLLOW_UP")
 
 
+    @field_validator("action_taken", "verification_result", mode="before")
+    @classmethod
+    def strip_evidence(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
+
 class ReopenRequest(BaseModel):
     reason: str = Field(..., min_length=3, max_length=2000)
+
+
+    @field_validator("reason", mode="before")
+    @classmethod
+    def strip_reason(cls, value):
+        return value.strip() if isinstance(value, str) else value
 
 
 router = APIRouter(prefix="/api/fault-reports", tags=["Fault Reports"])
@@ -153,10 +165,12 @@ def reopen_fault_report(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(UserRole.ADMINISTRATOR, UserRole.BIOMEDICAL_ENGINEER, UserRole.MEDICAL_TECHNICIAN)),
 ):
+    if FaultReportService(db).get_fault_report(report_id) is None:
+        raise HTTPException(status_code=404, detail="Fault report not found")
     try:
         workflow = FaultResolutionWorkflowService(db).reopen(report_id, reason=payload.reason, user_id=current_user.id)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=409, detail=str(exc))
     return FaultResolutionWorkflowService.to_dict(workflow)
 
 
@@ -196,7 +210,10 @@ def update_fault_report(
 ):
     """Update fault report"""
     fault_service = FaultReportService(db)
-    report = fault_service.update_fault_report(report_id, report_data)
+    try:
+        report = fault_service.update_fault_report(report_id, report_data)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
     if not report:
         raise HTTPException(status_code=404, detail="Fault report not found")
     return report
@@ -214,7 +231,7 @@ def resolve_fault_report(
     if not report:
         raise HTTPException(status_code=404, detail="Fault report not found")
     workflow = FaultResolutionWorkflowService(db).get(report_id)
-    if workflow is None or workflow.outcome != "RESOLVED":
+    if workflow is None or workflow.outcome != "RESOLVED" or report.status.value != "resolved":
         raise HTTPException(status_code=409, detail="Record the executed action and verification result through /verify-resolution before closing the report")
     return report
 

@@ -182,7 +182,7 @@ jobs:
         run: |
           npm test -- --run --passWithNoTests
 
-      - name: Run held-out local LLM benchmark
+      - name: Run development local LLM benchmark
         shell: pwsh
         working-directory: frontend
         run: |

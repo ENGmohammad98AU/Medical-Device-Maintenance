@@ -149,6 +149,7 @@ export default function FaultReportsPage() {
   };
 
   const handleOpenDialog = (report?: FaultReport) => {
+    setAiAnalysis(null); setDecisionSaved(false);
     if (report) {
       setEditingReport(report);
       setFormData({
@@ -166,17 +167,20 @@ export default function FaultReportsPage() {
   };
 
   const handleCloseDialog = () => {
+    if (analyzing) return;
     setDialogOpen(false);
     setEditingReport(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (analyzing) return;
     if (!formData.device_id || !formData.error_message.trim()) {
       setError('Please select a device and enter an error message');
       return;
     }
 
+    setAnalyzing(true);
     try {
       const submitData = {
         ...formData,
@@ -189,14 +193,18 @@ export default function FaultReportsPage() {
       } else {
         await api.post('/api/fault-reports/', submitData);
       }
-      handleCloseDialog();
+      setDialogOpen(false);
+      setEditingReport(null);
       fetchReports();
     } catch (err: any) {
-      setError('Failed to save fault report');
+      setError(typeof err.response?.data?.detail === 'string' ? err.response.data.detail : 'تعذر حفظ البلاغ؛ تحقق من الوصف وحالة الطلب.');
+    } finally {
+      setAnalyzing(false);
     }
   };
 
   const handleAnalyze = async () => {
+    if (analyzing) return;
     if (!formData.device_id || formData.error_message.trim().length < 10) {
       setError('اختر الجهاز وأدخل وصفًا فنيًا لا يقل عن 10 محارف');
       return;
@@ -219,6 +227,14 @@ export default function FaultReportsPage() {
           severity: 'medium',
         });
         linkedReportId = created.data.id;
+        setEditingReport(created.data);
+      } else if (editingReport && editingReport.device_id !== selectedDevice.id) {
+        const updated = await api.put(`/api/fault-reports/${linkedReportId}`, {
+          device_id: selectedDevice.id,
+          error_message: formData.error_message.trim(),
+          description: formData.error_message.trim(),
+        });
+        setEditingReport(updated.data);
       }
 
       const supportRequest = {
@@ -255,7 +271,7 @@ export default function FaultReportsPage() {
       setAiDialogOpen(true);
       await fetchReports();
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'تعذر تحليل البلاغ بالنموذج المحلي');
+      setError(typeof err.response?.data?.detail === 'string' ? err.response.data.detail : 'تعذر تحليل البلاغ بالنموذج المحلي؛ تحقق من طول الوصف وأعد المحاولة.');
     } finally {
       setAnalyzing(false);
     }
@@ -275,7 +291,19 @@ export default function FaultReportsPage() {
       });
       fetchReports();
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'يجب تحليل البلاغ واعتماد قرار المختص قبل توثيق نتيجة الحل');
+      setError(typeof err.response?.data?.detail === 'string' ? err.response.data.detail : 'يجب اعتماد قرار المختص وإدخال إجراء ونتيجة تحقق من 3 محارف على الأقل');
+    }
+  };
+
+  const handleReopen = async (report: FaultReport) => {
+    const reason = window.prompt('ما سبب إعادة فتح البلاغ؟');
+    if (!reason?.trim()) return;
+    try {
+      await api.post(`/api/fault-reports/${report.id}/reopen`, { reason: reason.trim() });
+      await fetchReports();
+      handleOpenDialog({ ...report, status: 'in_progress', resolved_at: null });
+    } catch (err: any) {
+      setError(typeof err.response?.data?.detail === 'string' ? err.response.data.detail : 'تعذر إعادة فتح البلاغ؛ أدخل سببًا واضحًا.');
     }
   };
 
@@ -287,7 +315,7 @@ export default function FaultReportsPage() {
       });
       setDecisionSaved(true);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'تعذر حفظ قرار المختص');
+      setError(typeof err.response?.data?.detail === 'string' ? err.response.data.detail : 'تعذر حفظ قرار المختص');
     }
   };
 
@@ -359,7 +387,8 @@ export default function FaultReportsPage() {
             <InputLabel>الجهاز / Device</InputLabel>
             <Select
               value={filterDevice}
-              label="الجهاز / Device"
+              disabled={analyzing}
+                    label="الجهاز / Device"
               onChange={(e) => setFilterDevice(e.target.value)}
             >
               <MenuItem value="">الكل / All</MenuItem>
@@ -501,6 +530,9 @@ export default function FaultReportsPage() {
                         حل / Resolve
                       </Button>
                     )}
+                    {normalizeEnumValue(report.status) === 'resolved' && (
+                      <Button size="small" onClick={() => handleReopen(report)}>إعادة الفتح والمتابعة</Button>
+                    )}
                     <Button size="small" color="error" onClick={() => handleDelete(report.id)} startIcon={<DeleteIcon />}>
                       حذف / Delete
                     </Button>
@@ -522,6 +554,7 @@ export default function FaultReportsPage() {
                   <TextField
                     fullWidth
                     select
+                    disabled={analyzing}
                     label="الجهاز / Device"
                     value={formData.device_id}
                     onChange={(e) => setFormData({ ...formData, device_id: e.target.value })}
@@ -540,6 +573,8 @@ export default function FaultReportsPage() {
                     fullWidth
                     multiline
                     rows={3}
+                    disabled={analyzing}
+                    inputProps={{ maxLength: 4000 }}
                     label="رسالة الخطأ / Error Message"
                     value={formData.error_message}
                     onChange={(e) => setFormData({ ...formData, error_message: e.target.value })}
@@ -562,8 +597,8 @@ export default function FaultReportsPage() {
             </Box>
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleCloseDialog}>إلغاء / Cancel</Button>
-            <Button onClick={handleSubmit} variant="contained">
+            <Button disabled={analyzing} onClick={handleCloseDialog}>إلغاء / Cancel</Button>
+            <Button disabled={analyzing} onClick={handleSubmit} variant="contained">
               {editingReport ? 'حفظ التعديلات / Save Changes' : 'إضافة / Add'}
             </Button>
           </DialogActions>
