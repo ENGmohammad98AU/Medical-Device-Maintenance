@@ -5,12 +5,6 @@
 🌐 **الموقع المنشور / Live Website**  
 [فتح الموقع](https://medical-app-frontend-8iiq.onrender.com/login)
 
-🎥 **فيديو عرض المشروع / Project Demo**  
-[مشاهدة أو تحميل فيديو المشروع](https://github.com/ENGmohammad98AU/Medical-Device-Maintenance/raw/refs/heads/main/report%20%2B%20demo/DEMO.mp4)
-
-📄 **تقرير مشروع الماجستير / Master's Project Report**  
-[تحميل تقرير المشروع](https://github.com/ENGmohammad98AU/Medical-Device-Maintenance/raw/refs/heads/main/report%20%2B%20demo/mohamad_330903_F25-Report.docx)
-
 مشروع مقدّم لنيل درجة الماجستير في علوم الحاسوب في الجامعة الافتراضية السورية يعمل على **إدارة الأجهزة الطبية، تسجيل بلاغات الأعطال، متابعة أعمال الصيانة، واسترجاع حلول مرجعية موثقة مرتبطة بالشركة المصنّعة والموديل**.
 
 A student project designed to support biomedical engineers and medical technicians in **medical-device management, fault reporting, maintenance tracking, and retrieval of manufacturer-referenced troubleshooting information**.
@@ -293,8 +287,6 @@ BACKEND_URL
 يمكن متابعة القواعد، مع إعلان مصدر النتيجة دون التحول إلى خدمة مدفوعة.
 النموذج تجريبي صغير وقد يخطئ؛ جميع الاقتراحات تحتاج مراجعة المختص.
 حساب التطبيق يبقى مطلوبًا للأجهزة والسجلات. الوضع الافتراضي للخادم `AI_MODE=browser`.
-راجع [دليل ترقية Qwen3‑1.7B والتقييم القابل للتكرار](docs/QWEN17_UPGRADE_AR.md).
-راجع أيضًا [مسار معالجة طلبات العملاء واختيار الحل المرجعي](docs/CUSTOMER_SUPPORT_LLM_AR.md).
 
 ---
 
