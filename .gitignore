@@ -52,6 +52,7 @@ logs/
 # Node
 node_modules/
 frontend/public/onnx/
+frontend/public/llm/
 .cache/
 dist/
 .npm/
