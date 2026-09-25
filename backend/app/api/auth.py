@@ -12,9 +12,17 @@ from app.models.user import UserRole
 from app.services.user_service import UserService
 from app.security.jwt import create_access_token
 from app.core.config import settings
+from app.api.dependencies import get_current_active_user
+from app.models.user import User as UserModel
 
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
+
+
+@router.get("/me", response_model=User)
+def current_session(current_user: UserModel = Depends(get_current_active_user)):
+    """Validate the signed, unexpired session and return the current DB user."""
+    return current_user
 
 
 @router.post("/register", response_model=User, status_code=status.HTTP_201_CREATED)

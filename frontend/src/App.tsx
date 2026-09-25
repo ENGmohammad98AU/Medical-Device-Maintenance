@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider, createTheme } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'
+import { Box, CircularProgress, Typography } from '@mui/material'
 import { AuthProvider, useAuth } from './hooks/useAuth'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
@@ -51,7 +52,11 @@ const pagePermissions: Record<string, string[]> = {
 }
 
 function ProtectedRoute({ children, path }: { children: JSX.Element; path: string }) {
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated, isInitializing, user } = useAuth()
+
+  if (isInitializing) {
+    return <Box sx={{p: 4, textAlign: 'center'}} role="status"><CircularProgress /><Typography>جارٍ التحقق من جلسة الدخول…</Typography></Box>
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />

@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { LoginRequest, AuthContextType, User } from '../types/auth';
-import { authService } from '../services/auth';
+import { authService, isAuthenticationError, SESSION_EXPIRED_MESSAGE } from '../services/auth';
 import { localModelSession } from '../llm/localModelSession';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -9,17 +9,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [authError, setAuthError] = useState('');
 
   useEffect(() => {
-    const storedToken = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
-    
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
-      setIsAuthenticated(true);
-      authService.setAuthToken(storedToken);
-    }
+    let active = true;
+    let generation = 0;
+    const clear = () => {
+      localModelSession.reset();
+      setToken(null); setUser(null); setIsAuthenticated(false);
+    };
+    const unsubscribe = authService.onSessionExpired(() => {
+      clear(); setAuthError(SESSION_EXPIRED_MESSAGE);
+    });
+    const restore = async () => {
+      const attempt = ++generation;
+      const storedToken = localStorage.getItem('token');
+      setIsInitializing(true);
+      if (!storedToken) { setIsInitializing(false); return; }
+      try {
+        const currentUser = await authService.getCurrentUser();
+        if (!active || attempt !== generation || localStorage.getItem('token') !== storedToken) return;
+        setToken(storedToken); setUser(currentUser); setIsAuthenticated(true); setAuthError('');
+      } catch (error) {
+        if (!active || attempt !== generation) return;
+        setAuthError(isAuthenticationError(error) ? SESSION_EXPIRED_MESSAGE
+          : 'تعذر التحقق من جلسة الدخول. تحقق من الاتصال وحاول تسجيل الدخول مجددًا.');
+      } finally {
+        if (active && attempt === generation) setIsInitializing(false);
+      }
+    };
+    const syncSession = (event: StorageEvent) => {
+      if (event.key === 'token' || event.key === null) { clear(); void restore(); }
+    };
+    window.addEventListener('storage', syncSession);
+    void restore();
+    return () => { active = false; unsubscribe(); window.removeEventListener('storage', syncSession); };
   }, []);
 
   const login = async (credentials: LoginRequest) => {
@@ -29,11 +54,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(response.user);
       setIsAuthenticated(true);
       
-      localStorage.setItem('token', response.access_token);
       localStorage.setItem('user', JSON.stringify(response.user));
       authService.setAuthToken(response.access_token);
+      setAuthError('');
     } catch (error) {
-      console.error('Login failed:', error);
       throw error;
     }
   };
@@ -43,8 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null);
     setUser(null);
     setIsAuthenticated(false);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    setAuthError('');
     authService.clearAuthToken();
   };
 
@@ -53,7 +76,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     token,
     login,
     logout,
-    isAuthenticated
+    isAuthenticated,
+    isInitializing,
+    authError,
   };
 
   return (
