@@ -34,7 +34,7 @@ import {
   Psychology as PsychologyIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../hooks/useAuth';
-import api from '../services/auth';
+import api, { authService, isAuthenticationError } from '../services/auth';
 import { filterFaultReports, normalizeEnumValue } from '../utils/faultReportFilters';
 import { useLocalModel } from '../hooks/useLocalModel';
 import { localModelConfig } from '../llm/localModelContract';
@@ -224,6 +224,9 @@ export default function FaultReportsPage() {
     setAnalysisStage('تجهيز البلاغ…');
     setError('');
     try {
+      // Validate with the server before downloading/running the local model.
+      await authService.getCurrentUser();
+      if (!mounted.current) return;
       let linkedReportId = editingReport?.id;
       if (!linkedReportId) {
         const created = await api.post('/api/fault-reports/', {
@@ -257,7 +260,8 @@ export default function FaultReportsPage() {
         setAnalysisStage('تجهيز المراجع…');
         try {
           support_context = (await api.post('/api/intelligent-support/prepare-support', supportRequest, { timeout: 90000 })).data;
-        } catch {
+        } catch (error) {
+          if (isAuthenticationError(error)) throw error;
           support_context = undefined;
         }
       }

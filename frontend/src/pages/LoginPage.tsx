@@ -71,7 +71,7 @@ const demoCredentials = [
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, authError, isInitializing } = useAuth();
   const [tabValue, setTabValue] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -180,6 +180,8 @@ export default function LoginPage() {
               {error}
             </Alert>
           )}
+          {!error && authError && <Alert severity="warning" sx={{mb: 2}}>{authError}</Alert>}
+          {isInitializing && <Alert severity="info" sx={{mb: 2}}>جارٍ التحقق من جلسة الدخول…</Alert>}
 
           <TabPanel value={tabValue} index={0}>
             <Box component="form" onSubmit={handleLogin} sx={{ mt: 1 }}>
@@ -267,7 +269,7 @@ export default function LoginPage() {
                   boxShadow: '0 12px 24px rgba(37, 99, 235, 0.35)',
                   '&:hover': { background: 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)' },
                 }}
-                disabled={loading}
+                disabled={loading || isInitializing}
               >
                 {loading ? <CircularProgress size={24} /> : 'تسجيل الدخول / Login'}
               </Button>
@@ -467,7 +469,7 @@ export default function LoginPage() {
                   boxShadow: '0 12px 24px rgba(37, 99, 235, 0.35)',
                   '&:hover': { background: 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)' },
                 }}
-                disabled={loading}
+                disabled={loading || isInitializing}
               >
                 {loading ? <CircularProgress size={24} /> : 'التسجيل / Register'}
               </Button>

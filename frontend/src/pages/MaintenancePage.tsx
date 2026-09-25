@@ -7,7 +7,7 @@ import {
 } from '@mui/material';
 import { ArrowBack as ArrowBackIcon, CheckCircle as CheckCircleIcon, Psychology as PsychologyIcon, Security as SecurityIcon } from '@mui/icons-material';
 import { useAuth } from '../hooks/useAuth';
-import api from '../services/auth';
+import api, { authService, isAuthenticationError } from '../services/auth';
 import LLMTriageSummary, { TriageMetadata } from '../components/LLMTriageSummary';
 import { useLocalModel } from '../hooks/useLocalModel';
 import { localModelConfig, localErrorText, type LocalError } from '../llm/localModelContract';
@@ -78,6 +78,8 @@ export default function MaintenancePage() {
     setDecisionSaved(false); setDecision(''); setComments('');
     setActionTaken(''); setVerificationResult(''); setOutcome('RESOLVED');
     try {
+      await authService.getCurrentUser();
+      if (!mounted.current) return;
       let currentReportId = reportId;
       if (!currentReportId) {
         const created = await api.post('/api/fault-reports/', {
@@ -109,7 +111,10 @@ export default function MaintenancePage() {
         // A rolling deployment or a transient preparation failure still permits
         // classification and an explicitly labelled reference-rule fallback.
         try { support_context = (await api.post('/api/intelligent-support/prepare-support', requestData, {timeout: 90000})).data; }
-        catch { support_context = undefined; }
+        catch (error) {
+          if (isAuthenticationError(error)) throw error;
+          support_context = undefined;
+        }
       }
       if (!mounted.current) return;
       const browser_llm = useLocal ? await localModel.run({
