@@ -78,6 +78,19 @@ try {
   await page.getByText(/اكتمل تشغيل النموذج على هذا المتصفح/).waitFor({timeout:35*60_000});
   await page.getByText(/قرار النموذج للطلب: المرجع B/).waitFor({timeout:5000});
   assert.equal(await page.getByText(/لم يكتمل اختيار المرجع|اختلف اختيار النموذج/).count(),0);
+  // A repeated production request must preserve the decision and avoid WASM
+  // inference. This timing measures session reuse, not fresh model performance.
+  const firstDuration=await page.getByText(/المدة بما فيها التجهيز/).innerText();
+  const repeatStarted=performance.now();
+  await page.getByRole('button',{name:'تشغيل النموذج مجانًا',exact:true}).click();
+  await page.getByText(/أُعيد استخدام نتيجة النموذج المطابقة/).waitFor({timeout:5000});
+  await page.getByText(/قرار النموذج للطلب: المرجع B/).waitFor({timeout:5000});
+  const repeatedDuration=await page.getByText(/المدة بما فيها التجهيز/).innerText();
+  assert.match(repeatedDuration,/0\.0/);
+  const reuse={kind:'session-result-reuse', first_duration_text:firstDuration,
+    repeated_duration_text:repeatedDuration, repeat_ui_ms:Math.round(performance.now()-repeatStarted)};
+  await writeFile('benchmark-results/session-reuse.json',JSON.stringify(reuse,null,2)+'\n');
+  console.log('SESSION_REUSE_RESULT='+JSON.stringify(reuse));
   await page.screenshot({path:'benchmark-results/browser-success.png',fullPage:true});
 } catch(error) {
   await writeFile('benchmark-results/failure.txt',String(error)+'\n'+await page.locator('body').innerText());

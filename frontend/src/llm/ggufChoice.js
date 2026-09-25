@@ -21,7 +21,16 @@ export async function chooseGgufToken(model, prompt, labels, maxTokens, allowSpa
   stage('prompt evaluation');
   await model.createCompletion(prompt, {nPredict: 0, useCache: true, sampling: {temp: 0, penalty_repeat: 1}});
   stage('label selection');
-  const choices = (await model.getLogits(-1)).filter(x => allowed.has(x.token) && Number.isFinite(x.p) && x.p > 0);
+  const valid = x => allowed.has(x.token) && Number.isFinite(x.p) && x.p > 0;
+  // A globally top-ranked allowed label is also the best allowed label. Avoid
+  // transferring the entire vocabulary unless none qualify or a boundary tie
+  // could affect the original ranking. Prompts and label restrictions are intact.
+  const top = await model.getLogits(40);
+  let choices = top.filter(valid);
+  if (!choices.length || (top.length === 40
+    && Math.max(...choices.map(x => x.p)) <= Math.min(...top.map(x => x.p)))) {
+    choices = (await model.getLogits(-1)).filter(valid);
+  }
   choices.sort((a, b) => b.p - a.p);
   if (!choices.length) throw new Error('invalid_output');
   const value = (await model.detokenize([choices[0].token], true)).trim();

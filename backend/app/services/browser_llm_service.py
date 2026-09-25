@@ -23,6 +23,7 @@ class BrowserLLMResult(BaseModel):
         "cancelled", "timeout", "unsupported_browser", "insufficient_storage", "load_failed", "input_too_long", "invalid_output",
     ]] = None
     support: Optional[BrowserSupportResult] = None
+    reused_result: bool = False
 
     @model_validator(mode="after")
     def validate_result(self):
@@ -33,6 +34,8 @@ class BrowserLLMResult(BaseModel):
             raise ValueError("Failed or disabled inference cannot supply a category")
         if self.status != "success" and self.support is not None:
             raise ValueError("Support selection requires a completed local classification")
+        if self.reused_result and self.status != "success":
+            raise ValueError("Only a successful inference can be reused")
         return self
 
 
@@ -50,6 +53,7 @@ def browser_run(result: BrowserLLMResult, *, report_text: str, device_type: str,
         client_reported=True, model_revision=MANIFEST["revision"],
         runtime=MANIFEST["runtime"], quantization=MANIFEST["dtype"],
         latency_ms=result.latency_ms, error_code=result.error_code,
+        reused_result=result.reused_result,
     )
     if result.status != "success":
         return run

@@ -91,3 +91,59 @@ def test_local_failure_or_disable_never_falls_through_to_cloud(api_client, monke
     assert response.status_code == 200, response.text
     assert response.json()["classification_source"] == "RULES"
     assert response.json()["llm"]["status"] == status
+
+
+def test_reused_inference_is_audited_and_still_requires_current_context(api_client):
+    from app.models.audit_log import AuditLog
+    client, db, _ = api_client
+    text = "Battery is no longer charging"
+    cached = {**payload(text), "reused_result": True, "latency_ms": 0}
+    response = client.post("/api/intelligent-support/analyze-fault", json={
+        "device_id": 901, "description": text, "browser_llm": cached,
+    })
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["llm"]["reused_result"] and body["llm"]["latency_ms"] == 0
+    log = db.query(AuditLog).filter_by(id=body["audit_log_id"]).one()
+    assert log.classification_result["llm"]["reused_result"]
+    stale = browser_run(BrowserLLMResult(**cached), report_text="Different fault",
+                        device_type="VENTILATOR", patient_connected=False)
+    assert stale.status == "invalid_response"
+
+
+def test_error_cannot_claim_reused_inference():
+    with pytest.raises(ValidationError):
+        BrowserLLMResult(status="disabled", revision=MANIFEST["revision"], reused_result=True)
+
+
+def test_fast_report_analysis_uses_reference_and_records_workflow_without_llm(api_client, monkeypatch):
+    import time
+    from app.api.fault_reports import router
+    from app.models.device import Device, DeviceType, DeviceStatus
+    from app.models.fault_report import FaultReport, FaultSeverity
+    client, db, api = api_client
+    client.app.include_router(router)
+    class NoCloud:
+        def classify(self, **kwargs): pytest.fail("Fast reference analysis must not wait for an LLM")
+    monkeypatch.setattr(api, "llm_service", NoCloud())
+    device = Device(id=902, name="B. Braun Perfusor Space", type=DeviceType.SYRINGE_PUMP,
+                    manufacturer="B. Braun", model="Perfusor Space", serial_number="SYNTHETIC-TEST",
+                    department="TEST", status=DeviceStatus.OPERATIONAL)
+    db.add(device); db.commit()
+    report = FaultReport(device_id=902, reported_by=900, error_message="Pressure high",
+                         description="Pressure high", severity=FaultSeverity.MEDIUM)
+    db.add(report); db.commit()
+    started = time.perf_counter()
+    response = client.post("/api/fault-reports/analyze", json={
+        "device_id": 902, "report_id": report.id, "error_message": "Pressure high",
+        "browser_llm": {"status": "disabled", "revision": MANIFEST["revision"], "latency_ms": 0},
+    })
+    elapsed = round((time.perf_counter() - started) * 1000)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["classification_source"] == "RULES" and body["llm"]["status"] == "disabled"
+    assert body["reference_found"] and body["recommended_solution"] and body["source"]
+    assert body["workflow"]["fault_report_id"] == report.id
+    db.refresh(report)
+    assert report.resolved_at is None  # Fast response is still a reviewed proposal.
+    print(f"FAST_REFERENCE_TEST_LOCAL_MS={elapsed}")

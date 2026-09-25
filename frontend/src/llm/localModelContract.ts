@@ -13,6 +13,7 @@ export interface LocalResult {
   latency_ms: number;
   error_code?: LocalError;
   support?: SupportResult;
+  reused_result?: boolean;
 }
 export interface LocalProgress { stage: 'loading' | 'running'; percent?: number; task?: 'classification' | 'reference_selection'; storage_mode?: 'persistent' | 'temporary' }
 

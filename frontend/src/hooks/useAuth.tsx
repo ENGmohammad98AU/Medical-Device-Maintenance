@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { LoginRequest, AuthContextType, User } from '../types/auth';
 import { authService } from '../services/auth';
+import { localModelSession } from '../llm/localModelSession';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -38,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    localModelSession.reset();
     setToken(null);
     setUser(null);
     setIsAuthenticated(false);
