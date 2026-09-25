@@ -80,6 +80,7 @@ class LLMRun(BaseModel):
     error_code: Optional[str] = None
     decision: Optional[LLMDecision] = None
     client_reported: bool = False
+    reused_result: bool = False
     model_revision: Optional[str] = None
     runtime: Optional[str] = None
     quantization: Optional[str] = None

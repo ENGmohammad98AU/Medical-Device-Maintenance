@@ -23,4 +23,24 @@ describe('constrained GGUF decisions', () => {
     expect(formatQwenMessages([{role: 'user', content: 'عطل البطارية'}], 'Choice:')).toBe(
       '<|im_start|>user\nعطل البطارية<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nChoice:');
   });
+  it('usually fetches just the top scores, with the same constrained choice', async () => {
+    const model = fake();
+    expect(await chooseGgufToken(model, 'prompt', ['A', 'B'], 1024)).toBe('B');
+    expect(model.getLogits).toHaveBeenCalledOnce();
+    expect(model.getLogits).toHaveBeenCalledWith(40);
+  });
+  it('falls back to full scores when the allowed labels are outside the top set', async () => {
+    const model = fake();
+    vi.mocked(model.getLogits).mockResolvedValueOnce([{token: 99, p: 0.9}]);
+    expect(await chooseGgufToken(model, 'prompt', ['A', 'B'], 1024)).toBe('B');
+    expect(model.getLogits).toHaveBeenLastCalledWith(-1);
+  });
+  it('resolves a tie at the top-set boundary using the original full ranking', async () => {
+    const model = fake();
+    vi.mocked(model.getLogits).mockResolvedValueOnce([
+      ...Array.from({length: 39}, (_, i) => ({token: 100 + i, p: 0.5})), {token: 1, p: 0.03},
+    ]);
+    expect(await chooseGgufToken(model, 'prompt', ['A', 'B'], 1024)).toBe('B');
+    expect(model.getLogits).toHaveBeenLastCalledWith(-1);
+  });
 });

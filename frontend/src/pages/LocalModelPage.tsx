@@ -49,6 +49,7 @@ export default function LocalModelPage() {
       <Button variant="contained" onClick={run} disabled={busy}>تشغيل النموذج مجانًا</Button>
       {local.progress && <LocalModelProgress progress={local.progress} cancel={local.cancel} />}
       {result?.status === 'success' && <Alert severity="success" sx={{mt: 2}}>اكتمل تشغيل النموذج على هذا المتصفح. الفئة المقترحة: {categoryLabels[category!]}.</Alert>}
+      {result?.reused_result && <Alert severity="info" sx={{mt: 1}}>أُعيد استخدام نتيجة النموذج المطابقة من هذه الجلسة دون إعادة الاستدلال.</Alert>}
       {result?.status === 'success' && mode === 'classification' && category !== cases[selected].expected && <Alert severity="warning" sx={{mt: 1}}>اختلفت الفئة عن المتوقع لهذا المثال. نجاح التشغيل لا يثبت صحة التصنيف.</Alert>}
       {result?.support?.status === 'success' && <Alert severity="info" sx={{mt: 1}}>قرار النموذج للطلب: {selectedReference
         ? `المرجع ${selectedReference.label}: ${selectedReference.symptom}`

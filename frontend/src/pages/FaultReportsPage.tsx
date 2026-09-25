@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -39,6 +39,8 @@ import { filterFaultReports, normalizeEnumValue } from '../utils/faultReportFilt
 import { useLocalModel } from '../hooks/useLocalModel';
 import { localModelConfig } from '../llm/localModelContract';
 import type { SupportContext } from '../llm/supportModelContract';
+import LocalModelProgress from '../components/LocalModelProgress';
+import LLMTriageSummary from '../components/LLMTriageSummary';
 
 interface FaultReport {
   id: number;
@@ -105,6 +107,9 @@ export default function FaultReportsPage() {
   const [editingReport, setEditingReport] = useState<FaultReport | null>(null);
   const [aiAnalysis, setAiAnalysis] = useState<any>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [analysisStage, setAnalysisStage] = useState<string | null>(null);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const [decisionSaved, setDecisionSaved] = useState(false);
   const localModel = useLocalModel();
   const [filterSeverity, setFilterSeverity] = useState('');
@@ -203,7 +208,7 @@ export default function FaultReportsPage() {
     }
   };
 
-  const handleAnalyze = async () => {
+  const handleAnalyze = async (useLlm = true) => {
     if (analyzing) return;
     if (!formData.device_id || formData.error_message.trim().length < 10) {
       setError('اختر الجهاز وأدخل وصفًا فنيًا لا يقل عن 10 محارف');
@@ -216,6 +221,7 @@ export default function FaultReportsPage() {
     }
 
     setAnalyzing(true);
+    setAnalysisStage('تجهيز البلاغ…');
     setError('');
     try {
       let linkedReportId = editingReport?.id;
@@ -236,6 +242,7 @@ export default function FaultReportsPage() {
         });
         setEditingReport(updated.data);
       }
+      if (!mounted.current) return;
 
       const supportRequest = {
         device_id: selectedDevice.id,
@@ -246,18 +253,24 @@ export default function FaultReportsPage() {
         patient_connected: false,
       };
       let support_context: SupportContext | undefined;
-      try {
-        support_context = (await api.post('/api/intelligent-support/prepare-support', supportRequest, { timeout: 90000 })).data;
-      } catch {
-        support_context = undefined;
+      if (useLlm) {
+        setAnalysisStage('تجهيز المراجع…');
+        try {
+          support_context = (await api.post('/api/intelligent-support/prepare-support', supportRequest, { timeout: 90000 })).data;
+        } catch {
+          support_context = undefined;
+        }
       }
+      if (!mounted.current) return;
 
-      const browser_llm = await localModel.run({
+      const browser_llm = useLlm ? await localModel.run({
         report_text: supportRequest.description,
         device_type: selectedDevice.type.toUpperCase().replace(/[- ]/g, '_'),
         patient_connected: false,
         support_context,
-      });
+      }) : { status: 'disabled' as const, revision: localModelConfig.revision, latency_ms: 0 };
+      if (!mounted.current) return;
+      setAnalysisStage('التحقق من المراجع وحفظ التحليل…');
 
       const response = await api.post('/api/fault-reports/analyze', {
         device_id: selectedDevice.id,
@@ -273,7 +286,7 @@ export default function FaultReportsPage() {
     } catch (err: any) {
       setError(typeof err.response?.data?.detail === 'string' ? err.response.data.detail : 'تعذر تحليل البلاغ بالنموذج المحلي؛ تحقق من طول الوصف وأعد المحاولة.');
     } finally {
-      setAnalyzing(false);
+      if (mounted.current) { setAnalyzing(false); setAnalysisStage(null); }
     }
   };
 
@@ -587,13 +600,22 @@ export default function FaultReportsPage() {
                 type="button"
                 variant="outlined"
                 startIcon={<PsychologyIcon />}
-                onClick={handleAnalyze}
+                onClick={() => handleAnalyze(true)}
                 disabled={analyzing}
                 sx={{ mt: 2 }}
                 fullWidth
               >
-                {analyzing ? 'جاري تشغيل النموذج المحلي...' : 'تحليل بالنموذج اللغوي المحلي / Local LLM Analysis'}
+                تحليل بالنموذج اللغوي المحلي / Local LLM Analysis
               </Button>
+              <Button type="button" variant="contained" onClick={() => handleAnalyze(false)} disabled={analyzing} sx={{mt: 1}} fullWidth>
+                تحليل سريع بالمراجع
+              </Button>
+              <Typography variant="caption" component="p" sx={{mt: 1}}>
+                التحليل السريع يستخدم المراجع وقواعد السلامة. تحليل النموذج يضيف تصنيفًا لغويًا واختيارًا للمرجع وقد يستغرق وقتًا أطول عند التشغيل الأول.
+              </Typography>
+              {localModel.progress ? <LocalModelProgress progress={localModel.progress} cancel={localModel.cancel} cancelLabel="متابعة بالمراجع دون انتظار النموذج" />
+                : analysisStage && <Typography role="status" sx={{mt: 2}}>{analysisStage}</Typography>}
+              {error && <Alert severity="error" sx={{mt: 2}}>{error}</Alert>}
             </Box>
           </DialogContent>
           <DialogActions>
@@ -614,6 +636,7 @@ export default function FaultReportsPage() {
           <DialogContent>
             {aiAnalysis && (
               <Box sx={{ mt: 2 }}>
+                <LLMTriageSummary result={aiAnalysis} />
                 <Grid container spacing={2}>
                   <Grid item xs={12} sm={6}>
                     <Typography variant="subtitle2" gutterBottom>
@@ -623,9 +646,9 @@ export default function FaultReportsPage() {
                   </Grid>
                   <Grid item xs={12} sm={6}>
                     <Typography variant="subtitle2" gutterBottom>
-                      الشركة / Manufacturer:
+                      العطل المرجعي / Matched Fault:
                     </Typography>
-                    <Typography variant="body1">{aiAnalysis.manufacturer}</Typography>
+                    <Typography variant="body1">{aiAnalysis.matched_fault || 'لم يُعتمد مرجع مطابق'}</Typography>
                   </Grid>
                   <Grid item xs={12} sm={6}>
                     <Typography variant="subtitle2" gutterBottom>
@@ -641,38 +664,43 @@ export default function FaultReportsPage() {
                   </Grid>
                   <Grid item xs={12} sm={6}>
                     <Typography variant="subtitle2" gutterBottom>
-                      الثقة / Confidence:
+                      درجة المطابقة المرجعية / Reference Match:
                     </Typography>
-                    <Typography variant="body1">{aiAnalysis.confidence}%</Typography>
+                    <Typography variant="body1">{aiAnalysis.reference_found ? `${(aiAnalysis.match_confidence * 100).toFixed(1)}%` : 'لا توجد مطابقة معتمدة'}</Typography>
                   </Grid>
                   <Grid item xs={12}>
                     <Typography variant="subtitle2" gutterBottom>
                       السبب المحتمل / Possible Cause:
                     </Typography>
-                    <Typography variant="body1">{aiAnalysis.possible_cause}</Typography>
+                    <Typography variant="body1">{aiAnalysis.possible_causes || aiAnalysis.customer_support?.message || 'لم يتوفر سبب مرجعي مناسب'}</Typography>
                   </Grid>
                   <Grid item xs={12}>
                     <Typography variant="subtitle2" gutterBottom>
-                      الفحص الأولي / Initial Inspection:
+                      إجراء السلامة الأولي / Immediate Safety Action:
                     </Typography>
-                    <Typography variant="body1">{aiAnalysis.initial_inspection}</Typography>
+                    <Typography variant="body1">{aiAnalysis.immediate_safety_action || aiAnalysis.warning_message || 'تجب مراجعة المختص قبل تنفيذ أي إجراء'}</Typography>
                   </Grid>
                   <Grid item xs={12}>
                     <Typography variant="subtitle2" gutterBottom>
                       التوصية / Recommendation:
                     </Typography>
-                    <Typography variant="body1">{aiAnalysis.escalation_recommendation}</Typography>
+                    <Typography variant="body1">{aiAnalysis.recommended_solution || aiAnalysis.recommended_action}</Typography>
                   </Grid>
-                  {aiAnalysis.references && (
+                  {!!aiAnalysis.troubleshooting_steps?.length && <Grid item xs={12}>
+                    <Typography variant="subtitle2">خطوات الفحص المرجعية:</Typography>
+                    <Box component="ol" sx={{pl: 3}}>{aiAnalysis.troubleshooting_steps.map((step: string, idx: number) => <li key={idx}>{step}</li>)}</Box>
+                  </Grid>}
+                  {aiAnalysis.verification_before_return_to_service && <Grid item xs={12}>
+                    <Typography variant="subtitle2">التحقق قبل إعادة الجهاز إلى الخدمة:</Typography>
+                    <Typography>{aiAnalysis.verification_before_return_to_service}</Typography>
+                  </Grid>}
+                  {aiAnalysis.source && (
                     <Grid item xs={12}>
                       <Typography variant="subtitle2" gutterBottom>
                         المراجع / References:
                       </Typography>
-                      {aiAnalysis.references.map((ref: string, idx: number) => (
-                        <Typography key={idx} variant="body2" sx={{ ml: 2 }}>
-                          • {ref}
-                        </Typography>
-                      ))}
+                      <Typography variant="body2">{aiAnalysis.source}</Typography>
+                      {aiAnalysis.reference_page && <Typography variant="body2">الصفحة: {aiAnalysis.reference_page}</Typography>}
                     </Grid>
                   )}
                 </Grid>

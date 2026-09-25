@@ -13,6 +13,7 @@ export interface TriageMetadata {
     provider?: string | null;
     error_code?: string | null;
     client_reported?: boolean;
+    reused_result?: boolean;
   };
 }
 
@@ -36,6 +37,7 @@ export default function LLMTriageSummary({ result }: { result: TriageMetadata })
     } />
     {(used || local || abstained) && result.llm?.model && <Typography variant="body2" sx={{ mb: 1, overflowWrap: 'anywhere' }}>النموذج: {result.llm.model}</Typography>}
     {local && result.fault_category && <Typography variant="body2" sx={{mb: 1}}>فئة العطل المقترحة: {categoryLabels[result.fault_category] || result.fault_category}</Typography>}
+    {result.llm?.reused_result && <Typography variant="body2" sx={{mb: 1}}>أُعيد استخدام نتيجة النموذج لنفس الوصف والسياق خلال هذه الجلسة، مع إعادة تحقق الخادم من المراجع.</Typography>}
     {result.llm?.client_reported && result.llm.status === 'success' && <Typography variant="caption" component="p" sx={{mb: 1}}>نتيجة أرسلها المتصفح؛ يتحقق الخادم من بنيتها وسياقها، ولا يثبت ذلك تنفيذ النموذج أو صحة اقتراحه.</Typography>}
     {unavailable && <Alert severity="warning" sx={{ mb: 1 }}>
       {result.llm?.provider === 'browser-local'
