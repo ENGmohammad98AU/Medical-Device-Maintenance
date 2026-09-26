@@ -38,7 +38,7 @@ const kinds=process.argv.includes('--skip-classification')?['support']:['classif
 try {
   if(process.argv.includes('--compare-runtimes')) {
     const measured={};
-    for(const runtime of ['baseline','fast']) {
+    for(const runtime of ['fast','baseline']) {
       await page.goto(`http://127.0.0.1:4174/model-upgrade-test.html?runtime=${runtime}&cpu=1`,{waitUntil:'commit'});
       await page.locator('#workflow').click();
       await page.waitForFunction(()=>/اكتمل الاختبار|فشل الاختبار/.test(document.querySelector('#status').textContent),{},{timeout:30*60_000});
@@ -65,8 +65,7 @@ try {
     console.log('RUNTIME_COMPARISON='+JSON.stringify(comparison));
     assert.ok(comparison.speedup>1,'Do not ship a slower runtime on the controlled CPU comparison');
     assert.ok(b.rows.slice(1).every(r=>r.classification.cached_tokens>0&&r.support.cached_tokens>0),'Both prompt slots must retain their cache');
-    // Continue with the already-loaded candidate; these development accuracy
-    // timings are warm and must not be compared with a historical cold run.
+    await page.goto('http://127.0.0.1:4174/model-upgrade-test.html?cpu=1',{waitUntil:'commit'});
   } else await page.goto('http://127.0.0.1:4174/model-upgrade-test.html?cpu=1',{waitUntil:'commit'});
   for(const kind of kinds) {
     await page.locator('#'+kind).click();
