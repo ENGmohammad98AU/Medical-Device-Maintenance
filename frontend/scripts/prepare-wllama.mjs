@@ -7,6 +7,10 @@ await copyFile(new URL('../node_modules/@wllama/wllama/esm/wasm/wllama.wasm', im
 await copyFile(new URL('../node_modules/wllama-v2/esm/index.js', import.meta.url), new URL('wllama-v2.js', out));
 await copyFile(new URL('../node_modules/wllama-v2/esm/single-thread/wllama.wasm', import.meta.url), new URL('wllama-v2.wasm', out));
 await copyFile(new URL('../node_modules/wllama-v2/esm/multi-thread/wllama.wasm', import.meta.url), new URL('wllama-v2-multi.wasm', out));
+// Keep the former asset URLs for already-open tabs during deployment. New
+// workers use the versioned 3.6.1 URL and cannot receive a cached v2 binary.
+await copyFile(new URL('wllama-v2.wasm', out), new URL('wllama.wasm', out));
+await copyFile(new URL('wllama-v2-multi.wasm', out), new URL('wllama-multi.wasm', out));
 await copyFile(new URL('./fixtures/ggufChoice-v2.js', import.meta.url), new URL('choice-v2.js', out));
 await copyFile(new URL('./fixtures/ggufConfig-v2.json', import.meta.url), new URL('config-v2.json', out));
 await copyFile(new URL('../src/llm/fastGgufChoice.js', import.meta.url), new URL('choice.js', out));
