@@ -145,7 +145,7 @@ jobs:
   frontend-clean-install:
     name: Frontend clean install on Windows
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
 
     steps:
       - name: Checkout fresh repository
@@ -190,7 +190,7 @@ jobs:
         shell: pwsh
         working-directory: frontend
         run: |
-          npm run benchmark:llm -- --skip-classification --low-storage
+          npm run benchmark:llm -- --compare-runtimes --low-storage
 
       - name: Save browser benchmark evidence
         if: always()

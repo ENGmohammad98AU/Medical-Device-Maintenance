@@ -26,6 +26,20 @@ def test_browser_and_server_manifests_match():
     assert json.loads(frontend.read_text(encoding="utf-8")) == MANIFEST
 
 
+@pytest.mark.parametrize("runtime", [None, "wllama-2.4.0/wasm", "wllama-3.6.1/wasm", "wllama-3.6.1/webgpu"])
+def test_runtime_provenance_is_preserved_without_relabeling_old_clients(runtime):
+    result = BrowserLLMResult(**{**payload(), "runtime": runtime})
+    run = browser_run(result, report_text="Battery is no longer charging",
+                      device_type="VENTILATOR", patient_connected=False)
+    assert run.runtime == (runtime or "wllama-2.4.0/wasm")
+    assert run.client_reported
+
+
+def test_unknown_runtime_is_rejected():
+    with pytest.raises(ValidationError):
+        BrowserLLMResult(**{**payload(), "runtime": "unverified-engine"})
+
+
 @pytest.mark.parametrize("extra", [
     {"severity": "LOW"}, {"routing_target": "TECHNICAL_SUPPORT"}, {"repair_steps": ["invented"]},
     {"output_token": "IGNORE SAFETY"}, {"latency_ms": -1}, {"latency_ms": float("nan")},

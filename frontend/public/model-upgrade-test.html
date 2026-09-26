@@ -3,46 +3,70 @@
 <h1>اختبار ترقية Qwen3‑1.7B</h1>
 <p>صفحة تحقق بأوصاف اصطناعية. لا تحفظ بلاغات ولا تتصل بخدمة ذكاء اصطناعي مدفوعة. التنزيل الأول نحو 1.1 غيغابايت. تتطلب Chrome أو Edge حديثًا وذاكرة متاحة.</p>
 <button id="smoke" disabled>تشغيل مثال البطارية</button><button id="classification" disabled>قياس التصنيف: 40 حالة</button><button id="support" disabled>اختبار اختيار المرجع: 6 حالات</button>
+<button id="workflow" disabled>مقارنة زمن معالجة البلاغ كاملاً</button>
 <p id="status">جارٍ تجهيز المتصفح</p><pre id="output" dir="ltr"></pre>
 <script type="module">
-import {Wllama} from './llm/wllama.js';
-import {chooseGgufToken} from './llm/choice.js';
 import {loadGgufModel} from './llm/storage.js';
 import {prepareIsolation,inferenceThreads} from './llm/isolation.js';
+import {selectComputeBackend,runtimeLoadOptions} from './llm/computeBackend.js';
+import {formatQwenMessages} from './llm/ggufChoice.js';
 await prepareIsolation(new URL('./llm-isolation-worker.js',location.href).href);
-const {config,cases,supportCases}=await fetch('./llm/candidate.json').then(r=>r.json());
+const baseline=new URLSearchParams(location.search).get('runtime')==='baseline';
+const {config:current,cases,supportCases}=await fetch('./llm/candidate.json').then(r=>r.json());
+const config=baseline?await fetch('./llm/config-v2.json').then(r=>r.json()):current;
+const {Wllama}=await import(baseline?'./llm/wllama-v2.js':'./llm/wllama.js');
+const module=await import(baseline?'./llm/choice-v2.js':'./llm/choice.js');
+const choose=module.chooseFastGgufToken||module.chooseGgufToken;
+const compute=baseline?'wasm':await selectComputeBackend(new URLSearchParams(location.search).get('cpu')==='1');
 const output=document.querySelector('#output'), status=document.querySelector('#status');
 const threads=inferenceThreads();
-const model=new Wllama({'single-thread/wllama.wasm':'./llm/wllama.wasm','multi-thread/wllama.wasm':'./llm/wllama-multi.wasm'},{suppressNativeLog:true,logger:{debug(){},log(){},warn:console.warn,error:console.error}});
-status.textContent=`جاهز للاختبار؛ عدد خيوط المعالجة: ${threads}`;
+const paths=baseline?{'single-thread/wllama.wasm':'./llm/wllama-v2.wasm','multi-thread/wllama.wasm':'./llm/wllama-v2-multi.wasm'}:{default:'./llm/wllama-3.6.1.wasm'};
+const model=new Wllama(paths,{suppressNativeLog:true,logger:{debug(){},log(){},warn:console.warn,error:console.error}});
+status.textContent=`جاهز للاختبار؛ عدد خيوط المعالجة: ${threads}؛ المحرك: ${baseline?'2.4.0':'3.6.1'} ${compute}`;
 document.querySelectorAll('button').forEach(b=>b.disabled=false);
 let loaded=false,storageMode;
+async function decision(c,support,index,kind){
+ let metrics={};
+ const t=performance.now();
+ const token=await choose(model,c.prompt,c.labels,config.max_input_tokens,support,step=>{
+  status.textContent=`تشغيل الحالة ${index+1}: ${step}`;console.log('INFERENCE_STAGE',kind,index+1,step);
+ },m=>metrics=m);
+ return {token,inference_ms:Math.round(performance.now()-t),...metrics};
+}
 async function run(kind){
  document.querySelectorAll('button').forEach(b=>b.disabled=true);
  const start=performance.now();const rows=[];output.textContent='';
  try {
   if(!loaded){
+   const options=baseline?{n_ctx:config.context_tokens,n_batch:config.batch_tokens,n_threads:threads,seed:0}:runtimeLoadOptions(config,threads,compute);
    storageMode=await loadGgufModel(model,`https://huggingface.co/${config.model}/resolve/${config.revision}/${config.model_file}`,{
-    n_ctx:config.context_tokens,n_batch:config.batch_tokens,n_threads:threads,seed:0,
-    progressCallback:({loaded,total})=>status.textContent=`تحميل النموذج: ${Math.round(100*loaded/total)}%`
+    ...options,progressCallback:({loaded,total})=>status.textContent=`تحميل النموذج: ${Math.round(100*loaded/total)}%`
    },config.model_file_bytes);loaded=true;
   }
   const loadMs=Math.round(performance.now()-start);
-  const tests=kind==='support'?supportCases:kind==='smoke'?cases.slice(0,1):cases;
-  for(const c of tests){
-   status.textContent=`تشغيل الحالة ${rows.length+1} من ${tests.length}`;
-   const t=performance.now();
-   const token=await chooseGgufToken(model,c.prompt,c.labels,config.max_input_tokens,kind==='support',step=>{
-     status.textContent=`تشغيل الحالة ${rows.length+1} من ${tests.length}: ${step}`;console.log('INFERENCE_STAGE',kind,rows.length+1,step);
-   });
-   const predicted=kind==='support'?token:config.categories[token];
-   const row={name:c.name,expected:c.expected,predicted,correct:predicted===c.expected,inference_ms:Math.round(performance.now()-t)};
+  // Alternating real classification/reference prompts exposes prefix eviction.
+  // No LocalModelClient result cache is involved in any measurement here.
+  const tests=kind==='workflow'?[supportCases[0],supportCases[1],supportCases[3],supportCases[0]]:
+    kind==='support'?supportCases:kind==='smoke'?cases.slice(0,1):cases;
+  for(const [index,c] of tests.entries()){
+   let row;
+   if(kind==='workflow'){
+    const prompt=formatQwenMessages([{role:'system',content:config.system_prompt},...config.examples,{role:'user',content:c.report_text.trim()}]);
+    const classification=await decision({prompt,labels:Object.keys(config.categories)},false,index,kind);
+    const support=await decision(c,true,index,kind);
+    row={name:c.name,expected:c.expected,predicted:support.token,correct:support.token===c.expected,
+      classification,support,inference_ms:classification.inference_ms+support.inference_ms};
+   }else{
+    const d=await decision(c,kind==='support',index,kind);
+    const predicted=kind==='support'?d.token:config.categories[d.token];
+    row={name:c.name,expected:c.expected,predicted,correct:predicted===c.expected,...d};
+   }
    rows.push(row);output.textContent+=JSON.stringify(row)+'\n';
   }
-  const result={model:config.model,revision:config.revision,dtype:config.dtype,runtime:config.runtime,prompt_version:config.prompt_version,threads:model.getNumThreads(),isolated:crossOriginIsolated,storage_mode:storageMode,kind,load_ms:loadMs,total:rows.length,correct:rows.filter(r=>r.correct).length,rows};
+  const result={model:config.model,revision:config.revision,dtype:config.dtype,runtime:baseline?config.runtime:`wllama-3.6.1/${compute}`,prompt_version:config.prompt_version,threads:model.getNumThreads(),isolated:crossOriginIsolated,storage_mode:storageMode,kind,load_ms:loadMs,total:rows.length,correct:rows.filter(r=>r.correct).length,rows};
   output.textContent=JSON.stringify(result,null,2);status.textContent=`اكتمل الاختبار: ${result.correct}/${result.total}`;
  }catch(e){status.textContent='فشل الاختبار';output.textContent+='\n'+String(e);console.error(e);}
  finally{document.querySelectorAll('button').forEach(b=>b.disabled=false);}
 }
-for(const id of ['smoke','classification','support'])document.querySelector('#'+id).onclick=()=>run(id);
+for(const id of ['smoke','classification','support','workflow'])document.querySelector('#'+id).onclick=()=>run(id);
 </script></html>
