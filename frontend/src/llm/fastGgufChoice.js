@@ -1,8 +1,9 @@
 import {formatQwenMessages} from './ggufChoice.js';
 export {formatQwenMessages};
 
-// One model, two independent prompt caches: classification and reference
-// selection no longer evict each other's long fixed instructions.
+// One model with two prompt slots. The pinned runtime selects a slot by
+// prefix similarity; its C++ bridge does not forward explicit id_slot values.
+// The real-model benchmark verifies cache reuse across alternating tasks.
 export async function chooseFastGgufToken(model, prompt, labels, maxTokens, allowSpace = false,
   stage = () => {}, onMetrics = () => {}) {
   if (!labels.length || labels.some(label => !/^[A-H]$/.test(label))) throw new Error('invalid_output');
@@ -13,7 +14,7 @@ export async function chooseFastGgufToken(model, prompt, labels, maxTokens, allo
     prompt, stream: false, max_tokens: allowSpace ? 2 : 1, temperature: 0,
     repeat_penalty: 1, frequency_penalty: 0, presence_penalty: 0,
     grammar: 'root ::= ' + alternatives.join(' | '),
-    seed: 0, cache_prompt: true, id_slot: allowSpace ? 1 : 0,
+    seed: 0, cache_prompt: true,
   });
   // The runtime is loaded with ctx_shift:false. Reject over-budget requests
   // instead of accepting a result from a truncated prompt. v3 exposes the

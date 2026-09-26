@@ -4,16 +4,16 @@ const fake = (text = 'B', tokens = 100) => ({createCompletion: vi.fn(async () =>
   choices: [{text}], usage: {prompt_tokens: tokens}, timings: {cache_n: 80, prompt_ms: 50},
 }))}) as unknown as FastChoiceModel;
 describe('runtime v3 constrained selection', () => {
-  it('keeps independent prompt caches when classification and support alternate', async () => {
+  it('requests prefix reuse for both tasks and constrains their output', async () => {
     const model = fake(); const metrics = vi.fn();
     expect(await chooseFastGgufToken(model, 'classify', ['A', 'B'], 1024, false, undefined, metrics)).toBe('B');
     await chooseFastGgufToken(model, 'support', ['B', 'D'], 1024, true);
     await chooseFastGgufToken(model, 'classify another', ['A', 'B'], 1024);
     const calls = vi.mocked(model.createCompletion).mock.calls.map(([p]) => p);
     expect(calls).toEqual([
-      expect.objectContaining({id_slot: 0, cache_prompt: true, max_tokens: 1, grammar: 'root ::= "A" | "B"', temperature: 0}),
-      expect.objectContaining({id_slot: 1, max_tokens: 2, grammar: 'root ::= "B" | "D" | " B" | " D"'}),
-      expect.objectContaining({id_slot: 0, cache_prompt: true}),
+      expect.objectContaining({cache_prompt: true, max_tokens: 1, grammar: 'root ::= "A" | "B"', temperature: 0}),
+      expect.objectContaining({cache_prompt: true, max_tokens: 2, grammar: 'root ::= "B" | "D" | " B" | " D"'}),
+      expect.objectContaining({cache_prompt: true}),
     ]);
     expect(metrics).toHaveBeenCalledWith(expect.objectContaining({prompt_tokens: 100, cached_tokens: 80}));
   });
