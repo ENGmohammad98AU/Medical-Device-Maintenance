@@ -1,6 +1,6 @@
 import { categoryToken, localModelConfig as config, type LocalInput } from './localModelContract';
 import { supportMessages, supportToken, supportModelConfig, type SupportContext } from './supportModelContract';
-import { chooseGgufToken, formatQwenMessages, type ChoiceModel } from './ggufChoice.js';
+import { chooseFastGgufToken as chooseGgufToken, formatQwenMessages, type FastChoiceModel as ChoiceModel } from './fastGgufChoice.js';
 
 export async function classifyLocally(model: ChoiceModel, input: LocalInput) {
   const messages = [{role: 'system', content: config.system_prompt}, ...config.examples,

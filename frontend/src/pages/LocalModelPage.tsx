@@ -60,7 +60,7 @@ export default function LocalModelPage() {
       {result?.status === 'success' && <Typography variant="body2" sx={{mt: 1}}>المدة بما فيها التجهيز: {(result.latency_ms / 1000).toFixed(1)} ثانية</Typography>}
     </CardContent></Card>
     <Alert severity="info" sx={{my: 2}}>هذه أمثلة تطوير اصطناعية وليست تشخيصًا أو قياسًا للدقة الطبية، ولا تنشئ طلب صيانة. في صفحة الصيانة يتحقق الخادم من الجهاز والمراجع ويُحفظ الاقتراح لمراجعة المختص.</Alert>
-    <Typography variant="caption" component="p" dir="ltr" sx={{overflowWrap: 'anywhere'}}>Model: {config.model}<br />Revision: {config.revision}<br />Runtime: {config.runtime}; {config.dtype}</Typography>
+    <Typography variant="caption" component="p" dir="ltr" sx={{overflowWrap: 'anywhere'}}>Model: {config.model}<br />Revision: {config.revision}<br />Runtime: {result?.runtime || config.runtime}; {config.dtype}</Typography>
     <Button component={Link} to="/login" sx={{mt: 2}}>الدخول إلى نظام الصيانة</Button>
   </Box></Container>;
 }

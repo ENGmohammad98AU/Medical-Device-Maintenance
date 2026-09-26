@@ -24,6 +24,7 @@ class BrowserLLMResult(BaseModel):
     ]] = None
     support: Optional[BrowserSupportResult] = None
     reused_result: bool = False
+    runtime: Optional[Literal["wllama-2.4.0/wasm", "wllama-3.6.1/wasm", "wllama-3.6.1/webgpu"]] = None
 
     @model_validator(mode="after")
     def validate_result(self):
@@ -51,7 +52,9 @@ def browser_run(result: BrowserLLMResult, *, report_text: str, device_type: str,
         status=result.status, provider="browser-local", requested_model=MANIFEST["model"],
         prompt_version=MANIFEST["prompt_version"], prompt_sha256=PROMPT_HASH,
         client_reported=True, model_revision=MANIFEST["revision"],
-        runtime=MANIFEST["runtime"], quantization=MANIFEST["dtype"],
+        # Old clients do not send runtime. Do not relabel their CPU results as
+        # executions of the upgraded engine during a rolling deployment.
+        runtime=result.runtime or "wllama-2.4.0/wasm", quantization=MANIFEST["dtype"],
         latency_ms=result.latency_ms, error_code=result.error_code,
         reused_result=result.reused_result,
     )

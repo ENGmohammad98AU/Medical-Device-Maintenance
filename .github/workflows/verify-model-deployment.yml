@@ -1,0 +1,29 @@
+name: Verify model deployment
+
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+
+permissions:
+  contents: read
+
+jobs:
+  public-model-assets:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: "${{ github.event.pull_request.merge_commit_sha }}"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Verify the deployed model manifest, worker and WASM
+        run: node frontend/scripts/verify-model-deployment.mjs
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: model-deployment-verification
+          path: deployment-verification.json

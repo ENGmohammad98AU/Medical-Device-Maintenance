@@ -1,0 +1,933 @@
+{
+  "schema_version": 1,
+  "title": "Qwen3-1.7B browser runtime speed evaluation",
+  "tested_commit": "53f2309470fed54af64d518915da1ac6fbc7a8c7",
+  "workflow_run_url": "https://github.com/ENGmohammad98AU/Medical-Device-Maintenance/actions/runs/36264920250",
+  "frontend_job_id": 108467648278,
+  "backend_job_id": 108467648416,
+  "baseline_fixture_source_commit": "ce38044bd51393441efa1bbe1aa3fffa0e5cacea",
+  "method": {
+    "runtime_comparison": "Frozen wllama 2.4.0 baseline versus wllama 3.6.1; identical model weights and prompt text.",
+    "execution": "One Windows Chromium runner, forced CPU, 4 threads. Candidate measured first, then baseline.",
+    "requests": "Four sequential classification + reference-selection requests; three distinct descriptions; the fourth repeats the first but still invokes the model.",
+    "timing": "Inference only; model load and download excluded. No complete-result cache in the runtime comparison.",
+    "warm_mean": "Mean of the last three workflow requests after the first cold request.",
+    "cache_gate": "Each warm candidate classification and reference request reused more than half of its prompt tokens.",
+    "quality": "40 development classification cases and 6 support smoke cases. Production worker/UI and exact session-result reuse were also exercised."
+  },
+  "validation": {
+    "frontend_unit_tests": 66,
+    "backend_tests": 154,
+    "clean_windows_install": true,
+    "production_build": true,
+    "production_worker_ui": true
+  },
+  "limitations": [
+    "The 40-case classification dataset was used during prompt development; 90% is development-set accuracy, not an independent holdout or clinical validation.",
+    "POWER recall is 40% (2/5); all per-case results, including errors, are retained below.",
+    "The workflow timing sample has only four requests. Actual latency depends on hardware, browser, input, model cache and session lifetime.",
+    "WebGPU capability selection and fallback are covered by unit tests, but GPU hardware performance was not benchmarked.",
+    "The session-reuse measurement returns a previously computed identical result and is not fresh LLM inference.",
+    "The initial approximately 1.1 GB model download is still required when no stored model exists.",
+    "Authenticated production backend behavior is not part of this local browser benchmark."
+  ],
+  "results": {
+    "WORKFLOW_BENCHMARK_RESULT": [
+      {
+        "model": "unsloth/Qwen3-1.7B-GGUF",
+        "revision": "d7f544eead698dbd1f15126ef60b45a1e1933222",
+        "dtype": "Q4_K_M",
+        "runtime": "wllama-3.6.1/wasm",
+        "prompt_version": "browser-device-category-v2-qwen3-1.7b",
+        "threads": 4,
+        "isolated": true,
+        "storage_mode": "temporary",
+        "kind": "workflow",
+        "load_ms": 34981,
+        "total": 4,
+        "correct": 4,
+        "rows": [
+          {
+            "name": "طلب عربي مع اختيار المرجع الثاني",
+            "expected": "B",
+            "predicted": "B",
+            "correct": true,
+            "classification": {
+              "token": "B",
+              "inference_ms": 129696,
+              "prompt_tokens": 758,
+              "cached_tokens": 0,
+              "prompt_ms": 129664.601,
+              "predicted_ms": 0.004
+            },
+            "support": {
+              "token": "B",
+              "inference_ms": 86160,
+              "prompt_tokens": 515,
+              "cached_tokens": 0,
+              "prompt_ms": 85721.736,
+              "predicted_ms": 398.629
+            },
+            "inference_ms": 215856
+          },
+          {
+            "name": "طلب إنجليزي مع اختيار المرجع الثالث",
+            "expected": "C",
+            "predicted": "C",
+            "correct": true,
+            "classification": {
+              "token": "B",
+              "inference_ms": 4825,
+              "prompt_tokens": 746,
+              "cached_tokens": 729,
+              "prompt_ms": 4799.73,
+              "predicted_ms": 0.001
+            },
+            "support": {
+              "token": "C",
+              "inference_ms": 9538,
+              "prompt_tokens": 493,
+              "cached_tokens": 455,
+              "prompt_ms": 9114.655,
+              "predicted_ms": 383.601
+            },
+            "inference_ms": 14363
+          },
+          {
+            "name": "وصف يحتاج تفاصيل",
+            "expected": "D",
+            "predicted": "D",
+            "correct": true,
+            "classification": {
+              "token": "H",
+              "inference_ms": 6494,
+              "prompt_tokens": 752,
+              "cached_tokens": 729,
+              "prompt_ms": 6475.859,
+              "predicted_ms": 0.001
+            },
+            "support": {
+              "token": "D",
+              "inference_ms": 8952,
+              "prompt_tokens": 491,
+              "cached_tokens": 455,
+              "prompt_ms": 8595.5,
+              "predicted_ms": 316.455
+            },
+            "inference_ms": 15446
+          },
+          {
+            "name": "طلب عربي مع اختيار المرجع الثاني",
+            "expected": "B",
+            "predicted": "B",
+            "correct": true,
+            "classification": {
+              "token": "B",
+              "inference_ms": 8094,
+              "prompt_tokens": 758,
+              "cached_tokens": 729,
+              "prompt_ms": 8075.161,
+              "predicted_ms": 0.001
+            },
+            "support": {
+              "token": "B",
+              "inference_ms": 14705,
+              "prompt_tokens": 515,
+              "cached_tokens": 455,
+              "prompt_ms": 14301.296,
+              "predicted_ms": 398.759
+            },
+            "inference_ms": 22799
+          }
+        ],
+        "browser": "147.0.7727.15",
+        "measured_at": "2026-09-26T19:13:51.205Z",
+        "machine": {
+          "os": "win32",
+          "cpu": "AMD EPYC 7763 64-Core Processor                ",
+          "logical_cpus": 4,
+          "memory_bytes": 17178693632
+        },
+        "note": "Same browser/CPU, identical weights/prompts. Four alternating classification/reference requests. Load/download excluded; no full-result cache."
+      },
+      {
+        "model": "unsloth/Qwen3-1.7B-GGUF",
+        "revision": "d7f544eead698dbd1f15126ef60b45a1e1933222",
+        "dtype": "Q4_K_M",
+        "runtime": "wllama-2.4.0/wasm",
+        "prompt_version": "browser-device-category-v2-qwen3-1.7b",
+        "threads": 4,
+        "isolated": true,
+        "storage_mode": "temporary",
+        "kind": "workflow",
+        "load_ms": 22043,
+        "total": 4,
+        "correct": 4,
+        "rows": [
+          {
+            "name": "طلب عربي مع اختيار المرجع الثاني",
+            "expected": "B",
+            "predicted": "B",
+            "correct": true,
+            "classification": {
+              "token": "B",
+              "inference_ms": 272840
+            },
+            "support": {
+              "token": "B",
+              "inference_ms": 169831
+            },
+            "inference_ms": 442671
+          },
+          {
+            "name": "طلب إنجليزي مع اختيار المرجع الثالث",
+            "expected": "C",
+            "predicted": "C",
+            "correct": true,
+            "classification": {
+              "token": "B",
+              "inference_ms": 242267
+            },
+            "support": {
+              "token": "C",
+              "inference_ms": 159115
+            },
+            "inference_ms": 401382
+          },
+          {
+            "name": "وصف يحتاج تفاصيل",
+            "expected": "D",
+            "predicted": "D",
+            "correct": true,
+            "classification": {
+              "token": "H",
+              "inference_ms": 244593
+            },
+            "support": {
+              "token": "D",
+              "inference_ms": 159130
+            },
+            "inference_ms": 403723
+          },
+          {
+            "name": "طلب عربي مع اختيار المرجع الثاني",
+            "expected": "B",
+            "predicted": "B",
+            "correct": true,
+            "classification": {
+              "token": "B",
+              "inference_ms": 246162
+            },
+            "support": {
+              "token": "B",
+              "inference_ms": 166175
+            },
+            "inference_ms": 412337
+          }
+        ],
+        "browser": "147.0.7727.15",
+        "measured_at": "2026-09-26T19:41:53.507Z",
+        "machine": {
+          "os": "win32",
+          "cpu": "AMD EPYC 7763 64-Core Processor                ",
+          "logical_cpus": 4,
+          "memory_bytes": 17178693632
+        },
+        "note": "Same browser/CPU, identical weights/prompts. Four alternating classification/reference requests. Load/download excluded; no full-result cache."
+      }
+    ],
+    "RUNTIME_COMPARISON": [
+      {
+        "baseline_runtime": "wllama-2.4.0/wasm",
+        "candidate_runtime": "wllama-3.6.1/wasm",
+        "threads": 4,
+        "browser": "147.0.7727.15",
+        "machine": {
+          "os": "win32",
+          "cpu": "AMD EPYC 7763 64-Core Processor                ",
+          "logical_cpus": 4,
+          "memory_bytes": 17178693632
+        },
+        "baseline_total_ms": 1660113,
+        "candidate_total_ms": 268464,
+        "baseline_warm_mean_ms": 405814,
+        "candidate_warm_mean_ms": 17536,
+        "speedup": 6.183745306633291,
+        "reduction_percent": 83.82857070572906
+      }
+    ],
+    "BROWSER_BENCHMARK_RESULT": [
+      {
+        "model": "unsloth/Qwen3-1.7B-GGUF",
+        "revision": "d7f544eead698dbd1f15126ef60b45a1e1933222",
+        "dtype": "Q4_K_M",
+        "runtime": "wllama-3.6.1/wasm",
+        "prompt_version": "browser-device-category-v2-qwen3-1.7b",
+        "threads": 4,
+        "isolated": true,
+        "storage_mode": "temporary",
+        "kind": "classification",
+        "load_ms": 22517,
+        "total": 40,
+        "correct": 36,
+        "rows": [
+          {
+            "name": "power_en_01",
+            "expected": "POWER",
+            "predicted": "POWER",
+            "correct": true,
+            "token": "A",
+            "inference_ms": 126722,
+            "prompt_tokens": 757,
+            "cached_tokens": 0,
+            "prompt_ms": 126689.98,
+            "predicted_ms": 0.005
+          },
+          {
+            "name": "power_en_02",
+            "expected": "POWER",
+            "predicted": "CIRCUIT",
+            "correct": false,
+            "token": "C",
+            "inference_ms": 6746,
+            "prompt_tokens": 754,
+            "cached_tokens": 730,
+            "prompt_ms": 6727.829,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "power_en_03",
+            "expected": "POWER",
+            "predicted": "POWER",
+            "correct": true,
+            "token": "A",
+            "inference_ms": 8402,
+            "prompt_tokens": 759,
+            "cached_tokens": 729,
+            "prompt_ms": 8394.339,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "power_ar_01",
+            "expected": "POWER",
+            "predicted": "UNKNOWN",
+            "correct": false,
+            "token": "H",
+            "inference_ms": 9157,
+            "prompt_tokens": 762,
+            "cached_tokens": 729,
+            "prompt_ms": 9146.05,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "power_ar_02",
+            "expected": "POWER",
+            "predicted": "OTHER",
+            "correct": false,
+            "token": "G",
+            "inference_ms": 10555,
+            "prompt_tokens": 767,
+            "cached_tokens": 729,
+            "prompt_ms": 10547.854,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "sensor_en_01",
+            "expected": "SENSOR",
+            "predicted": "SENSOR",
+            "correct": true,
+            "token": "B",
+            "inference_ms": 6990,
+            "prompt_tokens": 754,
+            "cached_tokens": 729,
+            "prompt_ms": 6983.4,
+            "predicted_ms": 0.006
+          },
+          {
+            "name": "sensor_en_02",
+            "expected": "SENSOR",
+            "predicted": "SENSOR",
+            "correct": true,
+            "token": "B",
+            "inference_ms": 8655,
+            "prompt_tokens": 761,
+            "cached_tokens": 730,
+            "prompt_ms": 8647.309,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "sensor_en_03",
+            "expected": "SENSOR",
+            "predicted": "SENSOR",
+            "correct": true,
+            "token": "B",
+            "inference_ms": 6443,
+            "prompt_tokens": 753,
+            "cached_tokens": 730,
+            "prompt_ms": 6429.306,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "sensor_ar_01",
+            "expected": "SENSOR",
+            "predicted": "SENSOR",
+            "correct": true,
+            "token": "B",
+            "inference_ms": 9413,
+            "prompt_tokens": 763,
+            "cached_tokens": 729,
+            "prompt_ms": 9405.74,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "sensor_ar_02",
+            "expected": "SENSOR",
+            "predicted": "SENSOR",
+            "correct": true,
+            "token": "B",
+            "inference_ms": 10074,
+            "prompt_tokens": 765,
+            "cached_tokens": 729,
+            "prompt_ms": 10067.21,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "circuit_en_01",
+            "expected": "CIRCUIT",
+            "predicted": "CIRCUIT",
+            "correct": true,
+            "token": "C",
+            "inference_ms": 7775,
+            "prompt_tokens": 757,
+            "cached_tokens": 729,
+            "prompt_ms": 7768.93,
+            "predicted_ms": 0.005
+          },
+          {
+            "name": "circuit_en_02",
+            "expected": "CIRCUIT",
+            "predicted": "CIRCUIT",
+            "correct": true,
+            "token": "C",
+            "inference_ms": 6462,
+            "prompt_tokens": 752,
+            "cached_tokens": 729,
+            "prompt_ms": 6454.675,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "circuit_en_03",
+            "expected": "CIRCUIT",
+            "predicted": "CIRCUIT",
+            "correct": true,
+            "token": "C",
+            "inference_ms": 6698,
+            "prompt_tokens": 753,
+            "cached_tokens": 729,
+            "prompt_ms": 6687.65,
+            "predicted_ms": 0.004
+          },
+          {
+            "name": "circuit_ar_01",
+            "expected": "CIRCUIT",
+            "predicted": "CIRCUIT",
+            "correct": true,
+            "token": "C",
+            "inference_ms": 8335,
+            "prompt_tokens": 759,
+            "cached_tokens": 729,
+            "prompt_ms": 8326.96,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "circuit_ar_02",
+            "expected": "CIRCUIT",
+            "predicted": "CIRCUIT",
+            "correct": true,
+            "token": "C",
+            "inference_ms": 9477,
+            "prompt_tokens": 763,
+            "cached_tokens": 729,
+            "prompt_ms": 9470.526,
+            "predicted_ms": 0.004
+          },
+          {
+            "name": "mechanical_en_01",
+            "expected": "MECHANICAL",
+            "predicted": "MECHANICAL",
+            "correct": true,
+            "token": "D",
+            "inference_ms": 6936,
+            "prompt_tokens": 754,
+            "cached_tokens": 729,
+            "prompt_ms": 6920.905,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "mechanical_en_02",
+            "expected": "MECHANICAL",
+            "predicted": "MECHANICAL",
+            "correct": true,
+            "token": "D",
+            "inference_ms": 5905,
+            "prompt_tokens": 751,
+            "cached_tokens": 730,
+            "prompt_ms": 5897.825,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "mechanical_en_03",
+            "expected": "MECHANICAL",
+            "predicted": "MECHANICAL",
+            "correct": true,
+            "token": "D",
+            "inference_ms": 7594,
+            "prompt_tokens": 756,
+            "cached_tokens": 729,
+            "prompt_ms": 7586.619,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "mechanical_ar_01",
+            "expected": "MECHANICAL",
+            "predicted": "MECHANICAL",
+            "correct": true,
+            "token": "D",
+            "inference_ms": 8130,
+            "prompt_tokens": 758,
+            "cached_tokens": 729,
+            "prompt_ms": 8122.15,
+            "predicted_ms": 0.004
+          },
+          {
+            "name": "mechanical_ar_02",
+            "expected": "MECHANICAL",
+            "predicted": "MECHANICAL",
+            "correct": true,
+            "token": "D",
+            "inference_ms": 9457,
+            "prompt_tokens": 763,
+            "cached_tokens": 729,
+            "prompt_ms": 9450.309,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "software_en_01",
+            "expected": "SOFTWARE",
+            "predicted": "SOFTWARE",
+            "correct": true,
+            "token": "E",
+            "inference_ms": 6175,
+            "prompt_tokens": 751,
+            "cached_tokens": 729,
+            "prompt_ms": 6165.16,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "software_en_02",
+            "expected": "SOFTWARE",
+            "predicted": "SOFTWARE",
+            "correct": true,
+            "token": "E",
+            "inference_ms": 5920,
+            "prompt_tokens": 751,
+            "cached_tokens": 730,
+            "prompt_ms": 5912.979,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "software_en_03",
+            "expected": "SOFTWARE",
+            "predicted": "SOFTWARE",
+            "correct": true,
+            "token": "E",
+            "inference_ms": 6433,
+            "prompt_tokens": 752,
+            "cached_tokens": 729,
+            "prompt_ms": 6425.199,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "software_ar_01",
+            "expected": "SOFTWARE",
+            "predicted": "SOFTWARE",
+            "correct": true,
+            "token": "E",
+            "inference_ms": 9213,
+            "prompt_tokens": 762,
+            "cached_tokens": 729,
+            "prompt_ms": 9205.151,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "software_ar_02",
+            "expected": "SOFTWARE",
+            "predicted": "SOFTWARE",
+            "correct": true,
+            "token": "E",
+            "inference_ms": 8687,
+            "prompt_tokens": 760,
+            "cached_tokens": 729,
+            "prompt_ms": 8680.241,
+            "predicted_ms": 0.004
+          },
+          {
+            "name": "alarm_en_01",
+            "expected": "ALARM",
+            "predicted": "ALARM",
+            "correct": true,
+            "token": "F",
+            "inference_ms": 7782,
+            "prompt_tokens": 757,
+            "cached_tokens": 729,
+            "prompt_ms": 7770.116,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "alarm_en_02",
+            "expected": "ALARM",
+            "predicted": "ALARM",
+            "correct": true,
+            "token": "F",
+            "inference_ms": 6712,
+            "prompt_tokens": 753,
+            "cached_tokens": 729,
+            "prompt_ms": 6705.11,
+            "predicted_ms": 0.004
+          },
+          {
+            "name": "alarm_en_03",
+            "expected": "ALARM",
+            "predicted": "ALARM",
+            "correct": true,
+            "token": "F",
+            "inference_ms": 6469,
+            "prompt_tokens": 753,
+            "cached_tokens": 730,
+            "prompt_ms": 6462.254,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "alarm_ar_01",
+            "expected": "ALARM",
+            "predicted": "ALARM",
+            "correct": true,
+            "token": "F",
+            "inference_ms": 12212,
+            "prompt_tokens": 773,
+            "cached_tokens": 729,
+            "prompt_ms": 12204.836,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "alarm_ar_02",
+            "expected": "ALARM",
+            "predicted": "ALARM",
+            "correct": true,
+            "token": "F",
+            "inference_ms": 9665,
+            "prompt_tokens": 764,
+            "cached_tokens": 729,
+            "prompt_ms": 9658.724,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "other_en_01",
+            "expected": "OTHER",
+            "predicted": "OTHER",
+            "correct": true,
+            "token": "G",
+            "inference_ms": 6424,
+            "prompt_tokens": 752,
+            "cached_tokens": 729,
+            "prompt_ms": 6417.855,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "other_en_02",
+            "expected": "OTHER",
+            "predicted": "OTHER",
+            "correct": true,
+            "token": "G",
+            "inference_ms": 6659,
+            "prompt_tokens": 754,
+            "cached_tokens": 730,
+            "prompt_ms": 6652.115,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "other_en_03",
+            "expected": "OTHER",
+            "predicted": "OTHER",
+            "correct": true,
+            "token": "G",
+            "inference_ms": 6965,
+            "prompt_tokens": 754,
+            "cached_tokens": 729,
+            "prompt_ms": 6958.7,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "other_ar_01",
+            "expected": "OTHER",
+            "predicted": "UNKNOWN",
+            "correct": false,
+            "token": "H",
+            "inference_ms": 11925,
+            "prompt_tokens": 772,
+            "cached_tokens": 729,
+            "prompt_ms": 11917.696,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "other_ar_02",
+            "expected": "OTHER",
+            "predicted": "OTHER",
+            "correct": true,
+            "token": "G",
+            "inference_ms": 8934,
+            "prompt_tokens": 761,
+            "cached_tokens": 729,
+            "prompt_ms": 8927.02,
+            "predicted_ms": 0.005
+          },
+          {
+            "name": "unknown_en_01",
+            "expected": "UNKNOWN",
+            "predicted": "UNKNOWN",
+            "correct": true,
+            "token": "H",
+            "inference_ms": 5368,
+            "prompt_tokens": 748,
+            "cached_tokens": 729,
+            "prompt_ms": 5358.746,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "unknown_en_02",
+            "expected": "UNKNOWN",
+            "predicted": "UNKNOWN",
+            "correct": true,
+            "token": "H",
+            "inference_ms": 7030,
+            "prompt_tokens": 754,
+            "cached_tokens": 729,
+            "prompt_ms": 7023.364,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "unknown_en_03",
+            "expected": "UNKNOWN",
+            "predicted": "UNKNOWN",
+            "correct": true,
+            "token": "H",
+            "inference_ms": 5166,
+            "prompt_tokens": 747,
+            "cached_tokens": 729,
+            "prompt_ms": 5157.15,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "unknown_ar_01",
+            "expected": "UNKNOWN",
+            "predicted": "UNKNOWN",
+            "correct": true,
+            "token": "H",
+            "inference_ms": 7232,
+            "prompt_tokens": 755,
+            "cached_tokens": 729,
+            "prompt_ms": 7222.429,
+            "predicted_ms": 0.001
+          },
+          {
+            "name": "unknown_ar_02",
+            "expected": "UNKNOWN",
+            "predicted": "UNKNOWN",
+            "correct": true,
+            "token": "H",
+            "inference_ms": 8632,
+            "prompt_tokens": 760,
+            "cached_tokens": 729,
+            "prompt_ms": 8624.346,
+            "predicted_ms": 0.001
+          }
+        ],
+        "dataset_sha256": "1c7159e1caf343db832d728f7efa4517b2d5d3015fd472d62ad3abd6a79093bc",
+        "manifest_sha256": "b59f1b31e41b427bc2ddc7287f58bbf8ba4e6e45685a47ccacb78b5524fbfd83",
+        "browser": "147.0.7727.15",
+        "measured_at": "2026-09-26T19:49:29.718Z",
+        "accuracy": 0.9,
+        "per_class": {
+          "POWER": {
+            "tp": 2,
+            "fp": 0,
+            "fn": 3,
+            "precision": 1,
+            "recall": 0.4,
+            "f1": 0.5714285714285715
+          },
+          "SENSOR": {
+            "tp": 5,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1,
+            "recall": 1,
+            "f1": 1
+          },
+          "CIRCUIT": {
+            "tp": 5,
+            "fp": 1,
+            "fn": 0,
+            "precision": 0.8333333333333334,
+            "recall": 1,
+            "f1": 0.9090909090909091
+          },
+          "MECHANICAL": {
+            "tp": 5,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1,
+            "recall": 1,
+            "f1": 1
+          },
+          "SOFTWARE": {
+            "tp": 5,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1,
+            "recall": 1,
+            "f1": 1
+          },
+          "ALARM": {
+            "tp": 5,
+            "fp": 0,
+            "fn": 0,
+            "precision": 1,
+            "recall": 1,
+            "f1": 1
+          },
+          "OTHER": {
+            "tp": 4,
+            "fp": 1,
+            "fn": 1,
+            "precision": 0.8,
+            "recall": 0.8,
+            "f1": 0.8000000000000002
+          },
+          "UNKNOWN": {
+            "tp": 5,
+            "fp": 2,
+            "fn": 0,
+            "precision": 0.7142857142857143,
+            "recall": 1,
+            "f1": 0.8333333333333333
+          }
+        },
+        "macro_precision": 0.918452380952381,
+        "macro_recall": 0.9,
+        "macro_f1": 0.8892316017316018
+      },
+      {
+        "model": "unsloth/Qwen3-1.7B-GGUF",
+        "revision": "d7f544eead698dbd1f15126ef60b45a1e1933222",
+        "dtype": "Q4_K_M",
+        "runtime": "wllama-3.6.1/wasm",
+        "prompt_version": "browser-device-category-v2-qwen3-1.7b",
+        "threads": 4,
+        "isolated": true,
+        "storage_mode": "temporary",
+        "kind": "support",
+        "load_ms": 0,
+        "total": 6,
+        "correct": 6,
+        "rows": [
+          {
+            "name": "طلب عربي مع اختيار المرجع الثاني",
+            "expected": "B",
+            "predicted": "B",
+            "correct": true,
+            "token": "B",
+            "inference_ms": 86064,
+            "prompt_tokens": 515,
+            "cached_tokens": 0,
+            "prompt_ms": 85658.505,
+            "predicted_ms": 362.05
+          },
+          {
+            "name": "طلب إنجليزي مع اختيار المرجع الثالث",
+            "expected": "C",
+            "predicted": "C",
+            "correct": true,
+            "token": "C",
+            "inference_ms": 9401,
+            "prompt_tokens": 493,
+            "cached_tokens": 455,
+            "prompt_ms": 9084.756,
+            "predicted_ms": 311.39
+          },
+          {
+            "name": "طلب خارج النطاق",
+            "expected": "E",
+            "predicted": "E",
+            "correct": true,
+            "token": "E",
+            "inference_ms": 39513,
+            "prompt_tokens": 240,
+            "cached_tokens": 3,
+            "prompt_ms": 39172.446,
+            "predicted_ms": 322.28
+          },
+          {
+            "name": "وصف يحتاج تفاصيل",
+            "expected": "D",
+            "predicted": "D",
+            "correct": true,
+            "token": "D",
+            "inference_ms": 8964,
+            "prompt_tokens": 491,
+            "cached_tokens": 455,
+            "prompt_ms": 8586.244,
+            "predicted_ms": 367.926
+          },
+          {
+            "name": "عطل لا يتوفر له مرجع",
+            "expected": "D",
+            "predicted": "D",
+            "correct": true,
+            "token": "D",
+            "inference_ms": 5252,
+            "prompt_tokens": 239,
+            "cached_tokens": 215,
+            "prompt_ms": 4919.271,
+            "predicted_ms": 315.08
+          },
+          {
+            "name": "طلب علاجي خارج الدعم الفني",
+            "expected": "E",
+            "predicted": "E",
+            "correct": true,
+            "token": "E",
+            "inference_ms": 4802,
+            "prompt_tokens": 237,
+            "cached_tokens": 215,
+            "prompt_ms": 4520.375,
+            "predicted_ms": 277.259
+          }
+        ],
+        "dataset_sha256": "b157668a1b40e24be418fb891cb366b8af0c321c2c358e4c41c4c153f1bb7e61",
+        "manifest_sha256": "b59f1b31e41b427bc2ddc7287f58bbf8ba4e6e45685a47ccacb78b5524fbfd83",
+        "browser": "147.0.7727.15",
+        "measured_at": "2026-09-26T19:52:03.780Z",
+        "accuracy": 1
+      }
+    ],
+    "SESSION_REUSE_RESULT": [
+      {
+        "kind": "session-result-reuse",
+        "first_duration_text": "المدة بما فيها التجهيز: 241.4 ثانية",
+        "repeated_duration_text": "المدة بما فيها التجهيز: 0.0 ثانية",
+        "repeat_ui_ms": 69
+      }
+    ]
+  }
+}

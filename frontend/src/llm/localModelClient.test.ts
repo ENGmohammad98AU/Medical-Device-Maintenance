@@ -46,6 +46,29 @@ describe('local inference lifecycle', () => {
     const client = new LocalModelClient(); const result = client.run(input, vi.fn());
     FakeWorker.instances[0].onerror?.(); expect((await result).error_code).toBe('load_failed');
   });
+  it('releases a failed GPU worker before one CPU retry and ignores late GPU messages', async () => {
+    const client = new LocalModelClient(); const progress = vi.fn();
+    const result = client.run(input, progress); const gpu = FakeWorker.instances[0];
+    gpu.message({id: 1, retry_cpu: true});
+    expect(gpu.terminate).toHaveBeenCalledOnce();
+    const cpu = FakeWorker.instances[1];
+    expect(cpu.postMessage).toHaveBeenCalledWith({id: 1, input, force_cpu: true});
+    gpu.message({id: 1, result: {...success, output_token: 'H'}});
+    gpu.onerror?.();
+    cpu.message({id: 1, result: {...success, runtime: 'wllama-3.6.1/wasm'}});
+    expect(await result).toMatchObject({status: 'success', output_token: 'A', runtime: 'wllama-3.6.1/wasm'});
+    expect(progress).toHaveBeenCalledWith(expect.objectContaining({cpu_fallback: true}));
+    client.dispose();
+  });
+  it('does not loop CPU retries and cancellation also stops a fallback worker', async () => {
+    const client = new LocalModelClient(); const first = client.run(input, vi.fn());
+    FakeWorker.instances[0].message({id: 1, retry_cpu: true});
+    FakeWorker.instances[1].message({id: 1, retry_cpu: true});
+    expect((await first).error_code).toBe('load_failed'); expect(FakeWorker.instances).toHaveLength(2);
+    const second = client.run(input, vi.fn()); client.cancel();
+    expect((await second).error_code).toBe('cancelled');
+    expect(FakeWorker.instances[2].terminate).toHaveBeenCalledOnce();
+  });
   it('rejects unsupported browsers before downloading', async () => {
     vi.stubGlobal('Worker', undefined);
     expect((await new LocalModelClient().run(input, vi.fn())).error_code).toBe('unsupported_browser');

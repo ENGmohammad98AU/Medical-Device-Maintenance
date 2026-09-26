@@ -3,9 +3,19 @@ import {formatQwenMessages as format} from '../src/llm/ggufChoice.js';
 const out = new URL('../public/llm/', import.meta.url);
 await mkdir(out, {recursive: true});
 await copyFile(new URL('../node_modules/@wllama/wllama/esm/index.js', import.meta.url), new URL('wllama.js', out));
-await copyFile(new URL('../node_modules/@wllama/wllama/esm/single-thread/wllama.wasm', import.meta.url), new URL('wllama.wasm', out));
-await copyFile(new URL('../node_modules/@wllama/wllama/esm/multi-thread/wllama.wasm', import.meta.url), new URL('wllama-multi.wasm', out));
-await copyFile(new URL('../src/llm/ggufChoice.js', import.meta.url), new URL('choice.js', out));
+await copyFile(new URL('../node_modules/@wllama/wllama/esm/wasm/wllama.wasm', import.meta.url), new URL('wllama-3.6.1.wasm', out));
+await copyFile(new URL('../node_modules/wllama-v2/esm/index.js', import.meta.url), new URL('wllama-v2.js', out));
+await copyFile(new URL('../node_modules/wllama-v2/esm/single-thread/wllama.wasm', import.meta.url), new URL('wllama-v2.wasm', out));
+await copyFile(new URL('../node_modules/wllama-v2/esm/multi-thread/wllama.wasm', import.meta.url), new URL('wllama-v2-multi.wasm', out));
+// Keep the former asset URLs for already-open tabs during deployment. New
+// workers use the versioned 3.6.1 URL and cannot receive a cached v2 binary.
+await copyFile(new URL('wllama-v2.wasm', out), new URL('wllama.wasm', out));
+await copyFile(new URL('wllama-v2-multi.wasm', out), new URL('wllama-multi.wasm', out));
+await copyFile(new URL('./fixtures/ggufChoice-v2.js', import.meta.url), new URL('choice-v2.js', out));
+await copyFile(new URL('./fixtures/ggufConfig-v2.json', import.meta.url), new URL('config-v2.json', out));
+await copyFile(new URL('../src/llm/fastGgufChoice.js', import.meta.url), new URL('choice.js', out));
+await copyFile(new URL('../src/llm/ggufChoice.js', import.meta.url), new URL('ggufChoice.js', out));
+await copyFile(new URL('../src/llm/computeBackend.js', import.meta.url), new URL('computeBackend.js', out));
 await copyFile(new URL('../src/llm/browserIsolation.js', import.meta.url), new URL('isolation.js', out));
 await copyFile(new URL('../src/llm/modelStorage.js', import.meta.url), new URL('storage.js', out));
 const read = async (path) => JSON.parse(await readFile(new URL(path, import.meta.url), 'utf8'));

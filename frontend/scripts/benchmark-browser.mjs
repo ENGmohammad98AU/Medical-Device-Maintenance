@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {readFile, mkdir, writeFile, mkdtemp, rm} from 'node:fs/promises';
 import {resolve, extname, relative, isAbsolute, join} from 'node:path';
-import {tmpdir} from 'node:os';
+import {tmpdir, cpus, platform, totalmem} from 'node:os';
 import {createHash} from 'node:crypto';
 import {chromium} from 'playwright';
 const root=resolve('dist');
@@ -30,13 +30,46 @@ page.on('console',msg=>{if(msg.text().startsWith('INFERENCE_STAGE'))console.log(
 page.on('pageerror',error=>console.error('Browser error:',error.message));
 await mkdir('benchmark-results',{recursive:true});
 const lowStorage=process.argv.includes('--low-storage');
+const machine={os:platform(),cpu:cpus()[0]?.model,logical_cpus:cpus().length,memory_bytes:totalmem()};
 if(lowStorage) {
   const cdp=await context.newCDPSession(page);
   await cdp.send('Storage.overrideQuotaForOrigin',{origin:'http://127.0.0.1:4174',quotaSize:128*1024*1024});
 }
 const kinds=process.argv.includes('--skip-classification')?['support']:['classification','support'];
 try {
-  await page.goto('http://127.0.0.1:4174/model-upgrade-test.html',{waitUntil:'commit'});
+  if(process.argv.includes('--compare-runtimes')) {
+    const measured={};
+    for(const runtime of ['fast','baseline']) {
+      await page.goto(`http://127.0.0.1:4174/model-upgrade-test.html?runtime=${runtime}&cpu=1`,{waitUntil:'commit'});
+      await page.locator('#workflow').click();
+      await page.waitForFunction(()=>/اكتمل الاختبار|فشل الاختبار/.test(document.querySelector('#status').textContent),{},{timeout:30*60_000});
+      const raw=await page.locator('#output').innerText();
+      assert.match(await page.locator('#status').innerText(),/اكتمل الاختبار/,raw.slice(-2000));
+      const result=JSON.parse(raw);
+      result.browser=browser.version();result.measured_at=new Date().toISOString();result.machine=machine;
+      result.note='Same browser/CPU, identical weights/prompts. Four alternating classification/reference requests. Load/download excluded; no full-result cache.';
+      await writeFile(`benchmark-results/workflow-${runtime}.json`,JSON.stringify(result,null,2)+'\n');
+      console.log('WORKFLOW_BENCHMARK_RESULT='+JSON.stringify(result));
+      assert.equal(result.correct,result.total,'Reference decisions must be preserved');
+      assert.equal(result.isolated,true);assert.ok(result.threads>=2);
+      measured[runtime]=result;
+    }
+    const a=measured.baseline,b=measured.fast;
+    assert.deepEqual([a.model,a.revision,a.dtype,a.threads],[b.model,b.revision,b.dtype,b.threads]);
+    assert.deepEqual(b.rows.map(r=>[r.name,r.classification.token,r.support.token]),a.rows.map(r=>[r.name,r.classification.token,r.support.token]),'Workflow decisions changed');
+    const sum=rows=>rows.reduce((n,r)=>n+r.inference_ms,0);
+    const comparison={baseline_runtime:a.runtime,candidate_runtime:b.runtime,threads:b.threads,browser:b.browser,machine,
+      baseline_total_ms:sum(a.rows),candidate_total_ms:sum(b.rows),
+      baseline_warm_mean_ms:sum(a.rows.slice(1))/3,candidate_warm_mean_ms:sum(b.rows.slice(1))/3};
+    comparison.speedup=comparison.baseline_total_ms/comparison.candidate_total_ms;
+    comparison.reduction_percent=100*(1-1/comparison.speedup);
+    await writeFile('benchmark-results/runtime-comparison.json',JSON.stringify(comparison,null,2)+'\n');
+    console.log('RUNTIME_COMPARISON='+JSON.stringify(comparison));
+    assert.ok(comparison.speedup>1,'Do not ship a slower runtime on the controlled CPU comparison');
+    assert.ok(b.rows.slice(1).every(r=>r.classification.cached_tokens>r.classification.prompt_tokens/2
+      &&r.support.cached_tokens>r.support.prompt_tokens/2),'Both tasks must reuse most of their prompt, not just a few common delimiter tokens');
+    await page.goto('http://127.0.0.1:4174/model-upgrade-test.html?cpu=1',{waitUntil:'commit'});
+  } else await page.goto('http://127.0.0.1:4174/model-upgrade-test.html?cpu=1',{waitUntil:'commit'});
   for(const kind of kinds) {
     await page.locator('#'+kind).click();
     await page.waitForFunction(()=>/اكتمل الاختبار|فشل الاختبار/.test(document.querySelector('#status').textContent),{},{timeout:25*60_000});
@@ -69,7 +102,7 @@ try {
     }
     await writeFile(`benchmark-results/${kind}.json`,JSON.stringify(result,null,2)+'\n');
     console.log('BROWSER_BENCHMARK_RESULT='+JSON.stringify(result));
-    if(kind==='classification')assert.ok(result.accuracy>13/40,'Must improve upon the frozen 0.6B development baseline');
+    if(kind==='classification')assert.ok(result.accuracy>=36/40,'Must retain the existing 1.7B development accuracy');
     else assert.equal(result.accuracy,1,'Reference-selection smoke cases must all pass');
   }
   // Exercise the production worker and UI too, not only the benchmark harness.

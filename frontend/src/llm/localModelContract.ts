@@ -14,8 +14,9 @@ export interface LocalResult {
   error_code?: LocalError;
   support?: SupportResult;
   reused_result?: boolean;
+  runtime?: 'wllama-3.6.1/wasm' | 'wllama-3.6.1/webgpu';
 }
-export interface LocalProgress { stage: 'loading' | 'running'; percent?: number; task?: 'classification' | 'reference_selection'; storage_mode?: 'persistent' | 'temporary' }
+export interface LocalProgress { stage: 'loading' | 'running'; percent?: number; task?: 'classification' | 'reference_selection'; storage_mode?: 'persistent' | 'temporary'; compute_backend?: 'wasm' | 'webgpu'; cpu_fallback?: boolean }
 
 // The server uses the same ordering. This detects stale input, not tampering.
 export function serializeInput(input: LocalInput): string {
