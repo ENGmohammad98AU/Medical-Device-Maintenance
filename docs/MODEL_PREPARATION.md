@@ -26,18 +26,20 @@ synthetic cases, not a mobile guarantee or a clinical-accuracy evaluation.
 
 | Measurement | Baseline | Release candidate |
 | --- | ---: | ---: |
-| Preparation | 172.104 s | 101.894 s |
-| Mean report inference, six cases | 18.639 s | 11.655 s |
-| Slowest report inference | 21.527 s | 13.806 s |
+| Preparation | 172.104 s | 108.384 s |
+| Mean report inference, six cases | 18.639 s | 11.587 s |
+| Slowest report inference | 21.527 s | 13.724 s |
 | Fixed classification result | 38/40 previously measured | 38/40 |
 
-Preparation was 40.8% shorter in this comparison. Two preceding development
+Preparation was 37.0% shorter in this comparison. Two preceding development
 probes prepared in approximately 105 seconds on the same machine.
 
 Generation remains English and evidence-bound. During the first performance
 probe, the existing server filter rejected a battery replacement instruction.
 Guidance v13 explicitly prohibits component replacement to align the prompt
-with that rule. The filter is unchanged. CI now replays all six real decoded
+with that rule. Shared instructions are evaluated during warmup, with only a
+short reminder after the evidence to keep slower CPUs within the inference
+budget. The filter is unchanged. CI now replays all six real decoded
 answers through the isolated production API, preserving text and selection
 tokens and rebinding only the context hashes to the test database.
 

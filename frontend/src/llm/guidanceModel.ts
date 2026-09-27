@@ -19,7 +19,8 @@ export interface GuidanceResult {
   error_code?: 'timeout' | 'input_too_long' | 'invalid_output' | 'load_failed' | 'not_allowed' | 'out_of_scope';
 }
 type Model = Pick<Wllama, 'createCompletion'>;
-const ENGLISH_INSTRUCTION = 'Answer in English only, in fewer than 65 words.\n';
+const ENGLISH_INSTRUCTION = 'Answer in English only, in fewer than 65 words. '
+  + 'Give only external checks; never recommend repair or replacement of parts, even if the reference mentions them.\n';
 
 function prompt(context: GuidanceContext, referenceId?: string | null) {
   if (context.version !== config.version) throw new Error('invalid_output');
@@ -38,7 +39,7 @@ function prompt(context: GuidanceContext, referenceId?: string | null) {
     {role: 'user', content: ENGLISH_INSTRUCTION
       + JSON.stringify({device: context.device_name, report: context.report_text,
       reference: reference ? {symptom: reference.symptom, evidence} : null})
-      + (reference ? '\nGive only external checks. Do not recommend repair or replacement of parts, even when the reference mentions them.'
+      + (reference ? '\nNo replacement advice.'
         : '\nNo manufacturer reference matched. State that the cause is unconfirmed. Suggest one external visual check of the part named in the report. Do not invent components, observations or causes. You have not inspected this device. Do not request alarm details when no alarm is reported.')
       }]);
 }
