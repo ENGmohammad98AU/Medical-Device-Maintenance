@@ -108,6 +108,7 @@ def test_patient_and_unclear_guards_suppress_even_forged_complete_text(api_clien
                                   'The cause is unconfirmed. افحص العجلة بصريًا.',
                                   'The wheel bearing has failed and needs replacement.',
                                   'The cause is unconfirmed. Return the device to clinical use.',
+                                  'The cause is unconfirmed. You can now return the device to service.',
                                   '1. افحص العجلة بصريًا.\n2. اسأل المريض عن حالة العجلة.'])
 def test_dangerous_and_truncated_drafts_are_not_displayed(api_client, text):
     client, _, _ = api_client
@@ -183,6 +184,17 @@ def test_generated_explanation_preserves_server_owned_evidence(three_devices, sa
     rejected = analyze(client, request, result)
     assert rejected['generated_guidance']['error_code'] == 'reference_mismatch'
     assert not rejected['generated_guidance']['text']
+
+
+def test_sourced_verification_condition_is_not_a_return_to_service_approval(three_devices):
+    client, _, _ = three_devices
+    request, context = prepare(client, 902, 'Resp Leads Off')
+    result = local(request, context)
+    result['support'] = dict(status='success', version=context['version'],
+                             input_sha256=context['input_sha256'], output_token='A')
+    result['guidance'].update(reference_id=context['candidates'][0]['reference_id'],
+        text='A specialist should check electrode connections. Verify alarm clearance before returning to service.')
+    assert analyze(client, request, result)['generated_guidance']['status'] == 'DRAFT'
 
 
 def test_arabic_input_receives_only_english_generated_and_support_text(api_client):

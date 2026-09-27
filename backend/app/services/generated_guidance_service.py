@@ -75,7 +75,11 @@ UNSAFE = re.compile(
     r"\b(?:calibrat\w*|reboot|reset|bypass|dosage|dose|sedat\w*|solder\w*)\b|"
     r"(?:disable|silence|change|adjust).{0,25}(?:alarm|limit|flow|rate|pressure|voltage)|"
     r"(?:replace|repair).{0,25}(?:board|fuse|battery|valve|motor)|"
-    r"(?:return|restore).{0,25}(?:service|clinical use)|\bsafe to use\b|"
+    # Reject approval/directives, while allowing a sourced prerequisite such as
+    # "Verify alarm clearance before returning to service".
+    r"(?:^|[.!?]\s+|\n)\s*(?:\d+[.)]\s*)?(?:return|restore)\b.{0,30}(?:service|clinical use)|"
+    r"\b(?:you can|you may|can now|may now|please)\b.{0,20}(?:return|restore).{0,30}(?:service|clinical use)|"
+    r"\b(?:safe to use|ready for clinical use)\b|"
     r"(?:disconnect|unplug).{0,25}(?:patient|ventilator|infusion)|"
     r"(?:فتح|افتح|فك|أزل|إزالة).{0,18}(?:غطاء|الغلاف|هيكل|لوحة)|"
     r"معاير|جرع|تخدير|لحام|تجاوز|إعادة (?:تشغيل|ضبط)|اعاده (?:تشغيل|ضبط)|"

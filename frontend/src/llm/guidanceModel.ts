@@ -29,6 +29,8 @@ function prompt(context: GuidanceContext, referenceId?: string | null) {
   return formatQwenMessages([{role: 'system', content: config.system_prompt},
     {role: 'user', content: JSON.stringify({device: context.device_name, report: context.report_text,
       reference: reference ? {symptom: reference.symptom, evidence: reference.evidence} : null})
+      + (reference ? '\nExplain only the supplied evidence and one non-invasive next check.'
+        : '\nNo manufacturer reference matched. State that the cause is unconfirmed. Suggest one external visual check of the part named in the report, or ask for the exact alarm. Do not invent components, observations or causes. You have not inspected this device.')
       + '\nAnswer in English only, in fewer than 65 words.'}]);
 }
 
