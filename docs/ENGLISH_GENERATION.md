@@ -63,7 +63,10 @@ The generation benchmark uses synthetic development cases for all three devices,
 including an Arabic report and selected manufacturer evidence. It checks actual
 decoding, English output, relevance, selected source identifier and timing. It is
 not an independent factual-accuracy or clinical-safety evaluation. The fixed
-40-case classification benchmark is unchanged.
+40-case classification benchmark is unchanged. CI also replays the actual
+decoded text through the isolated production API to check acceptance and source
+binding. See [Model preparation](MODEL_PREPARATION.md) for the faster warmup,
+measured timings and the v13 component-replacement instruction.
 
 Runtime references: [Qwen3-1.7B model card](https://huggingface.co/Qwen/Qwen3-1.7B)
 and [wllama completion API](https://github.ngxson.com/wllama/docs/classes/Wllama.html).

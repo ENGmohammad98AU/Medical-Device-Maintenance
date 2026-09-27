@@ -3,6 +3,12 @@ export function formatQwenMessages(messages, prefix = '') {
   return messages.map(m => `<|im_start|>${m.role}\n${m.content}<|im_end|>\n`).join('')
     + '<|im_start|>assistant\n<think>\n\n</think>\n\n' + prefix;
 }
+// Stop at the beginning of the variable user content. Only this prefix survives
+// the first real request; evaluating an empty report's suffix wastes warmup work.
+export function formatQwenUserPrefix(messages, userPrefix = '') {
+  return messages.map(m => `<|im_start|>${m.role}\n${m.content}<|im_end|>\n`).join('')
+    + '<|im_start|>user\n' + userPrefix;
+}
 export async function chooseGgufToken(model, prompt, labels, maxTokens, allowSpace = false, stage = () => {}) {
   stage('tokenization');
   const tokens = await model.tokenize(prompt, true);

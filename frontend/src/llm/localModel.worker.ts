@@ -42,6 +42,7 @@ self.addEventListener('message', async (event: MessageEvent<{id: number; input?:
     self.postMessage({id, ready: true});
     if (!input) {
       self.postMessage({id, result: {status: 'success', revision: config.revision,
+        preparation_version: config.preparation_version, preparation_threads: loaded.getNumThreads(),
         runtime: `wllama-3.6.1/${computeBackend}`, latency_ms: Math.round(performance.now() - started)}});
       return;
     }

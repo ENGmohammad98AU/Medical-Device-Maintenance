@@ -1,6 +1,7 @@
 import { categoryToken, localModelConfig as config, type LocalInput } from './localModelContract';
 import { supportMessages, supportToken, supportModelConfig, type SupportContext } from './supportModelContract';
-import { chooseFastGgufToken as chooseGgufToken, formatQwenMessages, type FastChoiceModel as ChoiceModel } from './fastGgufChoice.js';
+import { chooseFastGgufToken as chooseGgufToken, formatQwenMessages, warmGgufPrefix, type FastChoiceModel as ChoiceModel } from './fastGgufChoice.js';
+import { formatQwenUserPrefix } from './ggufChoice.js';
 import { warmGuidance } from './guidanceModel';
 import { normalizeReportText } from './reportText.js';
 
@@ -18,18 +19,18 @@ export async function selectSupportLocally(model: ChoiceModel, context: SupportC
     labels, supportModelConfig.max_input_tokens, true), context.candidates);
 }
 
-// Populate all four stable prompt prefixes before accepting reports. These
-// synthetic, empty inputs never become report results or enter the result cache.
+// Populate all four stable prefixes before accepting reports. Preparation uses
+// no report data, and never evaluates the disposable empty-report suffixes.
 export async function warmLocalPrompts(model: ChoiceModel,
   progress: (task: 'classification' | 'reference_selection' | 'scope' | 'generation') => void) {
   progress('classification');
-  await classifyLocally(model, {report_text: '', device_type: '', patient_connected: false});
-  const context: SupportContext = {version: supportModelConfig.version, input_sha256: '',
-    report_text: '', device_name: '', candidates: [{label: 'A', reference_id: '', symptom: ''}]};
+  await warmGgufPrefix(model, formatQwenUserPrefix([{role: 'system', content: config.system_prompt}, ...config.examples]));
   progress('reference_selection');
-  await selectSupportLocally(model, context);
+  await warmGgufPrefix(model, formatQwenUserPrefix([{role: 'system', content: supportModelConfig.system_prompt},
+    ...supportModelConfig.examples], 'Device: '));
   progress('scope');
-  await selectSupportLocally(model, {...context, candidates: []});
+  await warmGgufPrefix(model, formatQwenUserPrefix([{role: 'system', content: supportModelConfig.scope_prompt},
+    ...supportModelConfig.scope_examples]));
   progress('generation');
   await warmGuidance(model);
 }

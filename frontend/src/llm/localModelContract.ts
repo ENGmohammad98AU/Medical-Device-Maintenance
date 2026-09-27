@@ -17,6 +17,8 @@ export interface LocalResult {
   input_sha256?: string;
   latency_ms: number;
   preparation_ms?: number;
+  preparation_version?: string;
+  preparation_threads?: number;
   inference_ms?: number;
   error_code?: LocalError;
   support?: SupportResult;

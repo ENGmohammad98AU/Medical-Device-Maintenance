@@ -39,8 +39,19 @@ describe('optional browser isolation', () => {
   it('caps parallel work and uses one thread without shared memory isolation', () => {
     setup(); expect(inferenceThreads()).toBe(1);
     vi.stubGlobal('crossOriginIsolated', true);
-    expect(inferenceThreads()).toBe(4);
+    expect(inferenceThreads()).toBe(8);
     vi.stubGlobal('SharedArrayBuffer', undefined);
     expect(inferenceThreads()).toBe(1);
+  });
+  it('preserves the smaller-device limit and reserves desktop capacity for the UI', () => {
+    vi.stubGlobal('crossOriginIsolated', true);
+    for (const [cores, expected] of [[1, 1], [2, 2], [4, 4], [6, 4], [8, 7], [9, 8], [16, 8]]) {
+      vi.stubGlobal('navigator', {hardwareConcurrency: cores, userAgent: 'Desktop'});
+      expect(inferenceThreads()).toBe(expected);
+    }
+    for (const browser of [{userAgent: 'Android'}, {userAgent: 'iPhone'}, {userAgentData: {mobile: true}}]) {
+      vi.stubGlobal('navigator', {hardwareConcurrency: 16, ...browser});
+      expect(inferenceThreads()).toBe(4);
+    }
   });
 });

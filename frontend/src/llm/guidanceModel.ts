@@ -1,6 +1,7 @@
 import type { Wllama } from '@wllama/wllama';
 import config from './guidanceModelConfig.json';
-import { formatQwenMessages } from './fastGgufChoice.js';
+import { formatQwenMessages, warmGgufPrefix } from './fastGgufChoice.js';
+import { formatQwenUserPrefix } from './ggufChoice.js';
 
 export { config as guidanceModelConfig };
 export interface GuidanceReference {
@@ -18,6 +19,7 @@ export interface GuidanceResult {
   error_code?: 'timeout' | 'input_too_long' | 'invalid_output' | 'load_failed' | 'not_allowed' | 'out_of_scope';
 }
 type Model = Pick<Wllama, 'createCompletion'>;
+const ENGLISH_INSTRUCTION = 'Answer in English only, in fewer than 65 words.\n';
 
 function prompt(context: GuidanceContext, referenceId?: string | null) {
   if (context.version !== config.version) throw new Error('invalid_output');
@@ -33,10 +35,10 @@ function prompt(context: GuidanceContext, referenceId?: string | null) {
     field => ({'possible_causes:': 'Causes:', 'immediate_safety_action:': 'Safety:',
       'recommended_solution:': 'Solution:', 'verification_before_return_to_service:': 'Verification:'}[field]!));
   return formatQwenMessages([{role: 'system', content: config.system_prompt},
-    {role: 'user', content: 'Answer in English only, in fewer than 65 words.\n'
+    {role: 'user', content: ENGLISH_INSTRUCTION
       + JSON.stringify({device: context.device_name, report: context.report_text,
       reference: reference ? {symptom: reference.symptom, evidence} : null})
-      + (reference ? ''
+      + (reference ? '\nGive only external checks. Do not recommend repair or replacement of parts, even when the reference mentions them.'
         : '\nNo manufacturer reference matched. State that the cause is unconfirmed. Suggest one external visual check of the part named in the report. Do not invent components, observations or causes. You have not inspected this device. Do not request alarm details when no alarm is reported.')
       }]);
 }
@@ -57,9 +59,8 @@ export function completeGuidance(text: string): string {
 }
 
 export async function warmGuidance(model: Model) {
-  const options = {prompt: prompt({version: config.version, input_sha256: '', device_name: '', report_text: ''}),
-    stream: false as const, max_tokens: 1, temperature: 0, cache_prompt: true, seed: 0};
-  await model.createCompletion(options);
+  await warmGgufPrefix(model, formatQwenUserPrefix([{role: 'system', content: config.system_prompt}],
+    ENGLISH_INSTRUCTION + '{"device":"'));
 }
 
 export async function generateGuidance(model: Model, context: GuidanceContext, budgetMs: number,
