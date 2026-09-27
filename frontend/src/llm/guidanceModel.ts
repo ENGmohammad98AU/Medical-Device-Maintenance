@@ -20,7 +20,18 @@ function prompt(context: GuidanceContext) {
   if (context.report_text.length > 1600 || context.device_name.length > 400) throw new Error('input_too_long');
   return formatQwenMessages([{role: 'system', content: config.system_prompt},
     {role: 'user', content: JSON.stringify({device: context.device_name, report: context.report_text})
-      + (/[\u0600-\u06ff]/u.test(context.report_text) ? '\nبالعربية للفني: أمرَا فحص قصيران فقط، دون أسئلة.' : '\nWrite the two steps in English for this fault.')}]);
+      + (/[\u0600-\u06ff]/u.test(context.report_text) ? '\nLanguage: Arabic.' : '\nLanguage: English.')}]);
+}
+
+function guidanceGrammar(context: GuidanceContext) {
+  const verbs = /[\u0600-\u06ff]/u.test(context.report_text)
+    ? ['افحص', 'تحقق', 'سجل', 'سجّل'] : ['Check', 'Inspect', 'Record', 'Verify'];
+  // Only structure and inspection verbs are constrained. The model generates
+  // the component and check from the report; no stored answers are selected.
+  return 'root ::= "1. " step "\\n2. " step\n'
+    + 'step ::= verb (" " word){2,4} "."\n'
+    + 'verb ::= ' + verbs.map(verb => JSON.stringify(verb)).join(' | ') + '\n'
+    + 'word ::= [^ \\t\\r\\n<>.!?؟]{1,24}';
 }
 
 export function completeGuidance(text: string): string {
@@ -49,7 +60,7 @@ export async function generateGuidance(model: Model, context: GuidanceContext, b
     if (budgetMs < 2500) throw new Error('timeout');
     const options = {prompt: prompt(context), stream: false as const,
       max_tokens: config.max_new_tokens, temperature: 0.2, top_p: 0.8, top_k: 20,
-      repeat_penalty: 1.05, seed: 0, cache_prompt: true, abortSignal: controller.signal};
+      repeat_penalty: 1.05, seed: 0, cache_prompt: true, grammar: guidanceGrammar(context), abortSignal: controller.signal};
     const response = await model.createCompletion(options);
     // Compiled out of production. CI uses only the synthetic guidanceCases
     // reports, so formatting failures can be diagnosed without patient logs.
