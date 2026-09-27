@@ -184,4 +184,22 @@ describe('local inference lifecycle', () => {
     expect(FakeWorker.instances[0].postMessage).toHaveBeenCalledTimes(2);
     client.cancel(); await second;
   });
+  it('caches only completed generation and invalidates changed generation context', async () => {
+    const client = new LocalModelClient();
+    const guidance = {version: 'g1', input_sha256: 'a'.repeat(64), device_name: 'Ventilator', report_text: input.report_text};
+    const request = {...input, support_context: {...guidance, candidates: [], guidance}};
+    const first = client.run(request, vi.fn()); const worker = FakeWorker.instances[0];
+    worker.message({id: 1, result: {...success, guidance: {...guidance, status: 'error', error_code: 'timeout'}}});
+    await first;
+    const second = client.run(request, vi.fn());
+    expect(worker.postMessage).toHaveBeenCalledTimes(2);
+    worker.message({id: 2, result: {...success, guidance: {...guidance, status: 'success', text: 'Completed draft', latency_ms: 12000}}});
+    await second;
+    const reused = await client.run(request, vi.fn());
+    expect(reused.reused_result).toBe(true); expect(reused.guidance?.latency_ms).toBe(0);
+    expect(worker.postMessage).toHaveBeenCalledTimes(2);
+    const changed = client.run({...request, support_context: {...request.support_context, guidance: {...guidance, input_sha256: 'b'.repeat(64)}}}, vi.fn());
+    expect(worker.postMessage).toHaveBeenCalledTimes(3);
+    client.cancel(); await changed; client.dispose();
+  });
 });

@@ -369,7 +369,7 @@ def analyze_fault(
             reference_lookup = dict(NO_MATCH)
             restrict_retrieval = True
             if draft_text:
-                support_result.update(status="GENERATED", method="LOCAL_LLM_GENERATION", questions=[],
+                support_result.update(status="GENERATED", scope="IN_SCOPE", method="LOCAL_LLM_GENERATION", questions=[],
                                       selected_reference_id=None, message="ولّد النموذج مسودة إرشادات قصيرة للحالة الموصوفة، بانتظار مراجعة المختص.")
                 classification.recommended_action = "مراجعة المسودة بواسطة مهندس الأجهزة الطبية قبل التنفيذ."
                 routing_target = "BIOMEDICAL_ENGINEERING"

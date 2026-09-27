@@ -736,9 +736,10 @@ export default function FaultReportsPage() {
               استكمال الوصف وإعادة التحليل
             </Button>}
             {aiAnalysis?.workflow?.fault_report_id && !decisionSaved && (
-              <Button color={aiAnalysis.reference_found ? 'success' : 'warning'} variant="contained"
-                onClick={() => saveAnalysisDecision(aiAnalysis.reference_found ? 'APPROVED' : 'ESCALATED')}>
-                {aiAnalysis.reference_found ? 'اعتماد التوصية كمختص' : 'إحالة لمهندس الأجهزة الطبية'}
+              <Button color={aiAnalysis.reference_found || aiAnalysis.generated_guidance?.status === 'DRAFT' ? 'success' : 'warning'} variant="contained"
+                onClick={() => saveAnalysisDecision(aiAnalysis.reference_found || aiAnalysis.generated_guidance?.status === 'DRAFT' ? 'APPROVED' : 'ESCALATED')}>
+                {aiAnalysis.generated_guidance?.status === 'DRAFT' ? 'اعتماد المسودة بعد مراجعتها كمختص'
+                  : aiAnalysis.reference_found ? 'اعتماد التوصية كمختص' : 'إحالة لمهندس الأجهزة الطبية'}
               </Button>
             )}
             {decisionSaved && <Chip color="success" label="تم حفظ قرار المختص" />}

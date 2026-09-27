@@ -11,7 +11,7 @@ from test_llm_triage import api_client
 from test_device_support_regressions import three_devices, DEVICES
 
 TEXT = "1. افحص العجلة بصريًا بحثًا عن عائق ظاهر.\n2. سجّل موضع التعليق وحالة الفرامل الظاهرة."
-CASES = json.loads((Path(__file__).parents[1] / 'frontend/src/llm/guidanceCases.json').read_text())
+CASES = json.loads((Path(__file__).parents[1] / 'frontend/src/llm/guidanceCases.json').read_text(encoding="utf-8"))
 
 
 def prepare(client, device_id=901, text=CASES[0]['report_text'], **changes):
@@ -37,7 +37,7 @@ def analyze(client, request, inference):
 
 
 def test_generation_manifest_matches_browser():
-    assert json.loads((Path(__file__).parents[1] / 'frontend/src/llm/guidanceModelConfig.json').read_text()) == GUIDANCE
+    assert json.loads((Path(__file__).parents[1] / 'frontend/src/llm/guidanceModelConfig.json').read_text(encoding="utf-8")) == GUIDANCE
 
 
 @pytest.mark.parametrize('index,device_id', [(0, 901), (1, 902), (2, 903)])
@@ -122,3 +122,22 @@ def test_compatibility_endpoint_passes_generation_and_patient_context(api_client
                            generate_guidance=True, patient_connected=True, browser_llm=local(request, context)))
     assert response.status_code == 200, response.text
     assert response.json()['generated_guidance']['status'] == 'BLOCKED'
+
+
+def test_generated_draft_is_preserved_for_review_without_closing_report(api_client):
+    from test_full_support_workflow import create_report
+    from app.models.fault_report import FaultStatus
+    from app.services.fault_resolution_workflow_service import FaultResolutionWorkflowService
+    client, db, _ = api_client
+    report = create_report(db)
+    request, context = prepare(client, report_id=report.id)
+    body = analyze(client, request, local(request, context))
+    workflow = FaultResolutionWorkflowService(db).get(report.id)
+    assert body['generated_guidance']['status'] == 'DRAFT'
+    assert workflow.recommended_solution == TEXT
+    assert workflow.reference_source == 'LLM_GENERATED_UNVERIFIED'
+    assert workflow.selected_reference_id is None and workflow.specialist_decision is None
+    assert workflow.outcome == 'PENDING' and report.status == FaultStatus.IN_PROGRESS
+    with pytest.raises(ValueError):
+        FaultResolutionWorkflowService(db).verify_resolution(report.id, action_taken='Checked wheel',
+            verification_result='Rolls freely', outcome='RESOLVED', user_id=1)
