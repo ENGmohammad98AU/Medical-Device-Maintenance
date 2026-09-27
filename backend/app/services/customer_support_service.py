@@ -113,7 +113,7 @@ def resolve_support(context, references, result, llm_run, fallback):
                         message="اختار النموذج مرجعًا للأعراض المذكورة. الحل أدناه من نص المرجع ويتطلب اعتماد المختص.")
         return selected, metadata, True
     if token == "E":
-        metadata.update(status="OUT_OF_SCOPE", scope="OUT_OF_SCOPE",
+        metadata.update(status="OUT_OF_SCOPE", scope="OUT_OF_SCOPE", questions=[],
                         message="يبدو أن الطلب خارج نطاق الدعم الفني للأجهزة الطبية. وضّح إن كان يتعلق بعطل جهاز؛ أما العلاج أو الدواء فراجع الفريق السريري، والطلبات الإدارية تُوجّه إلى خدمة العملاء المختصة.")
     else:
         unclear = llm_run.browser_category == "UNKNOWN" or bool(references)

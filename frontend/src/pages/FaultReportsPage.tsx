@@ -336,6 +336,7 @@ export default function FaultReportsPage() {
         params: { decision, comments: decision === 'APPROVED' ? 'Approved from fault report analysis view' : 'Missing reference; escalated for specialist review' },
       });
       setDecisionSaved(true);
+      void fetchReports();
     } catch (err: any) {
       setError(typeof err.response?.data?.detail === 'string' ? err.response.data.detail : 'تعذر حفظ قرار المختص');
     }
@@ -646,6 +647,7 @@ export default function FaultReportsPage() {
           <DialogContent>
             {aiAnalysis && (
               <Box sx={{ mt: 2 }}>
+                {error && <Alert severity="error" sx={{mb: 2}}>{error}</Alert>}
                 <LLMTriageSummary result={aiAnalysis} />
                 {aiAnalysis.customer_support && <CustomerSupportSummary
                   support={aiAnalysis.customer_support} referenceFound={aiAnalysis.reference_found} />}
