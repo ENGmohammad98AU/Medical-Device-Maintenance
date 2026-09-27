@@ -1,8 +1,8 @@
 {
   "purpose": "Actual production-worker preparation timing and synthetic regression evidence",
   "baseline_commit": "3eea4689a655c82712bb9e8c14b56ab6157f644a",
-  "preparation_reduction_percent": 37.0,
-  "preparation_speedup": 1.59,
+  "preparation_reduction_percent": 39.6,
+  "preparation_speedup": 1.66,
   "method": {
     "fresh_browser_profile_per_run": true,
     "internet_download_included": false,
@@ -258,19 +258,19 @@
     "revision": "d7f544eead698dbd1f15126ef60b45a1e1933222",
     "model_sha256": "b139949c5bd74937ad8ed8c8cf3d9ffb1e99c866c823204dc42c0d91fa181897",
     "browser": "147.0.7727.15",
-    "measured_at": "2026-09-27T21:24:47.653Z",
+    "measured_at": "2026-09-27T21:40:36.484Z",
     "machine": {
       "os": "linux",
       "cpu": "AMD EPYC 9V74 80-Core Processor",
       "logical_cpus": 9
     },
     "model_source": "SHA-verified local file; Internet download excluded",
-    "preparation_ms": 108384,
+    "preparation_ms": 103900,
     "rows": [
       {
         "name": "Philips MX800 sourced Resp answer",
         "report_text": "Resp Leads Off",
-        "wall_ms": 13722,
+        "wall_ms": 11232,
         "status": "success",
         "revision": "d7f544eead698dbd1f15126ef60b45a1e1933222",
         "output_token": "D",
@@ -279,29 +279,29 @@
           "version": "browser-reference-selection-v1",
           "input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
           "output_token": "A",
-          "latency_ms": 3011
+          "latency_ms": 2586
         },
         "guidance": {
           "version": "browser-guidance-v13-english-evidence",
           "input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
           "status": "success",
-          "text": "Resp Leads Off indicates respiration electrodes are not connected. Check RA, LA, and LL electrode connections. Specialist review is required.",
+          "text": "Resp Leads Off - check RA, LA, LL electrode connections. Specialist confirms alarm cleared and function safe.",
           "reference_id": "PH-MX800-013",
           "finish_reason": "stop",
-          "prompt_tokens": 328,
-          "completion_tokens": 27,
-          "latency_ms": 9161
+          "prompt_tokens": 325,
+          "completion_tokens": 22,
+          "latency_ms": 7193
         },
         "prompt_version": "browser-device-category-v3-short-alarms",
         "runtime": "wllama-3.6.1/wasm",
         "input_sha256": "569861838c3674d503ccb72aa6e35f195bb2db9916e1548d9eee88d4abd255bc",
-        "latency_ms": 13320,
+        "latency_ms": 10827,
         "correct": true
       },
       {
         "name": "Hamilton C6 trolley wheel",
         "report_text": "The trolley caster wheel is jammed and cannot rotate.",
-        "wall_ms": 10406,
+        "wall_ms": 11531,
         "status": "success",
         "revision": "d7f544eead698dbd1f15126ef60b45a1e1933222",
         "output_token": "D",
@@ -310,29 +310,29 @@
           "version": "browser-reference-selection-v1",
           "input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
           "output_token": "D",
-          "latency_ms": 1436
+          "latency_ms": 1736
         },
         "guidance": {
           "version": "browser-guidance-v13-english-evidence",
           "input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
           "status": "success",
-          "text": "The trolley caster wheel is jammed and cannot rotate. Unconfirmed cause. Check for debris or mechanical obstruction.",
+          "text": "The trolley caster wheel is jammed and cannot rotate. Unconfirmed cause. Check for debris or obstructions around the wheel.",
           "reference_id": null,
           "finish_reason": "stop",
           "prompt_tokens": 296,
-          "completion_tokens": 24,
-          "latency_ms": 6736
+          "completion_tokens": 27,
+          "latency_ms": 7081
         },
         "prompt_version": "browser-device-category-v3-short-alarms",
         "runtime": "wllama-3.6.1/wasm",
         "input_sha256": "1e639e4a46a82ab25e7ee93201ecb140de03ae43541e8361ec742ffc41266557",
-        "latency_ms": 10011,
+        "latency_ms": 11146,
         "correct": true
       },
       {
         "name": "Philips MX800 network export",
         "report_text": "The report export to the central station fails with a network connection error.",
-        "wall_ms": 9844,
+        "wall_ms": 9695,
         "status": "success",
         "revision": "d7f544eead698dbd1f15126ef60b45a1e1933222",
         "output_token": "G",
@@ -341,29 +341,29 @@
           "version": "browser-reference-selection-v1",
           "input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
           "output_token": "D",
-          "latency_ms": 1477
+          "latency_ms": 1575
         },
         "guidance": {
           "version": "browser-guidance-v13-english-evidence",
           "input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
           "status": "success",
-          "text": "The cause is unconfirmed. Check the network cable and router connection.",
+          "text": "The cause is unconfirmed. Check the network connection and ensure the central station is reachable.",
           "reference_id": null,
           "finish_reason": "stop",
-          "prompt_tokens": 303,
-          "completion_tokens": 15,
-          "latency_ms": 6105
+          "prompt_tokens": 300,
+          "completion_tokens": 19,
+          "latency_ms": 5794
         },
         "prompt_version": "browser-device-category-v3-short-alarms",
         "runtime": "wllama-3.6.1/wasm",
         "input_sha256": "d00bce18a84ed104e4ebdffb11608cfcd600aebe117511a657892819859de688",
-        "latency_ms": 9440,
+        "latency_ms": 9298,
         "correct": true
       },
       {
         "name": "Perfusor Space handle",
         "report_text": "The carrying handle is cracked near its hinge.",
-        "wall_ms": 9492,
+        "wall_ms": 8513,
         "status": "success",
         "revision": "d7f544eead698dbd1f15126ef60b45a1e1933222",
         "output_token": "D",
@@ -372,7 +372,7 @@
           "version": "browser-reference-selection-v1",
           "input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
           "output_token": "D",
-          "latency_ms": 1322
+          "latency_ms": 1328
         },
         "guidance": {
           "version": "browser-guidance-v13-english-evidence",
@@ -381,20 +381,20 @@
           "text": "The cause is unconfirmed. Check the carrying handle for cracks near the hinge.",
           "reference_id": null,
           "finish_reason": "stop",
-          "prompt_tokens": 300,
+          "prompt_tokens": 296,
           "completion_tokens": 17,
-          "latency_ms": 6295
+          "latency_ms": 5314
         },
         "prompt_version": "browser-device-category-v3-short-alarms",
         "runtime": "wllama-3.6.1/wasm",
         "input_sha256": "7b6f21f091e3e94bed79649e5e738046446690adadc8228c59d35b59c5a3d61b",
-        "latency_ms": 9105,
+        "latency_ms": 8122,
         "correct": true
       },
       {
         "name": "Hamilton C6 Arabic wheel report",
         "report_text": "عجلة عربة جهاز التنفس عالقة ولا تدور.",
-        "wall_ms": 13724,
+        "wall_ms": 9863,
         "status": "success",
         "revision": "d7f544eead698dbd1f15126ef60b45a1e1933222",
         "output_token": "D",
@@ -403,29 +403,29 @@
           "version": "browser-reference-selection-v1",
           "input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
           "output_token": "D",
-          "latency_ms": 1969
+          "latency_ms": 1629
         },
         "guidance": {
           "version": "browser-guidance-v13-english-evidence",
           "input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
           "status": "success",
-          "text": "The wheel of the Hamilton C6 ventilator is stuck and not rotating. The cause is unconfirmed. Check the wheel for debris or mechanical obstruction.",
+          "text": "The cause is unconfirmed. Check if the wheel is properly attached and rotating.",
           "reference_id": null,
           "finish_reason": "stop",
           "prompt_tokens": 302,
-          "completion_tokens": 31,
-          "latency_ms": 8669
+          "completion_tokens": 17,
+          "latency_ms": 5707
         },
         "prompt_version": "browser-device-category-v3-short-alarms",
         "runtime": "wllama-3.6.1/wasm",
         "input_sha256": "994f87e788234d5a181ea2c1b7bf4046b75bddd39f5f9e23265021caa8e3f78f",
-        "latency_ms": 13326,
+        "latency_ms": 9467,
         "correct": true
       },
       {
         "name": "Hamilton C6 sourced battery answer",
         "report_text": "Battery low",
-        "wall_ms": 12333,
+        "wall_ms": 11676,
         "status": "success",
         "revision": "d7f544eead698dbd1f15126ef60b45a1e1933222",
         "output_token": "A",
@@ -434,23 +434,23 @@
           "version": "browser-reference-selection-v1",
           "input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
           "output_token": "A",
-          "latency_ms": 2462
+          "latency_ms": 2375
         },
         "guidance": {
           "version": "browser-guidance-v13-english-evidence",
           "input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
           "status": "success",
-          "text": "Battery low. Check primary power source. Verify alarm clears. Ensure stable power before use.",
+          "text": "Battery low. Check primary power source. Ensure ventilator is on primary power. Verify alarm clears.",
           "reference_id": "HAM-C6-001",
           "finish_reason": "stop",
           "prompt_tokens": 346,
-          "completion_tokens": 19,
-          "latency_ms": 8248
+          "completion_tokens": 21,
+          "latency_ms": 7873
         },
         "prompt_version": "browser-device-category-v3-short-alarms",
         "runtime": "wllama-3.6.1/wasm",
         "input_sha256": "c2cb6b2e1cf909c6cdb4e156f6b1b38ef09b3437ea6ce23b5460cfe256eaf64d",
-        "latency_ms": 11929,
+        "latency_ms": 11269,
         "correct": true
       }
     ],
@@ -460,28 +460,28 @@
     "preparation_stages": [
       {
         "stage": "loading",
-        "ms": 6757
+        "ms": 6519
       },
       {
         "stage": "classification",
-        "ms": 60881
+        "ms": 59203
       },
       {
         "stage": "reference_selection",
-        "ms": 21785
+        "ms": 19551
       },
       {
         "stage": "scope",
-        "ms": 9510
+        "ms": 9538
       },
       {
         "stage": "generation",
-        "ms": 9075
+        "ms": 8859
       }
     ],
     "device_rows": [],
-    "mean_ms": 11587,
-    "max_ms": 13724,
+    "mean_ms": 10418,
+    "max_ms": 11676,
     "completed": true
   },
   "classification": {
@@ -1051,16 +1051,18 @@
     ]
   },
   "validation": {
-    "frontend_tests_passed": 92,
+    "frontend_tests_passed": 93,
     "backend_tests_passed": 223,
     "actual_decoded_answers_accepted_by_api": 6,
     "production_build": "passed",
     "classification_correct": 38,
-    "classification_total": 40
+    "classification_total": 40,
+    "reference_selection_cases_passed": 6,
+    "device_cases_passed": 8
   },
   "windows_development_failure": {
     "workflow": "https://github.com/ENGmohammad98AU/Medical-Device-Maintenance/actions/runs/36350984375",
     "issue": "Three answers timed out on the Windows runner.",
-    "change": "Move common external-check instructions into the warmed user prefix, retaining a short post-evidence reminder. The 45-second limit and evidence are unchanged."
+    "change": "Cache common instructions and send the exact manufacturer/model once, without repeating the device display name. All evidence and the 45-second limit are preserved."
   }
 }

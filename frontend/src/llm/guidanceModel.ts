@@ -20,12 +20,16 @@ export interface GuidanceResult {
 }
 type Model = Pick<Wllama, 'createCompletion'>;
 const ENGLISH_INSTRUCTION = 'Answer in English only, in fewer than 65 words. '
-  + 'Give only external checks; never recommend repair or replacement of parts, even if the reference mentions them.\n';
+  + 'Do not repeat the device name. Give only external checks; never recommend repair or replacement of parts, even if the reference mentions them.\n';
 
 function prompt(context: GuidanceContext, referenceId?: string | null) {
   if (context.version !== config.version) throw new Error('invalid_output');
   // Bound prefill work without silently truncating the report.
   if (context.report_text.length > 1600 || context.device_name.length > 400) throw new Error('input_too_long');
+  // Server contexts append the manufacturer and model in parentheses after the
+  // display name. Send that exact identity once; the full name stays bound to
+  // the server context and visible in the UI. Unformatted names are preserved.
+  const device = context.device_name.match(/\(([^()]+)\)$/)?.[1] || context.device_name;
   const reference = context.references?.find(item => item.reference_id === referenceId);
   if (referenceId && !reference) throw new Error('invalid_output');
   if (reference && reference.evidence.length > 6000) throw new Error('input_too_long');
@@ -37,7 +41,7 @@ function prompt(context: GuidanceContext, referenceId?: string | null) {
       'recommended_solution:': 'Solution:', 'verification_before_return_to_service:': 'Verification:'}[field]!));
   return formatQwenMessages([{role: 'system', content: config.system_prompt},
     {role: 'user', content: ENGLISH_INSTRUCTION
-      + JSON.stringify({device: context.device_name, report: context.report_text,
+      + JSON.stringify({device, report: context.report_text,
       reference: reference ? {symptom: reference.symptom, evidence} : null})
       + (reference ? '\nNo replacement advice.'
         : '\nNo manufacturer reference matched. State that the cause is unconfirmed. Suggest one external visual check of the part named in the report. Do not invent components, observations or causes. You have not inspected this device. Do not request alarm details when no alarm is reported.')

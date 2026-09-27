@@ -29,6 +29,20 @@ describe('bounded free generation', () => {
       {...response, choices: [{text: '<think>draft</think>' + text, finish_reason: 'stop'}]},
     ]) expect(await generateGuidance(model(value).instance, context, 40000)).toMatchObject({status: 'error', error_code: 'invalid_output'});
   });
+  it('avoids repeating display names while preserving manufacturer/model identity and report binding', async () => {
+    for (const [name, identity] of [
+      ['Hamilton C6 Ventilator (Hamilton Medical C6)', 'Hamilton Medical C6'],
+      ['Philips IntelliVue MX800 Monitor (Philips MX800)', 'Philips MX800'],
+      ['B. Braun Perfusor Space Syringe Pump (B. Braun Perfusor Space)', 'B. Braun Perfusor Space'],
+      ['Unformatted device name', 'Unformatted device name'],
+    ]) {
+      const m = model();
+      const result = await generateGuidance(m.instance, {...context, device_name: name}, 40000);
+      const options = m.createCompletion.mock.calls[0] as unknown as [{prompt: string}];
+      expect(options[0].prompt).toContain(JSON.stringify({device: identity, report: context.report_text, reference: null}));
+      expect(result.input_sha256).toBe(context.input_sha256);
+    }
+  });
   it('accepts Markdown line-break spaces without changing the generated sentences', () => {
     expect(completeGuidance(text.replace('\n', '  \n'))).toBe(text);
     expect(completeGuidance('1. check the wheel for debris.  \n2. inspect the visible axle.')).toBe('1. check the wheel for debris.\n2. inspect the visible axle.');
