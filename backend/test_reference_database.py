@@ -27,8 +27,8 @@ def make_service():
 def test_reference_database_imports_all_rules():
     service, session, imported = make_service()
     try:
-        assert imported == 45
-        assert session.query(FaultReferenceRule).count() == 45
+        assert imported == 39
+        assert session.query(FaultReferenceRule).count() == 39
     finally:
         session.close()
 

@@ -317,6 +317,14 @@ def analyze_fault(
         # abstention suppresses all repair retrieval, including the legacy path.
         baseline_reference_severity = reference_lookup.get("severity") if reference_lookup.get("matched") else None
         support_context, support_references = prepare_support(request, device, db)
+        # Moving a source outside the catalogue must not lower its safety floor,
+        # including when the model abstains or cannot finish its selection.
+        if support_references and support_references[0].get("reference_origin") == "LLM_CONTEXT":
+            floors = [SeverityLevel(value) for value in (
+                baseline_reference_severity, support_references[0].get("severity")
+            ) if value in SeverityLevel._value2member_map_]
+            if floors:
+                baseline_reference_severity = max(floors, key=list(SeverityLevel).index).value
         fallback_reference = (support_references[0] if support_references else dict(NO_MATCH)) if request.browser_llm else reference_lookup
         reference_lookup, support_result, restrict_retrieval = resolve_support(
             support_context, support_references,
@@ -325,7 +333,8 @@ def analyze_fault(
         )
         # Local processing uses the same device/source boundaries during outages.
         # A fallback must not reintroduce an excluded or unsourced repair.
-        restrict_retrieval = restrict_retrieval or request.browser_llm is not None
+        restrict_retrieval = (restrict_retrieval or request.browser_llm is not None
+                             or support_result["status"] == "LLM_REQUIRED")
         classification, classification_source, routing_target, safety_guards = apply_triage(
             rule_classification, llm_run,
             baseline_reference_severity,
@@ -338,8 +347,9 @@ def analyze_fault(
         if classification.is_emergency:
             support_result["guards"].append("EMERGENCY_PRIORITY")
             support_result["message"] = "تستدعي الحالة مراجعة عاجلة وفق قواعد السلامة؛ اتبع إجراءات المنشأة ولا تنتظر اكتمال الدعم الآلي. " + support_result["message"]
-        if not classification.is_emergency and support_result["status"] in {"NEEDS_DETAILS", "NO_REFERENCE", "OUT_OF_SCOPE", "INVALID_RESULT"}:
-            routing_target = "REQUEST_CLARIFICATION" if support_result["status"] != "NO_REFERENCE" else "BIOMEDICAL_ENGINEERING"
+        if not classification.is_emergency and support_result["status"] in {"NEEDS_DETAILS", "NO_REFERENCE", "OUT_OF_SCOPE", "INVALID_RESULT", "LLM_REQUIRED"}:
+            routing_target = ("BIOMEDICAL_ENGINEERING" if support_result["status"] in {"NO_REFERENCE", "LLM_REQUIRED"}
+                              else "REQUEST_CLARIFICATION")
             classification.recommended_action = support_result["message"]
         
         # Step 2: Extract entities using NLP
@@ -379,13 +389,13 @@ def analyze_fault(
             manufacturer=manufacturer,
             model=model,
         )
-        db_reference_found = bool(reference_lookup.get("matched"))
+        selected_reference_found = bool(reference_lookup.get("matched"))
         rag_reference_found = bool(rag_result['sources'] and rag_result['retrieved_context'])
-        reference_found = db_reference_found or rag_reference_found
+        reference_found = selected_reference_found or rag_reference_found
 
-        # The verified manufacturer rule database is the primary diagnostic source.
-        # RAG is only a secondary source and must never override an exact verified rule.
-        if db_reference_found:
+        # Only an accepted source supplies technical text. LLM-only context
+        # reaches this branch after successful, validated model selection.
+        if selected_reference_found:
             troubleshooting_steps = reference_lookup.get("troubleshooting_steps") or []
             immediate_safety_action = reference_lookup.get("immediate_safety_action", "").strip()
             safety_precautions = [immediate_safety_action] if immediate_safety_action else []
@@ -421,9 +431,9 @@ def analyze_fault(
             rag_result['requires_review'] = True
 
         logger.info(
-            "maintenance_reference device_id=%s model=%s db_reference_found=%s rag_reference_found=%s "
+            "maintenance_reference device_id=%s model=%s selected_reference_found=%s rag_reference_found=%s "
             "reference_found=%s sources=%s final_response_type=%s",
-            device.id, model, db_reference_found, rag_reference_found, reference_found,
+            device.id, model, selected_reference_found, rag_reference_found, reference_found,
             rag_result['sources'], 'reference_context' if reference_found else 'no_reference'
         )
         
