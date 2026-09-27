@@ -49,6 +49,9 @@ export async function generateGuidance(model: Model, context: GuidanceContext, b
       max_tokens: config.max_new_tokens, temperature: 0.2, top_p: 0.8, top_k: 20,
       repeat_penalty: 1.05, seed: 0, cache_prompt: true, abortSignal: controller.signal};
     const response = await model.createCompletion(options);
+    // Compiled out of production. CI uses only the synthetic guidanceCases
+    // reports, so formatting failures can be diagnosed without patient logs.
+    if (import.meta.env.MODE === 'benchmark') console.warn('GENERATION_TRACE=' + JSON.stringify(response));
     if (controller.signal.aborted) throw new Error('timeout');
     if (response.usage.prompt_tokens > config.max_input_tokens) throw new Error('input_too_long');
     if (response.choices[0]?.finish_reason !== 'stop') throw new Error('invalid_output');

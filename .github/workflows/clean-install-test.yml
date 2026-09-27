@@ -38,7 +38,7 @@ jobs:
         working-directory: frontend
         run: |
           npm ci
-          npm run build
+          npm run build -- --mode benchmark
           npx playwright install chromium
       - name: Measure real generation for all three devices
         working-directory: frontend

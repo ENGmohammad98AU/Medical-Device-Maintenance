@@ -50,7 +50,10 @@ const context = await chromium.launchPersistentContext(profile, {headless: true,
   executablePath: process.env.BROWSER_EXECUTABLE || undefined, args: ['--no-sandbox']});
 const page = context.pages()[0];
 page.on('pageerror', error => console.error(error.message));
-page.on('console', msg => { if (msg.type() === 'warning' || msg.type() === 'error') console.log(msg.text().slice(0, 300)); });
+page.on('console', msg => {
+  if (msg.type() === 'warning' || msg.type() === 'error')
+    console.log(msg.text().slice(0, msg.text().startsWith('GENERATION_TRACE=') ? 6000 : 300));
+});
 await context.addInitScript(() => {
   // Collect real worker results without replacing inference or timers.
   window.__modelResults = [];
