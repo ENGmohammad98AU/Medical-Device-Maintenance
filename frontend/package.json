@@ -15,6 +15,7 @@
     "smoke:llm:wasm": "vite-node scripts/smoke-wasm-llm.ts",
     "smoke:llm:support": "vite-node scripts/smoke-support-llm.ts",
     "benchmark:llm": "node scripts/benchmark-browser.mjs",
+    "benchmark:prepared": "node scripts/benchmark-prepared.mjs",
     "benchmark:onnx-baseline": "vite-node scripts/benchmark-local-llm.ts"
   },
   "dependencies": {

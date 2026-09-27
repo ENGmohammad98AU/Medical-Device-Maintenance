@@ -76,6 +76,8 @@ class LLMRun(BaseModel):
     prompt_sha256: str = PROMPT_SHA256
     input_sha256: Optional[str] = None
     latency_ms: float = 0.0
+    preparation_ms: Optional[float] = None
+    inference_ms: Optional[float] = None
     usage: Dict[str, int] = Field(default_factory=dict)
     error_code: Optional[str] = None
     decision: Optional[LLMDecision] = None

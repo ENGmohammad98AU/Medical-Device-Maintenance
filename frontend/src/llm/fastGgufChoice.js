@@ -1,7 +1,7 @@
 import {formatQwenMessages} from './ggufChoice.js';
 export {formatQwenMessages};
 
-// One model with two prompt slots. The pinned runtime selects a slot by
+// One model with three prompt slots. The pinned runtime selects a slot by
 // prefix similarity; its C++ bridge does not forward explicit id_slot values.
 // The real-model benchmark verifies cache reuse across alternating tasks.
 export async function chooseFastGgufToken(model, prompt, labels, maxTokens, allowSpace = false,

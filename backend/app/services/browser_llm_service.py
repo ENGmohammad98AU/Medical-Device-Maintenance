@@ -19,6 +19,8 @@ class BrowserLLMResult(BaseModel):
     output_token: Optional[Literal["A", "B", "C", "D", "E", "F", "G", "H"]] = None
     input_sha256: Optional[str] = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     latency_ms: float = Field(default=0, ge=0, le=2700000, allow_inf_nan=False)
+    preparation_ms: Optional[float] = Field(default=None, ge=0, le=2700000, allow_inf_nan=False)
+    inference_ms: Optional[float] = Field(default=None, ge=0, le=2700000, allow_inf_nan=False)
     error_code: Optional[Literal[
         "cancelled", "timeout", "unsupported_browser", "insufficient_storage", "load_failed", "input_too_long", "invalid_output",
     ]] = None
@@ -56,6 +58,7 @@ def browser_run(result: BrowserLLMResult, *, report_text: str, device_type: str,
         # executions of the upgraded engine during a rolling deployment.
         runtime=result.runtime or "wllama-2.4.0/wasm", quantization=MANIFEST["dtype"],
         latency_ms=result.latency_ms, error_code=result.error_code,
+        preparation_ms=result.preparation_ms, inference_ms=result.inference_ms,
         reused_result=result.reused_result,
     )
     if result.status != "success":

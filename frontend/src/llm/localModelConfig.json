@@ -150,8 +150,8 @@
   "model_file_sha256": "b139949c5bd74937ad8ed8c8cf3d9ffb1e99c866c823204dc42c0d91fa181897",
   "model_file": "Qwen3-1.7B-Q4_K_M.gguf",
   "model_file_bytes": 1107409472,
-  "context_tokens": 3072,
+  "context_tokens": 4608,
   "batch_tokens": 512,
   "selection_method": "grammar-constrained-greedy-v1",
-  "parallel_slots": 2
+  "parallel_slots": 3
 }

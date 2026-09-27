@@ -1,22 +1,36 @@
 import { useEffect, useRef, useState } from 'react';
 import { localModelSession } from '../llm/localModelSession';
-import { localFailure, type LocalInput, type LocalProgress } from '../llm/localModelContract';
+import { localFailure, type LocalInput, type LocalProgress, type LocalResult } from '../llm/localModelContract';
 
 export function useLocalModel() {
   const client = useRef<ReturnType<typeof localModelSession.acquire>>();
   const [progress, setProgress] = useState<LocalProgress | null>(null);
+  const [ready, setReady] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+  const [preparation, setPreparation] = useState<LocalResult | null>(null);
   useEffect(() => {
     client.current = localModelSession.acquire();
+    setReady(client.current.isReady);
     return () => { client.current?.release(); client.current = undefined; };
   }, []);
   return {
-    progress,
-    run: async (input: LocalInput) => {
+    progress, ready, preparing, preparation,
+    prepare: async () => {
+      const lease = client.current;
+      if (!lease) return localFailure('cancelled');
+      setPreparing(true); setPreparation(null); setProgress({stage: 'loading'});
+      const result = await lease.prepare(value => { if (client.current === lease) setProgress(value); });
+      if (client.current === lease) {
+        setProgress(null); setPreparing(false); setPreparation(result); setReady(lease.isReady);
+      }
+      return result;
+    },
+    run: async (input: LocalInput, budgetMs?: number) => {
       const lease = client.current;
       if (!lease) return localFailure('cancelled');
       setProgress({stage: 'loading'});
-      const result = await lease.run(input, (value) => { if (client.current === lease) setProgress(value); });
-      if (client.current === lease) setProgress(null);
+      const result = await lease.run(input, (value) => { if (client.current === lease) setProgress(value); }, budgetMs);
+      if (client.current === lease) { setProgress(null); setReady(lease.isReady); }
       return result;
     },
     cancel: () => client.current?.cancel(),

@@ -3,7 +3,7 @@ import { Wllama } from '@wllama/wllama';
 import { inferenceThreads } from './browserIsolation.js';
 import { loadGgufModel, type StorageMode } from './modelStorage.js';
 import {selectComputeBackend, runtimeLoadOptions, type ComputeBackend} from './computeBackend.js';
-import { classifyLocally, selectSupportLocally } from './localModelEngine';
+import { classifyLocally, selectSupportLocally, warmLocalPrompts } from './localModelEngine';
 import type { SupportResult } from './supportModelContract';
 import { inputHash, localFailure, localModelConfig as config, type LocalInput, type LocalError } from './localModelContract';
 
@@ -13,12 +13,12 @@ Object.defineProperty(globalThis, 'document', {value: {baseURI: self.location.hr
 let generator: Promise<Wllama> | undefined;
 let storageMode: StorageMode | undefined;
 let computeBackend: ComputeBackend = 'wasm';
-self.addEventListener('message', async (event: MessageEvent<{id: number; input: LocalInput; force_cpu?: boolean}>) => {
+self.addEventListener('message', async (event: MessageEvent<{id: number; input?: LocalInput; force_cpu?: boolean}>) => {
   const {id, input} = event.data;
   const started = performance.now();
   let loading = true;
   try {
-    self.postMessage({id, progress: {stage: 'loading', storage_mode: storageMode}});
+    if (!generator) self.postMessage({id, progress: {stage: 'loading', storage_mode: storageMode}});
     if (!WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,5,3,1,4,1]))) throw new Error('unsupported_browser');
     generator ??= (async () => {
       computeBackend = await selectComputeBackend(event.data.force_cpu);
@@ -33,9 +33,17 @@ self.addEventListener('message', async (event: MessageEvent<{id: number; input: 
         storageMode = mode;
         self.postMessage({id, progress: {stage: 'loading', storage_mode: mode, compute_backend: computeBackend}});
       });
+      await warmLocalPrompts(model, task => self.postMessage({id, progress: {
+        stage: 'warming', task, storage_mode: storageMode, compute_backend: computeBackend}}));
       return model;
     })();
     const loaded = await generator;
+    self.postMessage({id, ready: true});
+    if (!input) {
+      self.postMessage({id, result: {status: 'success', revision: config.revision,
+        runtime: `wllama-3.6.1/${computeBackend}`, latency_ms: Math.round(performance.now() - started)}});
+      return;
+    }
     loading = false;
     self.postMessage({id, progress: {stage: 'running', task: 'classification', storage_mode: storageMode, compute_backend: computeBackend}});
     const output_token = await classifyLocally(loaded, input);

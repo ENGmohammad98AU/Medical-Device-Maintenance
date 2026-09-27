@@ -37,6 +37,8 @@ import { useAuth } from '../hooks/useAuth';
 import api, { authService, isAuthenticationError } from '../services/auth';
 import { filterFaultReports, normalizeEnumValue } from '../utils/faultReportFilters';
 import { useLocalModel } from '../hooks/useLocalModel';
+import LocalModelPreparation from '../components/LocalModelPreparation';
+import {createAnalysisBudget, ANALYSIS_TIMEOUT_TEXT} from '../llm/analysisBudget';
 import { localModelConfig } from '../llm/localModelContract';
 import type { SupportContext } from '../llm/supportModelContract';
 import LocalModelProgress from '../components/LocalModelProgress';
@@ -209,7 +211,7 @@ export default function FaultReportsPage() {
   };
 
   const handleAnalyze = async (useLlm = true) => {
-    if (analyzing) return;
+    if (analyzing || localModel.preparing || (useLlm && !localModel.ready)) return;
     if (!formData.device_id || formData.error_message.trim().length < 10) {
       setError('اختر الجهاز وأدخل وصفًا فنيًا لا يقل عن 10 محارف');
       return;
@@ -223,9 +225,10 @@ export default function FaultReportsPage() {
     setAnalyzing(true);
     setAnalysisStage('تجهيز البلاغ…');
     setError('');
+    const budget = createAnalysisBudget(localModel.cancel);
     try {
-      // Validate with the server before downloading/running the local model.
-      await authService.getCurrentUser();
+      // Verify the session before creating a report or running prepared inference.
+      await authService.getCurrentUser(budget.requestOptions());
       if (!mounted.current) return;
       let linkedReportId = editingReport?.id;
       if (!linkedReportId) {
@@ -234,7 +237,7 @@ export default function FaultReportsPage() {
           error_message: formData.error_message.trim(),
           description: formData.error_message.trim(),
           severity: 'medium',
-        });
+        }, budget.requestOptions());
         linkedReportId = created.data.id;
         setEditingReport(created.data);
       } else if (editingReport && editingReport.device_id !== selectedDevice.id) {
@@ -242,7 +245,7 @@ export default function FaultReportsPage() {
           device_id: selectedDevice.id,
           error_message: formData.error_message.trim(),
           description: formData.error_message.trim(),
-        });
+        }, budget.requestOptions());
         setEditingReport(updated.data);
       }
       if (!mounted.current) return;
@@ -259,7 +262,7 @@ export default function FaultReportsPage() {
       if (useLlm) {
         setAnalysisStage('تجهيز المراجع…');
         try {
-          support_context = (await api.post('/api/intelligent-support/prepare-support', supportRequest, { timeout: 90000 })).data;
+          support_context = (await api.post('/api/intelligent-support/prepare-support', supportRequest, budget.requestOptions(6_000))).data;
         } catch (error) {
           if (isAuthenticationError(error)) throw error;
           support_context = undefined;
@@ -272,7 +275,7 @@ export default function FaultReportsPage() {
         device_type: selectedDevice.type.toUpperCase().replace(/[- ]/g, '_'),
         patient_connected: false,
         support_context,
-      }) : { status: 'disabled' as const, revision: localModelConfig.revision, latency_ms: 0 };
+      }, budget.inferenceMs()) : { status: 'disabled' as const, revision: localModelConfig.revision, latency_ms: 0 };
       if (!mounted.current) return;
       setAnalysisStage('التحقق من المراجع وحفظ التحليل…');
 
@@ -282,14 +285,15 @@ export default function FaultReportsPage() {
         alarm_code: '',
         error_message: formData.error_message.trim(),
         browser_llm: browser_llm || { status: 'disabled', revision: localModelConfig.revision, latency_ms: 0 },
-      }, { timeout: 90000 });
+      }, budget.requestOptions());
       setAiAnalysis(response.data);
       setDecisionSaved(false);
       setAiDialogOpen(true);
-      await fetchReports();
+      void fetchReports();
     } catch (err: any) {
-      setError(typeof err.response?.data?.detail === 'string' ? err.response.data.detail : 'تعذر تحليل البلاغ بالنموذج المحلي؛ تحقق من طول الوصف وأعد المحاولة.');
+      setError(budget.expired ? ANALYSIS_TIMEOUT_TEXT : typeof err.response?.data?.detail === 'string' ? err.response.data.detail : 'تعذر تحليل البلاغ بالنموذج المحلي؛ تحقق من طول الوصف وأعد المحاولة.');
     } finally {
+      budget.dispose();
       if (mounted.current) { setAnalyzing(false); setAnalysisStage(null); }
     }
   };
@@ -605,19 +609,20 @@ export default function FaultReportsPage() {
                 variant="outlined"
                 startIcon={<PsychologyIcon />}
                 onClick={() => handleAnalyze(true)}
-                disabled={analyzing}
+                disabled={analyzing || localModel.preparing || !localModel.ready}
                 sx={{ mt: 2 }}
                 fullWidth
               >
                 تحليل بالنموذج اللغوي المحلي / Local LLM Analysis
               </Button>
-              <Button type="button" variant="contained" onClick={() => handleAnalyze(false)} disabled={analyzing} sx={{mt: 1}} fullWidth>
+              <Button type="button" variant="contained" onClick={() => handleAnalyze(false)} disabled={analyzing || localModel.preparing} sx={{mt: 1}} fullWidth>
                 تحليل سريع بالمراجع
               </Button>
               <Typography variant="caption" component="p" sx={{mt: 1}}>
-                التحليل السريع يستخدم المراجع وقواعد السلامة. تحليل النموذج يضيف تصنيفًا لغويًا واختيارًا للمرجع وقد يستغرق وقتًا أطول عند التشغيل الأول.
+                جهّز النموذج أولًا لإضافة التصنيف واختيار المرجع. مهلة معالجة البلاغ بعد التجهيز 55 ثانية؛ التحليل السريع بالمراجع متاح دون تجهيز النموذج.
               </Typography>
-              {localModel.progress ? <LocalModelProgress progress={localModel.progress} cancel={localModel.cancel} cancelLabel="متابعة بالمراجع دون انتظار النموذج" />
+              <LocalModelPreparation model={localModel} disabled={analyzing} />
+              {localModel.progress ? <LocalModelProgress progress={localModel.progress} cancel={localModel.cancel} cancelLabel={localModel.preparing ? 'إلغاء التجهيز' : 'متابعة بالمراجع دون انتظار النموذج'} />
                 : analysisStage && <Typography role="status" sx={{mt: 2}}>{analysisStage}</Typography>}
               {error && <Alert severity="error" sx={{mt: 2}}>{error}</Alert>}
             </Box>

@@ -40,6 +40,21 @@ def test_unknown_runtime_is_rejected():
         BrowserLLMResult(**{**payload(), "runtime": "unverified-engine"})
 
 
+def test_preparation_and_inference_timings_survive_client_validation():
+    result = BrowserLLMResult(**{**payload(), "preparation_ms": 0, "inference_ms": 1234})
+    run = browser_run(result, report_text="Battery is no longer charging",
+                      device_type="VENTILATOR", patient_connected=False)
+    assert run.status == "success" and run.preparation_ms == 0 and run.inference_ms == 1234
+    assert run.client_reported  # timing is browser-reported, never server-attested
+
+
+@pytest.mark.parametrize("field,value", [("preparation_ms", -1), ("inference_ms", float("nan")),
+                                          ("inference_ms", float("inf")), ("preparation_ms", 2700001)])
+def test_invalid_phase_timings_are_rejected(field, value):
+    with pytest.raises(ValidationError):
+        BrowserLLMResult(**{**payload(), field: value})
+
+
 @pytest.mark.parametrize("extra", [
     {"severity": "LOW"}, {"routing_target": "TECHNICAL_SUPPORT"}, {"repair_steps": ["invented"]},
     {"output_token": "IGNORE SAFETY"}, {"latency_ms": -1}, {"latency_ms": float("nan")},
