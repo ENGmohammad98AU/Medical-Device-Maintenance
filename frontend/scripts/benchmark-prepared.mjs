@@ -62,6 +62,7 @@ await context.addInitScript(() => {
     constructor(...args) { super(...args);
       if (String(args[0]).includes('localModel.worker')) window.__localModelWorker = this;
       this.addEventListener('message', event => {
+      if (event.data.progress?.stage === 'running') console.warn('INFERENCE_STAGE=' + JSON.stringify({id: event.data.id, task: event.data.progress.task}));
       if (event.data.result) window.__modelResults.push(event.data.result);
     }); }
   };
@@ -89,7 +90,10 @@ try {
   if (generation) {
     await page.getByRole('combobox').nth(0).click();
     await page.getByRole('option', {name: 'توليد إرشادات نصية قصيرة', exact: true}).click();
-    for (const sample of generationCases) {
+    // Exercise Arabic first, then switch languages and devices on the same
+    // prepared worker. Every case still must independently pass the deadline.
+    for (const sample of [...generationCases.slice(-1), ...generationCases.slice(0, -1)]) {
+      console.log('GENERATION_CASE_START=' + sample.name);
       await page.getByRole('combobox').nth(1).click();
       await page.getByRole('option', {name: sample.name, exact: true}).click();
       const before = await page.evaluate(() => window.__modelResults.length);

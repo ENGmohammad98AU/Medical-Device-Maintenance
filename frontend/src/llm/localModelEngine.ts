@@ -8,7 +8,8 @@ export async function classifyLocally(model: ChoiceModel, input: LocalInput) {
   const messages = [{role: 'system', content: config.system_prompt}, ...config.examples,
     {role: 'user', content: normalizeReportText(input.report_text, config.report_spelling)}];
   return categoryToken(await chooseGgufToken(model, formatQwenMessages(messages),
-    Object.keys(config.categories), config.max_input_tokens));
+    Object.keys(config.categories), config.max_input_tokens, false, undefined,
+    import.meta.env.MODE === 'benchmark' ? metrics => console.warn('CLASSIFICATION_TRACE=' + JSON.stringify(metrics)) : undefined));
 }
 export async function selectSupportLocally(model: ChoiceModel, context: SupportContext) {
   const labels = context.candidates.length ? [...context.candidates.map(c => c.label), 'D'] : ['D', 'E'];
