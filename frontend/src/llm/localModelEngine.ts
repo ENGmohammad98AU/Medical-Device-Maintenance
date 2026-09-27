@@ -1,10 +1,11 @@
 import { categoryToken, localModelConfig as config, type LocalInput } from './localModelContract';
 import { supportMessages, supportToken, supportModelConfig, type SupportContext } from './supportModelContract';
 import { chooseFastGgufToken as chooseGgufToken, formatQwenMessages, type FastChoiceModel as ChoiceModel } from './fastGgufChoice.js';
+import { normalizeReportText } from './reportText.js';
 
 export async function classifyLocally(model: ChoiceModel, input: LocalInput) {
   const messages = [{role: 'system', content: config.system_prompt}, ...config.examples,
-    {role: 'user', content: input.report_text.trim()}];
+    {role: 'user', content: normalizeReportText(input.report_text, config.report_spelling)}];
   return categoryToken(await chooseGgufToken(model, formatQwenMessages(messages),
     Object.keys(config.categories), config.max_input_tokens));
 }

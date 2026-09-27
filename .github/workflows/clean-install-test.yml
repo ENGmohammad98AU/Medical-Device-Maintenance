@@ -72,7 +72,7 @@ jobs:
         shell: pwsh
         working-directory: backend
         run: |
-          & ".\.venv\Scripts\python.exe" -c "from app.database.connection import SessionLocal; from app.models.user import User; from app.models.device import Device; from app.models.fault_reference_rule import FaultReferenceRule; import app.models.maintenance, app.models.fault_report, app.models.fault_resolution_workflow; db=SessionLocal(); u=db.query(User).count(); d=db.query(Device).count(); r=db.query(FaultReferenceRule).count(); print(f'users={u}, devices={d}, reference_rules={r}'); db.close(); assert u >= 5; assert d >= 3; assert r == 39"
+          & ".\.venv\Scripts\python.exe" -c "from pathlib import Path; from app.database.connection import SessionLocal; from app.models.user import User; from app.models.device import Device; from app.models.fault_reference_rule import FaultReferenceRule; import app.models.maintenance, app.models.fault_report, app.models.fault_resolution_workflow; db=SessionLocal(); u=db.query(User).count(); d=db.query(Device).count(); r=db.query(FaultReferenceRule).count(); print(f'users={u}, devices={d}, reference_rules={r}'); db.close(); assert u >= 5; assert d >= 3; assert r == len(__import__('json').loads(Path('reference_data/medical_device_fault_reference.json').read_text(encoding='utf-8')))"
 
       - name: Start backend and verify API
         shell: pwsh

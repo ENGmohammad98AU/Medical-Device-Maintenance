@@ -1,4 +1,6 @@
 import config from './supportModelConfig.json';
+import localConfig from './localModelConfig.json';
+import { normalizeReportText } from './reportText.js';
 import type { LocalError } from './localModelContract';
 
 export { config as supportModelConfig };
@@ -19,9 +21,10 @@ export function supportToken(value: string, candidates: SupportCandidate[]): Sup
 export function supportMessages(context: SupportContext) {
   if (context.version !== config.version || context.candidates.length > 3
     || context.candidates.some((c, i) => c.label !== ['A', 'B', 'C'][i])) throw new Error('invalid_output');
+  const report = normalizeReportText(context.report_text, localConfig.report_spelling);
   if (!context.candidates.length) return [{role: 'system', content: config.scope_prompt}, ...config.scope_examples,
-    {role: 'user', content: context.report_text}];
+    {role: 'user', content: report}];
   const references = context.candidates.map((c) => `${c.label}: ${c.symptom}`).join('\n');
   return [{role: 'system', content: config.system_prompt}, ...config.examples,
-    {role: 'user', content: `Device: ${context.device_name}\nRequest: ${context.report_text}\nReferences:\n${references}`}];
+    {role: 'user', content: `Device: ${context.device_name}\nRequest: ${report}\nReferences:\n${references}`}];
 }

@@ -10,7 +10,7 @@ from test_llm_triage import api_client, baseline, config  # reuse isolated DB fi
 
 
 def payload(text="Battery is no longer charging", token="A", connected=False):
-    return {"status": "success", "revision": MANIFEST["revision"], "output_token": token,
+    return {"status": "success", "revision": MANIFEST["revision"], "prompt_version": MANIFEST["prompt_version"], "output_token": token,
             "input_sha256": browser_input_hash(text, "VENTILATOR", connected), "latency_ms": 1234}
 
 
@@ -71,6 +71,14 @@ def test_stale_context_or_model_is_not_a_success(change):
     run = browser_run(BrowserLLMResult(**{**payload(), **change}), report_text="Battery is no longer charging",
                       device_type="VENTILATOR", patient_connected=False)
     assert run.status == "invalid_response" and run.browser_category is None
+
+
+@pytest.mark.parametrize("version", [None, "browser-device-category-v2-qwen3-1.7b"])
+def test_stale_prompt_requires_reload_instead_of_mislabeling_old_results(version):
+    run = browser_run(BrowserLLMResult(**{**payload(), "prompt_version": version}),
+                      report_text="Battery is no longer charging", device_type="VENTILATOR", patient_connected=False)
+    assert run.status == "invalid_response" and run.error_code == "browser_prompt_mismatch"
+    assert not run.prompt_sha256 and run.browser_category is None
 
 
 @pytest.mark.parametrize("token", ["A", "H"])

@@ -13,6 +13,8 @@ const baseline = process.argv.includes('--baseline');
 const root = resolve(process.env.BENCHMARK_DIST || 'dist');
 const config = JSON.parse(await readFile('src/llm/localModelConfig.json', 'utf8'));
 const cases = JSON.parse(await readFile('src/llm/supportSmokeCases.json', 'utf8'));
+const deviceCases = JSON.parse(await readFile('src/llm/deviceRegressionCases.json', 'utf8'));
+const supportConfig = JSON.parse(await readFile('src/llm/supportModelConfig.json', 'utf8'));
 const localModel = process.env.LLM_MODEL_FILE;
 if (localModel) {
   const hash = createHash('sha256');
@@ -52,7 +54,9 @@ await context.addInitScript(() => {
   window.__modelResults = [];
   const NativeWorker = window.Worker;
   window.Worker = class extends NativeWorker {
-    constructor(...args) { super(...args); this.addEventListener('message', event => {
+    constructor(...args) { super(...args);
+      if (String(args[0]).includes('localModel.worker')) window.__localModelWorker = this;
+      this.addEventListener('message', event => {
       if (event.data.result) window.__modelResults.push(event.data.result);
     }); }
   };
@@ -97,6 +101,37 @@ try {
     if (!baseline) assert.ok(row.wall_ms < 45_000, 'Fresh classification and reference selection must finish within the shared inference budget');
     await page.getByText(/اكتمل تشغيل النموذج على هذا المتصفح/).waitFor();
   }
+  // Exercise production inference for the three supported device types. These
+  // synthetic contexts are checked against the real server candidate builder
+  // by test_device_support_regressions.py; no classification is mocked here.
+  result.device_rows = [];
+  for (const [index, sample] of (baseline ? [] : deviceCases).entries()) {
+    const start = performance.now();
+    const measured = await page.evaluate(async ({sample, version, id}) => {
+      const worker = window.__localModelWorker;
+      if (!worker) throw new Error('Production model worker was not captured');
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => { worker.removeEventListener('message', listener); reject(new Error('Device regression timeout')); }, 45_000);
+        const listener = event => {
+          if (event.data.id === id && event.data.result) {
+            clearTimeout(timer); worker.removeEventListener('message', listener); resolve(event.data.result);
+          }
+        };
+        worker.addEventListener('message', listener);
+        worker.postMessage({id, input: {report_text: sample.report_text, device_type: sample.device_type,
+          patient_connected: false, support_context: {version, input_sha256: '0'.repeat(64),
+            report_text: sample.report_text, device_name: sample.device_name, candidates: sample.candidates}}});
+      });
+    }, {sample, version: supportConfig.version, id: 10_000 + index});
+    const row = {name: sample.name, expected_category: sample.expected_category,
+      predicted_category: config.categories[measured.output_token], expected_support: sample.expected_support,
+      wall_ms: Math.round(performance.now() - start), ...measured};
+    result.device_rows.push(row); console.log('DEVICE_REGRESSION=' + JSON.stringify(row));
+    row.correct = measured.status === 'success' && measured.prompt_version === config.prompt_version
+      && row.predicted_category === sample.expected_category && measured.support?.output_token === sample.expected_support
+      && row.wall_ms < 45_000;
+  }
+  assert.ok(result.device_rows.every(row => row.correct), JSON.stringify(result.device_rows.filter(row => !row.correct)));
   result.mean_ms = Math.round(result.rows.reduce((n, r) => n + r.wall_ms, 0) / result.rows.length);
   result.max_ms = Math.max(...result.rows.map(r => r.wall_ms));
   result.completed = true;

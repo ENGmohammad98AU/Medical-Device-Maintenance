@@ -11,6 +11,7 @@ export type LocalError = 'cancelled' | 'timeout' | 'unsupported_browser' | 'insu
 export interface LocalResult {
   status: 'success' | 'error' | 'disabled';
   revision: string;
+  prompt_version?: string;
   output_token?: CategoryToken;
   input_sha256?: string;
   latency_ms: number;

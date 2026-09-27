@@ -536,7 +536,7 @@ def analyze_fault(
         # the permanent local rule database imported from the extracted workbook data.
         return FaultAnalysisResponse(
             # Primary reference lookup fields
-            device=reference_lookup.get("device", ""),
+            device=device_name,
             matched_fault=reference_lookup.get("matched_fault", ""),
             meaning=reference_lookup.get("meaning", ""),
             possible_causes=reference_lookup.get("possible_causes", ""),
