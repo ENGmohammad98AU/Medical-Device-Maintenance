@@ -36,6 +36,7 @@ describe('bounded free generation', () => {
   it('rejects instructions addressed to a patient in an off-patient technical draft', () => {
     expect(() => completeGuidance('1. افحص العجلة بصريًا.\n2. اسأل المريض عن حالة العجلة.')).toThrow('invalid_output');
     expect(() => completeGuidance('1. Check the wheel for debris.\n2. Ask the patient about the wheel.')).toThrow('invalid_output');
+    expect(() => completeGuidance('Check patient breathing pattern for signs of respiratory distress.')).toThrow('invalid_output');
   });
   it('answers Arabic and language-override requests in English', async () => {
     const m = model();

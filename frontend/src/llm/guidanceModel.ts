@@ -29,8 +29,8 @@ function prompt(context: GuidanceContext, referenceId?: string | null) {
   return formatQwenMessages([{role: 'system', content: config.system_prompt},
     {role: 'user', content: JSON.stringify({device: context.device_name, report: context.report_text,
       reference: reference ? {symptom: reference.symptom, evidence: reference.evidence} : null})
-      + (reference ? '\nExplain only the supplied evidence and one non-invasive next check.'
-        : '\nNo manufacturer reference matched. State that the cause is unconfirmed. Suggest one external visual check of the part named in the report, or ask for the exact alarm. Do not invent components, observations or causes. You have not inspected this device.')
+      + (reference ? ''
+        : '\nNo manufacturer reference matched. State that the cause is unconfirmed. Suggest one external visual check of the part named in the report. Do not invent components, observations or causes. You have not inspected this device. Do not request alarm details when no alarm is reported.')
       + '\nAnswer in English only, in fewer than 65 words.'}]);
 }
 
@@ -42,6 +42,7 @@ export function completeGuidance(text: string): string {
   const value = text.trim().split('\n').map(line => line.trim()).join('\n');
   // A cut-off sentence or a leaked reasoning/template token is not a draft.
   if (/(?:اسأل|اسال|استشر|اطلب من).{0,12}(?:المريض|مريض)|\b(?:ask|consult|question)\b.{0,15}\bpatient\b/iu.test(value)) throw new Error('invalid_output');
+  if (/\b(?:check|assess|monitor|evaluate|observe|examine)\b.{0,45}\b(?:patient|breathing pattern|respiratory distress)\b/iu.test(value)) throw new Error('invalid_output');
   if (value.length < 20 || value.length > 1200 || /[<>`]|https?:\/\//i.test(value)
     || /[^\x20-\x7e\n]/u.test(value) || !/[A-Za-z]{3}/.test(value)
     || !/[.!?]$/.test(value)) throw new Error('invalid_output');

@@ -109,6 +109,7 @@ def test_patient_and_unclear_guards_suppress_even_forged_complete_text(api_clien
                                   'The wheel bearing has failed and needs replacement.',
                                   'The cause is unconfirmed. Return the device to clinical use.',
                                   'The cause is unconfirmed. You can now return the device to service.',
+                                  'The cause is unconfirmed. Check patient breathing pattern for signs of respiratory distress.',
                                   '1. افحص العجلة بصريًا.\n2. اسأل المريض عن حالة العجلة.'])
 def test_dangerous_and_truncated_drafts_are_not_displayed(api_client, text):
     client, _, _ = api_client
