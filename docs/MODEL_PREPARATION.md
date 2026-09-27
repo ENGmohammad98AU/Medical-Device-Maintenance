@@ -26,20 +26,20 @@ synthetic cases, not a mobile guarantee or a clinical-accuracy evaluation.
 
 | Measurement | Baseline | Release candidate |
 | --- | ---: | ---: |
-| Preparation | 172.104 s | 103.900 s |
-| Mean report inference, six cases | 18.639 s | 10.418 s |
-| Slowest report inference | 21.527 s | 11.676 s |
+| Preparation | 172.104 s | 103.838 s |
+| Mean report inference, six cases | 18.639 s | 9.560 s |
+| Slowest report inference | 21.527 s | 11.887 s |
 | Fixed classification result | 38/40 previously measured | 38/40 |
 
-Preparation was 39.6% shorter in this comparison. Two preceding development
+Preparation was 39.7% shorter in this comparison. Two preceding development
 probes prepared in approximately 105 seconds on the same machine.
 
 Generation remains English and evidence-bound. During the first performance
 probe, the existing server filter rejected a battery replacement instruction.
 Guidance v13 explicitly prohibits component replacement to align the prompt
-with that rule. Shared instructions are evaluated during warmup, with only a
-short reminder after the evidence to keep slower CPUs within the inference
-budget. Generation sends the exact manufacturer/model from the server context
+with that rule. Shared instructions, including the conditions for answering
+without a reference, are evaluated during warmup. Only a short reminder follows
+sourced evidence; report-specific data still requires fresh inference. Generation sends the exact manufacturer/model from the server context
 once, without repeating the display name. The full device name remains visible
 and bound to the original report. No manufacturer evidence is removed. The
 filter is unchanged. CI now replays all six real decoded
@@ -57,6 +57,11 @@ LLM_MODEL_FILE=/absolute/path/Qwen3-1.7B-Q4_K_M.gguf npm run benchmark:prepared 
 cd ../backend
 MDM_GENERATION_BENCHMARK=../frontend/benchmark-results/prepared-generation.json python -m pytest -q test_generation_benchmark.py
 ```
+
+Older Windows CI CPUs exposed report timeouts during development; the shared
+no-reference instructions were moved into preparation after that finding.
+Hardware can still exceed the response budget, in which case the application
+returns a failure and discards the answer.
 
 The optional classification pass uses the unchanged 40-case set and requires
 at least the previously measured 38 correct decisions. The shared 45-second

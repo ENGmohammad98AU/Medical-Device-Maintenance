@@ -36,7 +36,13 @@ describe('preparation prefixes', () => {
       input_sha256: 'a'.repeat(64), device_name: 'Hamilton C6', report_text: 'The wheel is jammed.'}, 40_000);
     expect(guidance.status).toBe('success');
     expect(lastPrompt().startsWith(prefixes[3])).toBe(true);
-    expect(prefixes[3]).not.toContain('No manufacturer reference matched.');
+    expect(prefixes[3]).toContain('If reference is null, state that the cause is unconfirmed.');
+    createCompletion.mockResolvedValueOnce(completion('Inspect the external electrode connections.'));
+    await generateGuidance(model, {version: guidanceModelConfig.version,
+      input_sha256: 'a'.repeat(64), device_name: 'Philips MX800', report_text: 'Resp Leads Off',
+      references: [{reference_id: 'resp', symptom: 'Resp Leads Off', evidence: 'Inspect the external electrode connections.'}]}, 40_000, 'resp');
+    expect(lastPrompt().startsWith(prefixes[3])).toBe(true);
+    expect(lastPrompt()).toContain('Inspect the external electrode connections.');
   });
   it('does not mark later stages ready after a warmup failure', async () => {
     const model = {createCompletion: vi.fn().mockRejectedValue(new Error('runtime failure'))};

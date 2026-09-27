@@ -20,7 +20,9 @@ export interface GuidanceResult {
 }
 type Model = Pick<Wllama, 'createCompletion'>;
 const ENGLISH_INSTRUCTION = 'Answer in English only, in fewer than 65 words. '
-  + 'Do not repeat the device name. Give only external checks; never recommend repair or replacement of parts, even if the reference mentions them.\n';
+  + 'Do not repeat the device name. Give only external checks; never recommend repair or replacement of parts, even if the reference mentions them. '
+  + 'If reference is null, state that the cause is unconfirmed. Suggest one external visual check of the part named in the report. '
+  + 'Do not invent components, observations or causes. You have not inspected this device. Do not request alarm details when no alarm is reported.\n';
 
 function prompt(context: GuidanceContext, referenceId?: string | null) {
   if (context.version !== config.version) throw new Error('invalid_output');
@@ -43,8 +45,7 @@ function prompt(context: GuidanceContext, referenceId?: string | null) {
     {role: 'user', content: ENGLISH_INSTRUCTION
       + JSON.stringify({device, report: context.report_text,
       reference: reference ? {symptom: reference.symptom, evidence} : null})
-      + (reference ? '\nNo replacement advice.'
-        : '\nNo manufacturer reference matched. State that the cause is unconfirmed. Suggest one external visual check of the part named in the report. Do not invent components, observations or causes. You have not inspected this device. Do not request alarm details when no alarm is reported.')
+      + (reference ? '\nNo replacement advice.' : '')
       }]);
 }
 
