@@ -28,7 +28,11 @@ describe('bounded free generation', () => {
   });
   it('accepts Markdown line-break spaces without changing the generated sentences', () => {
     expect(completeGuidance(text.replace('\n', '  \n'))).toBe(text);
-    expect(() => completeGuidance('1. check the wheel for debris.  \n2. inspect the visible axle.')).toThrow('invalid_output');
+    expect(completeGuidance('1. check the wheel for debris.  \n2. inspect the visible axle.')).toBe('1. check the wheel for debris.\n2. inspect the visible axle.');
+  });
+  it('requires Arabic when the report is Arabic', async () => {
+    const m = model({...response, choices: [{text: '1. check the wheel for debris.\n2. inspect the visible axle.', finish_reason: 'stop'}]});
+    expect((await generateGuidance(m.instance, {...context, report_text: 'عجلة العربة عالقة'}, 40000)).error_code).toBe('invalid_output');
   });
   it('does not spend tokens on blocked, oversized or exhausted requests', async () => {
     const m = model();

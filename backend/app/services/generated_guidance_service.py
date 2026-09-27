@@ -102,7 +102,7 @@ def resolve_guidance(context, result, llm_run, *, patient_connected, is_emergenc
             metadata["message"] = "الوصف أطول من سعة التوليد المحلي. اختصره مع إبقاء اسم الجزء ورسالة الخطأ والأعراض المهمة."
         return metadata
     text = result.text.strip()
-    if (UNSAFE.search(text) or not re.search(r"[\u0600-\u06ff]", text)
+    if (UNSAFE.search(text) or (re.search(r"[\u0600-\u06ff]", context["report_text"]) and not re.search(r"[\u0600-\u06ff]", text))
             or not re.fullmatch(r"1[.)] [^\n]+[.؟!?]\n+2[.)] [^\n]+[.؟!?]", text)
             or redact_report(text) != text):
         metadata.update(status="BLOCKED", error_code="content_rejected",

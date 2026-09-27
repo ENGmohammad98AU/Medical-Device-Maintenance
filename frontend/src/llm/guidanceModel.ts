@@ -18,14 +18,15 @@ function prompt(context: GuidanceContext) {
   if (context.version !== config.version) throw new Error('invalid_output');
   // Bound prefill work without silently truncating the report.
   if (context.report_text.length > 1600 || context.device_name.length > 400) throw new Error('input_too_long');
-  return formatQwenMessages([{role: 'system', content: config.system_prompt}, ...config.examples,
-    {role: 'user', content: JSON.stringify({device: context.device_name, report: context.report_text})}]);
+  return formatQwenMessages([{role: 'system', content: config.system_prompt},
+    {role: 'user', content: JSON.stringify({device: context.device_name, report: context.report_text})
+      + (/[\u0600-\u06ff]/u.test(context.report_text) ? '\nاكتب الخطوتين بالعربية لهذا العطل تحديدًا.' : '\nWrite the two steps in English for this fault.')}]);
 }
 
 export function completeGuidance(text: string): string {
   const value = text.trim().split('\n').map(line => line.trim()).join('\n');
   // A cut-off sentence or a leaked reasoning/template token is not a draft.
-  if (value.length < 20 || value.length > 800 || !/[\u0600-\u06ff]/u.test(value) || /[<>]|https?:\/\//i.test(value)
+  if (value.length < 20 || value.length > 800 || /[<>]|https?:\/\//i.test(value)
     || !/^1[.)] [^\n]+[.؟!?]\n+2[.)] [^\n]+[.؟!?]$/u.test(value)) throw new Error('invalid_output');
   return value;
 }
@@ -57,7 +58,9 @@ export async function generateGuidance(model: Model, context: GuidanceContext, b
       || response.usage.completion_tokens > config.max_new_tokens) throw new Error('invalid_output');
     if (response.usage.prompt_tokens > config.max_input_tokens) throw new Error('input_too_long');
     if (response.choices[0]?.finish_reason !== 'stop') throw new Error('invalid_output');
-    return {...base, status: 'success', text: completeGuidance(response.choices[0].text), finish_reason: 'stop',
+    const text = completeGuidance(response.choices[0].text);
+    if (/[\u0600-\u06ff]/u.test(context.report_text) && !/[\u0600-\u06ff]/u.test(text)) throw new Error('invalid_output');
+    return {...base, status: 'success', text, finish_reason: 'stop',
       prompt_tokens: response.usage.prompt_tokens, completion_tokens: response.usage.completion_tokens,
       latency_ms: Math.round(performance.now() - started)};
   } catch (error) {
