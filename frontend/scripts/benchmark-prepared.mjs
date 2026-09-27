@@ -90,7 +90,7 @@ try {
   if (generation) {
     await page.getByRole('combobox').nth(0).click();
     await page.getByRole('option', {name: 'توليد إرشادات نصية قصيرة', exact: true}).click();
-    // Exercise Arabic first, then switch languages and devices on the same
+    // Exercise sourced answers and both input languages and devices on the same
     // prepared worker. Every case still must independently pass the deadline.
     for (const sample of [...generationCases.slice(-1), ...generationCases.slice(0, -1)]) {
       console.log('GENERATION_CASE_START=' + sample.name);
@@ -104,7 +104,10 @@ try {
       const row = {name: sample.name, report_text: sample.report_text, wall_ms: Math.round(performance.now() - start), ...measured};
       result.rows.push(row); console.log('GENERATED_CASE=' + JSON.stringify(row));
       row.correct = measured.status === 'success' && measured.guidance?.status === 'success'
-        && new RegExp(sample.relevance, 'i').test(measured.guidance.text) && row.wall_ms < 45_000;
+        && new RegExp(sample.relevance, 'i').test(measured.guidance.text)
+        && !/[^\x20-\x7e\n]/u.test(measured.guidance.text)
+        && measured.guidance.reference_id === (sample.references?.[0]?.reference_id || null)
+        && row.wall_ms < 45_000;
       assert.equal(measured.reused_result, undefined);
       if (measured.guidance?.status === 'success') await page.getByTestId('generation-preview').waitFor();
     }
@@ -128,7 +131,7 @@ try {
     assert.equal(measured.support?.output_token, sample.expected);
     assert.equal(measured.reused_result, undefined);
     if (!baseline) assert.ok(row.wall_ms < 45_000, 'Fresh classification and reference selection must finish within the shared inference budget');
-    await page.getByText(/اكتمل تشغيل النموذج على هذا المتصفح/).waitFor();
+    await page.getByText(/The model completed on this browser/).waitFor();
   }
   // Exercise production inference for the three supported device types. These
   // synthetic contexts are checked against the real server candidate builder

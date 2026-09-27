@@ -42,16 +42,16 @@ export function localFailure(error_code: LocalError): LocalResult {
   return {status: 'error', revision: config.revision, latency_ms: 0, error_code};
 }
 export const localErrorText: Record<LocalError, string> = {
-  cancelled: 'أُلغي تشغيل النموذج المحلي.',
-  timeout: 'انتهت المهلة المتاحة للنموذج. بعد التجهيز، يُسمح بـ45 ثانية للتصنيف واختيار المرجع أو توليد المسودة؛ يمكن متابعة التحليل المرجعي دون نتيجة لغوية مكتملة.',
-  unsupported_browser: 'يحتاج هذا النموذج إلى متصفح حديث يدعم WebAssembly Memory64 واتصال HTTPS. جرّب إصدارًا حديثًا من Chrome أو Edge.',
-  insufficient_storage: 'مساحة تخزين المتصفح غير كافية للنموذج. افتح الموقع في نافذة عادية بدل التصفح الخاص، ووفّر مساحة لتنزيل نحو 1.1 غيغابايت، ثم أعد المحاولة.',
-  load_failed: 'تعذر تحميل النموذج أو تشغيله. تحقق من الاتصال والذاكرة المتاحة ثم أعد المحاولة.',
-  input_too_long: 'الوصف والسياق أكبر من سعة النموذج المحلي. اختصر الوصف أو تابع بالقواعد؛ لم يُحذف جزء منه للتحليل.',
-  invalid_output: 'لم يُرجع النموذج اختيارًا صالحًا لهذه الخطوة.',
+  cancelled: 'Local model execution was cancelled.',
+  timeout: 'The shared 45-second inference budget expired. You can continue with reference analysis or retry the local model.',
+  unsupported_browser: 'This model needs HTTPS and a recent browser supporting WebAssembly Memory64. Try a current version of Chrome or Edge.',
+  insufficient_storage: 'Browser storage is insufficient. Use a regular browser window, free space for the approximately 1.1 GB model, and retry.',
+  load_failed: 'The model could not load or run. Check the connection and available memory, then retry.',
+  input_too_long: 'The report and context exceed local model capacity. Shorten the report or continue with rules; input was not silently truncated.',
+  invalid_output: 'The model did not return a valid result for this step.',
 };
 export const categoryLabels: Record<string, string> = {
-  POWER: 'الطاقة والبطارية', SENSOR: 'الحساسات والقياس', CIRCUIT: 'الدارات الكهربائية',
-  MECHANICAL: 'الأجزاء الميكانيكية والتسريب', SOFTWARE: 'البرمجيات والعرض',
-  ALARM: 'الإنذارات', OTHER: 'عطل فني آخر', UNKNOWN: 'وصف غير واضح أو ليس بلاغ عطل',
+  POWER: 'Power and battery', SENSOR: 'Sensors and measurement', CIRCUIT: 'Electrical circuits',
+  MECHANICAL: 'Mechanical parts and leaks', SOFTWARE: 'Software and display',
+  ALARM: 'Alarms', OTHER: 'Other technical fault', UNKNOWN: 'Unclear or not a fault report',
 };

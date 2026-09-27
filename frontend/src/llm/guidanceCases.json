@@ -4,27 +4,77 @@
     "device_name": "Hamilton C6 Ventilator (Hamilton Medical C6)",
     "device_type": "VENTILATOR",
     "report_text": "The trolley caster wheel is jammed and cannot rotate.",
-    "relevance": "عجل|حرك|دور|فرامل|wheel|caster"
+    "relevance": "wheel|caster",
+    "references": [],
+    "candidates": []
   },
   {
     "name": "Philips MX800 network export",
     "device_name": "Philips IntelliVue MX800 Monitor (Philips MX800)",
     "device_type": "PATIENT_MONITOR",
     "report_text": "The report export to the central station fails with a network connection error.",
-    "relevance": "شبك|اتصال|كابل|رسالة|خطأ|network|connection|cable|server"
+    "relevance": "network|connection|cable|server",
+    "references": [],
+    "candidates": []
   },
   {
     "name": "Perfusor Space handle",
     "device_name": "B. Braun Perfusor Space Syringe Pump (B. Braun Perfusor Space)",
     "device_type": "SYRINGE_PUMP",
     "report_text": "The carrying handle is cracked near its hinge.",
-    "relevance": "مقبض|مفصل|تشق|كسر|شرخ|handle|hinge|crack"
+    "relevance": "handle|hinge|crack",
+    "references": [],
+    "candidates": []
   },
   {
     "name": "Hamilton C6 Arabic wheel report",
     "device_name": "Hamilton C6 Ventilator (Hamilton Medical C6)",
     "device_type": "VENTILATOR",
     "report_text": "عجلة عربة جهاز التنفس عالقة ولا تدور.",
-    "relevance": "عجل|حرك|دور|فرامل"
+    "relevance": "wheel|caster",
+    "references": [],
+    "candidates": []
+  },
+  {
+    "name": "Hamilton C6 sourced battery answer",
+    "report_text": "Battery low",
+    "device_name": "Hamilton C6 Ventilator (Hamilton Medical C6)",
+    "device_type": "VENTILATOR",
+    "relevance": "battery|charge|power",
+    "candidates": [
+      {
+        "label": "A",
+        "reference_id": "HAM-C6-001",
+        "symptom": "Battery low"
+      }
+    ],
+    "references": [
+      {
+        "reference_id": "HAM-C6-001",
+        "symptom": "Battery low",
+        "evidence": "meaning: Battery charge is low; alarm priority depends on remaining charge and whether the ventilator is on battery or primary power.\npossible_causes: Low total battery charge; ventilator operating on battery power or battery capacity below threshold.\nimmediate_safety_action: Connect to primary power and be prepared for alternative ventilation if needed.\nrecommended_solution: Restore a reliable approved power source and replace/recharge the battery as appropriate.\nverification_before_return_to_service: Confirm the battery alarm clears and stable primary power/battery status is shown before continued use."
+      }
+    ]
+  },
+  {
+    "name": "Philips MX800 sourced Resp answer",
+    "report_text": "Resp Leads Off",
+    "device_name": "Philips IntelliVue MX800 Monitor (Philips MX800)",
+    "device_type": "PATIENT_MONITOR",
+    "relevance": "electrode|lead|resp|connection",
+    "candidates": [
+      {
+        "label": "A",
+        "reference_id": "PH-MX800-013",
+        "symptom": "Resp Leads Off"
+      }
+    ],
+    "references": [
+      {
+        "reference_id": "PH-MX800-013",
+        "symptom": "Resp Leads Off",
+        "evidence": "meaning: The required respiration measurement electrodes are not fully connected.\nimmediate_safety_action: Specialist review is required, with assessment of the patient if connected to the device.\nrecommended_solution: A specialist checks the RA, LA, and LL electrode connections used for respiration measurement.\nverification_before_return_to_service: A specialist verifies that the alarm has cleared and the function is safe before returning the device to service."
+      }
+    ]
   }
 ]

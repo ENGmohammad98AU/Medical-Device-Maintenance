@@ -93,7 +93,7 @@ def test_mx800_battery_requests_accessory_identity_without_cross_model_repair(th
     assert not context['candidates']
     assert not body['reference_found'] and not body['recommended_solution']
     assert 'X2/X3' in ' '.join(body['customer_support']['questions'])
-    assert 'لا يوجد مرجع' in body['customer_support']['message']
+    assert 'No technical reference matches' in body['customer_support']['message']
 
 
 def test_normalization_does_not_modify_codes_or_negation():

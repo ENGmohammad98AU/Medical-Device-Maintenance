@@ -497,7 +497,7 @@ export default function FaultReportsPage() {
               لا توجد تقارير مطابقة لمعايير البحث. يمكنك مسح الفلاتر لإظهار جميع البيانات.
             </Alert>
           ) : (
-            <Grid container spacing={3}>
+            <Grid container spacing={3} dir="ltr" lang="en" sx={{textAlign: 'left'}}>
               {filteredReports.map((report) => (
                 <Grid item xs={12} sm={6} md={4} key={report.id}>
                 <Card
@@ -650,12 +650,12 @@ export default function FaultReportsPage() {
           <DialogTitle>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <PsychologyIcon sx={{ color: '#e53935' }} />
-              تحليل الذكاء الاصطناعي / AI Analysis
+              AI Analysis
             </Box>
           </DialogTitle>
           <DialogContent>
             {aiAnalysis && (
-              <Box sx={{ mt: 2 }}>
+              <Box dir="ltr" lang="en" sx={{ mt: 2, textAlign: 'left' }}>
                 {error && <Alert severity="error" sx={{mb: 2}}>{error}</Alert>}
                 <LLMTriageSummary result={aiAnalysis} />
                 <GeneratedGuidanceSummary guidance={aiAnalysis.generated_guidance} />
@@ -664,19 +664,19 @@ export default function FaultReportsPage() {
                 <Grid container spacing={2}>
                   <Grid item xs={12} sm={6}>
                     <Typography variant="subtitle2" gutterBottom>
-                      الجهاز / Device:
+                      Device:
                     </Typography>
                     <Typography variant="body1">{aiAnalysis.device}</Typography>
                   </Grid>
                   <Grid item xs={12} sm={6}>
                     <Typography variant="subtitle2" gutterBottom>
-                      العطل المرجعي / Matched Fault:
+                      Matched fault:
                     </Typography>
-                    <Typography variant="body1">{aiAnalysis.matched_fault || 'لم يُعتمد مرجع مطابق'}</Typography>
+                    <Typography variant="body1">{aiAnalysis.matched_fault || 'No matching reference selected'}</Typography>
                   </Grid>
                   <Grid item xs={12} sm={6}>
                     <Typography variant="subtitle2" gutterBottom>
-                      الخطورة / Severity:
+                      Severity:
                     </Typography>
                     <Chip
                       label={aiAnalysis.severity}
@@ -688,43 +688,43 @@ export default function FaultReportsPage() {
                   </Grid>
                   <Grid item xs={12} sm={6}>
                     <Typography variant="subtitle2" gutterBottom>
-                      درجة المطابقة المرجعية / Reference Match:
+                      Reference match:
                     </Typography>
-                    <Typography variant="body1">{aiAnalysis.reference_found ? `${(aiAnalysis.match_confidence * 100).toFixed(1)}%` : 'لا توجد مطابقة معتمدة'}</Typography>
+                    <Typography variant="body1">{aiAnalysis.reference_found ? `${(aiAnalysis.match_confidence * 100).toFixed(1)}%` : 'No accepted match'}</Typography>
                   </Grid>
                   <Grid item xs={12}>
                     <Typography variant="subtitle2" gutterBottom>
-                      السبب المحتمل / Possible Cause:
+                      Possible cause:
                     </Typography>
-                    <Typography variant="body1">{aiAnalysis.possible_causes || 'لم يتوفر سبب مرجعي مناسب'}</Typography>
+                    <Typography variant="body1">{aiAnalysis.possible_causes || 'No source-supported cause available'}</Typography>
                   </Grid>
                   <Grid item xs={12}>
                     <Typography variant="subtitle2" gutterBottom>
-                      إجراء السلامة الأولي / Immediate Safety Action:
+                      Immediate safety action:
                     </Typography>
-                    <Typography variant="body1">{aiAnalysis.immediate_safety_action || aiAnalysis.warning_message || 'تجب مراجعة المختص قبل تنفيذ أي إجراء'}</Typography>
+                    <Typography variant="body1">{aiAnalysis.immediate_safety_action || aiAnalysis.warning_message || 'Specialist review is required before taking action'}</Typography>
                   </Grid>
                   <Grid item xs={12}>
                     <Typography variant="subtitle2" gutterBottom>
-                      التوصية / Recommendation:
+                      Recommendation:
                     </Typography>
                     <Typography variant="body1">{aiAnalysis.recommended_solution || aiAnalysis.recommended_action}</Typography>
                   </Grid>
                   {!!aiAnalysis.troubleshooting_steps?.length && <Grid item xs={12}>
-                    <Typography variant="subtitle2">خطوات الفحص المرجعية:</Typography>
+                    <Typography variant="subtitle2">Reference inspection steps:</Typography>
                     <Box component="ol" sx={{pl: 3}}>{aiAnalysis.troubleshooting_steps.map((step: string, idx: number) => <li key={idx}>{step}</li>)}</Box>
                   </Grid>}
                   {aiAnalysis.verification_before_return_to_service && <Grid item xs={12}>
-                    <Typography variant="subtitle2">التحقق قبل إعادة الجهاز إلى الخدمة:</Typography>
+                    <Typography variant="subtitle2">Verification before return to service:</Typography>
                     <Typography>{aiAnalysis.verification_before_return_to_service}</Typography>
                   </Grid>}
                   {aiAnalysis.source && (
                     <Grid item xs={12}>
                       <Typography variant="subtitle2" gutterBottom>
-                        المراجع / References:
+                        References:
                       </Typography>
                       <Typography variant="body2">{aiAnalysis.source}</Typography>
-                      {aiAnalysis.reference_page && <Typography variant="body2">الصفحة: {aiAnalysis.reference_page}</Typography>}
+                      {aiAnalysis.reference_page && <Typography variant="body2">Page: {aiAnalysis.reference_page}</Typography>}
                     </Grid>
                   )}
                 </Grid>

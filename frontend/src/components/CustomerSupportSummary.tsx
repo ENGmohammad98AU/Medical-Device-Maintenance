@@ -10,21 +10,21 @@ export interface CustomerSupportMetadata {
 export default function CustomerSupportSummary({support, referenceFound}: {
   support: CustomerSupportMetadata; referenceFound: boolean;
 }) {
-  return <Box sx={{mb: 2}}>
+  return <Box dir="ltr" lang="en" sx={{mb: 2, textAlign: 'left'}}>
     <Alert severity={support.status === 'SELECTED' ? 'success' : 'info'}>{support.message}</Alert>
     {support.result?.error_code && <Typography sx={{mt: 1}}>
-      {localErrorText[support.result.error_code as LocalError] || 'تعذر إكمال اختيار المرجع محليًا.'}
+      {localErrorText[support.result.error_code as LocalError] || 'Local reference selection could not finish.'}
     </Typography>}
     {!referenceFound && support.reference_status !== 'NO_MATCHING_REFERENCE' && support.status === 'FALLBACK'
-      && <Typography sx={{mt: 1}}>لا يوجد مرجع مطابق حاليًا. أضف رمز الإنذار ووصف الأعراض، أو اطلب مراجعة مهندس الأجهزة الطبية.</Typography>}
+      && <Typography sx={{mt: 1}}>No matching reference is currently available. Add the alarm code and symptoms, or request review by a biomedical engineer.</Typography>}
     {!!support.questions?.length && <Box sx={{mt: 2}}>
-      <Typography variant="subtitle2">المعلومات المطلوبة لاستكمال التحليل:</Typography>
+      <Typography variant="subtitle2">Details needed to continue the analysis:</Typography>
       <Box component="ul" sx={{my: 1, paddingInlineStart: 3}}>
         {support.questions.map(question => <li key={question}>{question}</li>)}
       </Box>
     </Box>}
     {support.selected_reference_id && <Typography variant="body2" sx={{mt: 1}}>
-      المرجع المقترح: {support.selected_reference_id} — يحتاج اعتماد المختص.
+      Selected reference: {support.selected_reference_id} — requires specialist review.
     </Typography>}
   </Box>;
 }

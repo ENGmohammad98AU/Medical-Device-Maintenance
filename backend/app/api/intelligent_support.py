@@ -191,7 +191,7 @@ def _is_meaningful_fault(text: str) -> bool:
     return bool(tokens.intersection(FAULT_INDICATORS))
 
 
-NO_REFERENCE_MESSAGE = "لا توجد حالياً معلومات مرجعية كافية لتشخيص هذا العطل. يرجى إضافة المرجع الفني الخاص بالجهاز."
+NO_REFERENCE_MESSAGE = "Insufficient reference information is available to diagnose this fault. Add the technical reference for this device."
 
 
 @router.post("/prepare-support")
@@ -209,7 +209,7 @@ def prepare_customer_support(
         if not report or report.device_id != device.id:
             raise HTTPException(status_code=422, detail="Fault report does not belong to the selected device")
         if report.status == FaultStatus.RESOLVED:
-            raise HTTPException(status_code=409, detail="أعد فتح البلاغ مع ذكر السبب قبل إجراء تحليل جديد.")
+            raise HTTPException(status_code=409, detail="Reopen the report with a reason before running a new analysis.")
     context, references = prepare_support(request, device, db)
     guidance = prepare_guidance(request, device, references)
     if guidance is not None:
@@ -240,11 +240,11 @@ def analyze_fault(
     description_text = (request.description or "").strip()
     if not description_text:
         logger.info("maintenance_validation device_id=%s validation=invalid", request.device_id)
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="يرجى إدخال وصف العطل")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Please enter a fault description.")
 
     if fault_text and not _is_meaningful_fault(fault_text):
         logger.info("maintenance_validation device_id=%s validation=invalid", request.device_id)
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="يرجى إدخال العطل")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Please enter the fault.")
 
     device = db.query(Device).filter(Device.id == request.device_id).first()
     if not device:
@@ -256,7 +256,7 @@ def analyze_fault(
         if report.device_id != device.id:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Fault report does not belong to the selected device")
         if report.status == FaultStatus.RESOLVED:
-            raise HTTPException(status_code=409, detail="أعد فتح البلاغ مع ذكر السبب قبل إجراء تحليل جديد.")
+            raise HTTPException(status_code=409, detail="Reopen the report with a reason before running a new analysis.")
 
     device_type = device.type.value.upper().replace('-', '_').replace(' ', '_')
     device_name = device.name
@@ -352,7 +352,7 @@ def analyze_fault(
         safety_guards = list(dict.fromkeys(safety_guards + selected_guards))
         if classification.is_emergency:
             support_result["guards"].append("EMERGENCY_PRIORITY")
-            support_result["message"] = "تستدعي الحالة مراجعة عاجلة وفق قواعد السلامة؛ اتبع إجراءات المنشأة ولا تنتظر اكتمال الدعم الآلي. " + support_result["message"]
+            support_result["message"] = "This case requires urgent review under the safety rules. Follow facility procedures without waiting for automated support. " + support_result["message"]
         if not classification.is_emergency and support_result["status"] in {"NEEDS_DETAILS", "NO_REFERENCE", "OUT_OF_SCOPE", "INVALID_RESULT", "LLM_REQUIRED"}:
             routing_target = ("BIOMEDICAL_ENGINEERING" if support_result["status"] in {"NO_REFERENCE", "LLM_REQUIRED"}
                               else "REQUEST_CLARIFICATION")
@@ -362,16 +362,20 @@ def analyze_fault(
         generated_guidance = resolve_guidance(
             guidance_context, request.browser_llm.guidance if request.browser_llm else None, llm_run,
             patient_connected=request.patient_connected, is_emergency=classification.is_emergency,
+            selected_reference=reference_lookup if support_result["status"] == "SELECTED" else None,
+            out_of_scope=support_result["status"] == "OUT_OF_SCOPE",
         )
         draft_text = generated_guidance["text"] if generated_guidance and generated_guidance["status"] == "DRAFT" else ""
         if guidance_context is not None:
-            # Free generation does not claim a selected manufacturer reference.
-            reference_lookup = dict(NO_MATCH)
+            # A generated explanation supplements the selected server-owned
+            # source; it never overwrites manufacturer evidence or citations.
+            if support_result["status"] != "SELECTED":
+                reference_lookup = dict(NO_MATCH)
             restrict_retrieval = True
             if draft_text:
                 support_result.update(status="GENERATED", scope="IN_SCOPE", method="LOCAL_LLM_GENERATION", questions=[],
-                                      selected_reference_id=None, message="ولّد النموذج مسودة إرشادات قصيرة للحالة الموصوفة، بانتظار مراجعة المختص.")
-                classification.recommended_action = "مراجعة المسودة بواسطة مهندس الأجهزة الطبية قبل التنفيذ."
+                                      message="The model generated an English explanation for specialist review.")
+                classification.recommended_action = "Have a biomedical engineer review the generated answer and its evidence before taking action."
                 routing_target = "BIOMEDICAL_ENGINEERING"
 
         # Step 2: Extract entities using NLP
@@ -547,7 +551,9 @@ def analyze_fault(
                 llm_latency_ms=llm_run.latency_ms,
                 total_processing_time_ms=end_to_end_processing_time_ms,
                 selected_reference_id=support_result.get('selected_reference_id'),
-                reference_source='LLM_GENERATED_UNVERIFIED' if draft_text else reference_lookup.get('source', ''),
+                reference_source=('LLM_GENERATED_WITH_REFERENCE: ' + reference_lookup['source']
+                                  if draft_text and reference_lookup.get('source') else
+                                  'LLM_GENERATED_UNVERIFIED' if draft_text else reference_lookup.get('source', '')),
                 recommended_solution=draft_text or reference_lookup.get('recommended_solution', ''),
                 verification_instructions=reference_lookup.get('verification_before_return_to_service', ''),
                 severity=classification.severity.value,

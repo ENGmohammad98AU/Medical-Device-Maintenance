@@ -51,14 +51,7 @@ self.addEventListener('message', async (event: MessageEvent<{id: number; input?:
     const output_token = await classifyLocally(loaded, input);
     let support: SupportResult | undefined;
     let guidance: GuidanceResult | undefined;
-    if (input.support_context?.guidance) {
-      const context = input.support_context.guidance;
-      self.postMessage({id, progress: {stage: 'running', task: 'generation', storage_mode: storageMode, compute_backend: computeBackend}});
-      guidance = output_token === 'H'
-        ? {status: 'error', version: context.version, input_sha256: context.input_sha256, latency_ms: 0, error_code: 'out_of_scope'}
-        : await generateGuidance(loaded, context, Math.min(45_000, event.data.inference_budget_ms ?? 45_000) - (performance.now() - inferenceStarted));
-      if (computeBackend === 'webgpu' && guidance.error_code === 'load_failed') throw new Error('generation_failed');
-    } else if (input.support_context) {
+    if (input.support_context) {
       self.postMessage({id, progress: {stage: 'running', task: 'reference_selection', storage_mode: storageMode, compute_backend: computeBackend}});
       const supportStarted = performance.now();
       const context = input.support_context;
@@ -72,6 +65,18 @@ self.addEventListener('message', async (event: MessageEvent<{id: number; input?:
           error_code: message === 'input_too_long' || message === 'invalid_output' ? message : 'load_failed',
           latency_ms: Math.round(performance.now() - supportStarted)};
       }
+    }
+    if (input.support_context?.guidance) {
+      const context = input.support_context.guidance;
+      const referenceId = input.support_context.candidates.find(candidate => candidate.label === support?.output_token)?.reference_id;
+      self.postMessage({id, progress: {stage: 'running', task: 'generation', storage_mode: storageMode, compute_backend: computeBackend}});
+      guidance = output_token === 'H' || support?.output_token === 'E'
+        ? {status: 'error', version: context.version, input_sha256: context.input_sha256, latency_ms: 0, error_code: 'out_of_scope'}
+        : support?.status !== 'success'
+        ? {status: 'error', version: context.version, input_sha256: context.input_sha256, latency_ms: 0, error_code: 'not_allowed'}
+        : await generateGuidance(loaded, context,
+          Math.min(45_000, event.data.inference_budget_ms ?? 45_000) - (performance.now() - inferenceStarted), referenceId);
+      if (computeBackend === 'webgpu' && guidance.error_code === 'load_failed') throw new Error('generation_failed');
     }
     self.postMessage({id, result: {
       status: 'success', revision: config.revision, output_token, support, guidance,
