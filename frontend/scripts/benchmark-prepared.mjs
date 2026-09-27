@@ -10,11 +10,13 @@ import {tmpdir, cpus, platform} from 'node:os';
 import {chromium} from 'playwright';
 
 const baseline = process.argv.includes('--baseline');
+const generation = process.argv.includes('--generation');
 const root = resolve(process.env.BENCHMARK_DIST || 'dist');
 const config = JSON.parse(await readFile('src/llm/localModelConfig.json', 'utf8'));
 const cases = JSON.parse(await readFile('src/llm/supportSmokeCases.json', 'utf8'));
 const deviceCases = JSON.parse(await readFile('src/llm/deviceRegressionCases.json', 'utf8'));
 const supportConfig = JSON.parse(await readFile('src/llm/supportModelConfig.json', 'utf8'));
+const generationCases = JSON.parse(await readFile('src/llm/guidanceCases.json', 'utf8'));
 const localModel = process.env.LLM_MODEL_FILE;
 if (localModel) {
   const hash = createHash('sha256');
@@ -63,7 +65,7 @@ await context.addInitScript(() => {
 });
 if (localModel) await context.route(`https://huggingface.co/${config.model}/resolve/${config.revision}/${config.model_file}`,
   route => route.fulfill({status: 307, headers: {location: origin + '/benchmark-model.gguf', 'Access-Control-Allow-Origin': '*'}}));
-const result = {kind: baseline ? 'unprepared-baseline' : 'prepared-production', model: config.model,
+const result = {kind: generation ? 'prepared-generation' : baseline ? 'unprepared-baseline' : 'prepared-production', model: config.model,
   revision: config.revision, model_sha256: config.model_file_sha256, browser: context.browser().version(),
   measured_at: new Date().toISOString(), machine: {os: platform(), cpu: cpus()[0]?.model, logical_cpus: cpus().length},
   model_source: localModel ? 'SHA-verified local file; Internet download excluded' : 'model host',
@@ -81,9 +83,29 @@ try {
     result.preparation_ms = Math.round(performance.now() - start);
     console.log('PREPARATION_MS=' + result.preparation_ms);
   }
+  if (generation) {
+    await page.getByRole('combobox').nth(0).click();
+    await page.getByRole('option', {name: 'توليد إرشادات نصية قصيرة', exact: true}).click();
+    for (const sample of generationCases) {
+      await page.getByRole('combobox').nth(1).click();
+      await page.getByRole('option', {name: sample.name, exact: true}).click();
+      const before = await page.evaluate(() => window.__modelResults.length);
+      const start = performance.now();
+      await page.getByRole('button', {name: 'تشغيل النموذج مجانًا', exact: true}).click();
+      await page.waitForFunction(n => window.__modelResults.length > n, before, {timeout: 50_000});
+      const measured = await page.evaluate(() => window.__modelResults.at(-1));
+      const row = {name: sample.name, report_text: sample.report_text, wall_ms: Math.round(performance.now() - start), ...measured};
+      result.rows.push(row); console.log('GENERATED_CASE=' + JSON.stringify(row));
+      row.correct = measured.status === 'success' && measured.guidance?.status === 'success'
+        && new RegExp(sample.relevance).test(measured.guidance.text) && row.wall_ms < 45_000;
+      assert.equal(measured.reused_result, undefined);
+      if (measured.guidance?.status === 'success') await page.getByTestId('generation-preview').waitFor();
+    }
+    assert.ok(result.rows.every(row => row.correct), JSON.stringify(result.rows.filter(row => !row.correct)));
+  }
   // Alternate references and no-reference requests, then return to references.
   // Every report is distinct; no exact-result cache can satisfy these requests.
-  for (const index of [0, 2, 1, 4, 3, 5]) {
+  for (const index of (generation ? [] : [0, 2, 1, 4, 3, 5])) {
     const sample = cases[index];
     await page.getByRole('combobox').nth(1).click();
     await page.getByRole('option', {name: sample.name, exact: true}).click();
@@ -105,7 +127,7 @@ try {
   // synthetic contexts are checked against the real server candidate builder
   // by test_device_support_regressions.py; no classification is mocked here.
   result.device_rows = [];
-  for (const [index, sample] of (baseline ? [] : deviceCases).entries()) {
+  for (const [index, sample] of (baseline || generation ? [] : deviceCases).entries()) {
     const start = performance.now();
     const measured = await page.evaluate(async ({sample, version, id}) => {
       const worker = window.__localModelWorker;

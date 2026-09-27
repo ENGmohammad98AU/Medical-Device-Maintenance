@@ -65,7 +65,7 @@ describe('local inference lifecycle', () => {
   it('prepares without a report, reuses the worker and records preparation separately', async () => {
     const client = new LocalModelClient(); const preparing = client.prepare(vi.fn());
     const worker = FakeWorker.instances[0];
-    expect(worker.postMessage).toHaveBeenCalledWith({id: 1, input: undefined, force_cpu: false});
+    expect(worker.postMessage).toHaveBeenCalledWith({id: 1, input: undefined, force_cpu: false, inference_budget_ms: LOCAL_INFERENCE_TIMEOUT_MS});
     vi.advanceTimersByTime(120_000);
     worker.message({id: 1, progress: {stage: 'warming'}});
     worker.message({id: 1, ready: true, result: {status: 'success', revision: localModelConfig.revision, latency_ms: 120_000}});
@@ -107,7 +107,7 @@ describe('local inference lifecycle', () => {
     gpu.message({id: 1, retry_cpu: true});
     expect(gpu.terminate).toHaveBeenCalledOnce();
     const cpu = FakeWorker.instances[1];
-    expect(cpu.postMessage).toHaveBeenCalledWith({id: 1, input, force_cpu: true});
+    expect(cpu.postMessage).toHaveBeenCalledWith({id: 1, input, force_cpu: true, inference_budget_ms: LOCAL_INFERENCE_TIMEOUT_MS});
     gpu.message({id: 1, result: {...success, output_token: 'H'}});
     gpu.onerror?.();
     cpu.message({id: 1, result: {...success, runtime: 'wllama-3.6.1/wasm'}});

@@ -7,6 +7,7 @@ from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from app.services.llm_triage_service import LLMRun
 from app.services.customer_support_service import BrowserSupportResult
+from app.services.generated_guidance_service import BrowserGuidanceResult
 
 MANIFEST = json.loads((Path(__file__).parent / "browser_llm_manifest.json").read_text(encoding="utf-8"))
 PROMPT_HASH = hashlib.sha256(json.dumps(MANIFEST, sort_keys=True).encode("utf-8")).hexdigest()
@@ -26,6 +27,7 @@ class BrowserLLMResult(BaseModel):
         "cancelled", "timeout", "unsupported_browser", "insufficient_storage", "load_failed", "input_too_long", "invalid_output",
     ]] = None
     support: Optional[BrowserSupportResult] = None
+    guidance: Optional[BrowserGuidanceResult] = None
     reused_result: bool = False
     runtime: Optional[Literal["wllama-2.4.0/wasm", "wllama-3.6.1/wasm", "wllama-3.6.1/webgpu"]] = None
 
@@ -36,8 +38,8 @@ class BrowserLLMResult(BaseModel):
                 raise ValueError("Successful browser inference requires a token and input hash")
         elif self.output_token is not None:
             raise ValueError("Failed or disabled inference cannot supply a category")
-        if self.status != "success" and self.support is not None:
-            raise ValueError("Support selection requires a completed local classification")
+        if self.status != "success" and (self.support is not None or self.guidance is not None):
+            raise ValueError("Support or generation requires a completed local classification")
         if self.reused_result and self.status != "success":
             raise ValueError("Only a successful inference can be reused")
         return self

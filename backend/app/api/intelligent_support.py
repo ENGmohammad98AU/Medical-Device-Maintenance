@@ -34,6 +34,7 @@ from app.services.fault_reference_lookup_service import FaultReferenceLookupServ
 from app.services.llm_triage_service import LLMTriageService, LLMRun, apply_triage, redact_report
 from app.services.browser_llm_service import BrowserLLMResult, browser_run
 from app.services.customer_support_service import prepare_support, resolve_support
+from app.services.generated_guidance_service import prepare_guidance, resolve_guidance
 from app.services.fault_resolution_workflow_service import FaultResolutionWorkflowService
 
 
@@ -63,6 +64,7 @@ class FaultAnalysisRequest(BaseModel):
     device_location: Optional[str] = Field(None, description="Location of device")
     patient_connected: bool = Field(default=False, description="Whether patient is connected")
     browser_llm: Optional[BrowserLLMResult] = None
+    generate_guidance: bool = False
 
     @field_validator("description", mode="before")
     @classmethod
@@ -160,6 +162,7 @@ class FaultAnalysisResponse(BaseModel):
     safety_guards: List[str] = Field(default_factory=list)
     llm: LLMRun = Field(default_factory=lambda: LLMRun(status="disabled"))
     customer_support: Dict[str, Any] = Field(default_factory=dict)
+    generated_guidance: Optional[Dict[str, Any]] = None
     workflow: Optional[Dict[str, Any]] = None
 
 
@@ -207,7 +210,10 @@ def prepare_customer_support(
             raise HTTPException(status_code=422, detail="Fault report does not belong to the selected device")
         if report.status == FaultStatus.RESOLVED:
             raise HTTPException(status_code=409, detail="أعد فتح البلاغ مع ذكر السبب قبل إجراء تحليل جديد.")
-    context, _ = prepare_support(request, device, db)
+    context, references = prepare_support(request, device, db)
+    guidance = prepare_guidance(request, device, references)
+    if guidance is not None:
+        context["guidance"] = guidance
     return context
 
 
@@ -226,7 +232,7 @@ def analyze_fault(
     - NLP entity extraction (device, error codes, department, etc.)
     - Knowledge base lookup (troubleshooting steps, safety precautions)
     - Local LLM scope assessment and selection among sourced references
-    - Reference text with source attribution (no generated repair instructions)
+    - Reference text with source attribution, or an explicitly unverified LLM draft
     - Safety layer enforcement (prevents unauthorized clinical advice)
     - Escalation path determination
     """
@@ -352,6 +358,22 @@ def analyze_fault(
                               else "REQUEST_CLARIFICATION")
             classification.recommended_action = support_result["message"]
         
+        guidance_context = prepare_guidance(request, device, support_references)
+        generated_guidance = resolve_guidance(
+            guidance_context, request.browser_llm.guidance if request.browser_llm else None, llm_run,
+            patient_connected=request.patient_connected, is_emergency=classification.is_emergency,
+        )
+        draft_text = generated_guidance["text"] if generated_guidance and generated_guidance["status"] == "DRAFT" else ""
+        if guidance_context is not None:
+            # Free generation does not claim a selected manufacturer reference.
+            reference_lookup = dict(NO_MATCH)
+            restrict_retrieval = True
+            if draft_text:
+                support_result.update(status="GENERATED", method="LOCAL_LLM_GENERATION", questions=[],
+                                      selected_reference_id=None, message="ولّد النموذج مسودة إرشادات قصيرة للحالة الموصوفة، بانتظار مراجعة المختص.")
+                classification.recommended_action = "مراجعة المسودة بواسطة مهندس الأجهزة الطبية قبل التنفيذ."
+                routing_target = "BIOMEDICAL_ENGINEERING"
+
         # Step 2: Extract entities using NLP
         extracted_entities = nlp_service.extract_structured_data(cleaned_data.cleaned_text)
         
@@ -426,7 +448,7 @@ def analyze_fault(
             rag_result['response'] = support_result["message"] if restrict_retrieval else NO_REFERENCE_MESSAGE
 
         # LLM outcomes, refusals and outages all remain reviewable, even without
-        # a matching manual. No model output populates technical repair fields.
+        # a matching manual. Generated drafts are stored separately from manufacturer repair fields.
         if llm_run.status != "disabled":
             rag_result['requires_review'] = True
 
@@ -491,11 +513,12 @@ def analyze_fault(
                 },
                 'llm': llm_run.model_dump(),
                 'customer_support': support_result,
+                'generated_guidance': generated_guidance,
             },
             retrieved_chunks=rag_result['retrieved_context'],
             retrieval_scores=[],
             sources=sources,
-            generated_response=rag_result['response'],
+            generated_response=draft_text or rag_result['response'],
             confidence_score=rag_result['confidence'],
             safety_check_result={
                 'safety_level': safety_check.safety_level.value,
@@ -524,8 +547,8 @@ def analyze_fault(
                 llm_latency_ms=llm_run.latency_ms,
                 total_processing_time_ms=end_to_end_processing_time_ms,
                 selected_reference_id=support_result.get('selected_reference_id'),
-                reference_source=reference_lookup.get('source', ''),
-                recommended_solution=reference_lookup.get('recommended_solution', ''),
+                reference_source='LLM_GENERATED_UNVERIFIED' if draft_text else reference_lookup.get('source', ''),
+                recommended_solution=draft_text or reference_lookup.get('recommended_solution', ''),
                 verification_instructions=reference_lookup.get('verification_before_return_to_service', ''),
                 severity=classification.severity.value,
             )
@@ -620,6 +643,7 @@ def analyze_fault(
             safety_guards=safety_guards,
             llm=llm_run,
             customer_support=support_result,
+            generated_guidance=generated_guidance,
             workflow=workflow_payload,
         )
         

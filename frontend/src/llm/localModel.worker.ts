@@ -4,6 +4,7 @@ import { inferenceThreads } from './browserIsolation.js';
 import { loadGgufModel, type StorageMode } from './modelStorage.js';
 import {selectComputeBackend, runtimeLoadOptions, type ComputeBackend} from './computeBackend.js';
 import { classifyLocally, selectSupportLocally, warmLocalPrompts } from './localModelEngine';
+import { generateGuidance, type GuidanceResult } from './guidanceModel';
 import type { SupportResult } from './supportModelContract';
 import { inputHash, localFailure, localModelConfig as config, type LocalInput, type LocalError } from './localModelContract';
 
@@ -13,7 +14,7 @@ Object.defineProperty(globalThis, 'document', {value: {baseURI: self.location.hr
 let generator: Promise<Wllama> | undefined;
 let storageMode: StorageMode | undefined;
 let computeBackend: ComputeBackend = 'wasm';
-self.addEventListener('message', async (event: MessageEvent<{id: number; input?: LocalInput; force_cpu?: boolean}>) => {
+self.addEventListener('message', async (event: MessageEvent<{id: number; input?: LocalInput; force_cpu?: boolean; inference_budget_ms?: number}>) => {
   const {id, input} = event.data;
   const started = performance.now();
   let loading = true;
@@ -46,9 +47,17 @@ self.addEventListener('message', async (event: MessageEvent<{id: number; input?:
     }
     loading = false;
     self.postMessage({id, progress: {stage: 'running', task: 'classification', storage_mode: storageMode, compute_backend: computeBackend}});
+    const inferenceStarted = performance.now();
     const output_token = await classifyLocally(loaded, input);
     let support: SupportResult | undefined;
-    if (input.support_context) {
+    let guidance: GuidanceResult | undefined;
+    if (input.support_context?.guidance) {
+      const context = input.support_context.guidance;
+      self.postMessage({id, progress: {stage: 'running', task: 'generation', storage_mode: storageMode, compute_backend: computeBackend}});
+      guidance = output_token === 'H'
+        ? {status: 'error', version: context.version, input_sha256: context.input_sha256, latency_ms: 0, error_code: 'out_of_scope'}
+        : await generateGuidance(loaded, context, Math.min(45_000, event.data.inference_budget_ms ?? 45_000) - (performance.now() - inferenceStarted));
+    } else if (input.support_context) {
       self.postMessage({id, progress: {stage: 'running', task: 'reference_selection', storage_mode: storageMode, compute_backend: computeBackend}});
       const supportStarted = performance.now();
       const context = input.support_context;
@@ -64,7 +73,7 @@ self.addEventListener('message', async (event: MessageEvent<{id: number; input?:
       }
     }
     self.postMessage({id, result: {
-      status: 'success', revision: config.revision, output_token, support,
+      status: 'success', revision: config.revision, output_token, support, guidance,
       prompt_version: config.prompt_version,
       runtime: `wllama-3.6.1/${computeBackend}`,
       input_sha256: await inputHash(input), latency_ms: Math.round(performance.now() - started),

@@ -1,6 +1,7 @@
 import config from './supportModelConfig.json';
 import localConfig from './localModelConfig.json';
 import { normalizeReportText } from './reportText.js';
+import type { GuidanceContext } from './guidanceModel';
 import type { LocalError } from './localModelContract';
 
 export { config as supportModelConfig };
@@ -9,6 +10,7 @@ export interface SupportCandidate { label: 'A' | 'B' | 'C'; reference_id: string
 export interface SupportContext {
   version: string; input_sha256: string; report_text: string; device_name: string;
   candidates: SupportCandidate[];
+  guidance?: GuidanceContext;
 }
 export interface SupportResult {
   status: 'success' | 'error'; version: string; input_sha256: string;

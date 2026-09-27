@@ -9,6 +9,7 @@ import { ArrowBack as ArrowBackIcon, CheckCircle as CheckCircleIcon, Psychology 
 import { useAuth } from '../hooks/useAuth';
 import api, { authService, isAuthenticationError } from '../services/auth';
 import LLMTriageSummary, { TriageMetadata } from '../components/LLMTriageSummary';
+import GeneratedGuidanceSummary, {type GeneratedGuidance} from '../components/GeneratedGuidanceSummary';
 import CustomerSupportSummary, {type CustomerSupportMetadata} from '../components/CustomerSupportSummary';
 import { useLocalModel } from '../hooks/useLocalModel';
 import LocalModelPreparation from '../components/LocalModelPreparation';
@@ -29,6 +30,7 @@ interface AnalysisResult extends TriageMetadata {
   immediate_safety_action: string; recommended_solution: string; verification_before_return_to_service: string;
   source: string; reference_url: string; reference_page: string; match_confidence: number; match_status: string;
   customer_support?: CustomerSupportMetadata;
+  generated_guidance?: GeneratedGuidance;
   workflow?: { fault_report_id: number; outcome: string; total_processing_time_ms?: number } | null;
 }
 
@@ -109,6 +111,7 @@ export default function MaintenancePage() {
         customer_expertise: expertise,
         device_location: selectedDevice.location || selectedDevice.department,
         patient_connected: patientConnected,
+        generate_guidance: useLocal,
       };
       let support_context: SupportContext | undefined;
       if (useLocal) {
@@ -198,7 +201,7 @@ export default function MaintenancePage() {
       </Grid>
       <FormControlLabel control={<Switch checked={useLocal} disabled={busy} onChange={(event) => setUseLocal(event.target.checked)} />} label="معالجة الطلب واختيار المرجع بنموذج محلي مجاني" />
       {useLocal && <LocalModelPreparation model={localModel} disabled={busy} />}
-      <Alert severity="info" sx={{mt: 2}}>لا يحتاج النموذج إلى حساب خارجي أو مفتاح API. التنزيل الأول نحو 1.1 غيغابايت، ثم يعمل على جهازك. يصنّف الطلب ويقترح المرجع المناسب؛ تحدد قواعد الخادم الخطورة وتبقى الإجراءات خاضعة لمراجعة المختص.</Alert>
+      <Alert severity="info" sx={{mt: 2}}>لا يحتاج النموذج إلى حساب خارجي أو مفتاح API. التنزيل الأول نحو 1.1 غيغابايت، ثم يعمل على جهازك. يصنّف الطلب ويختار المرجع للأعطال الـ39، ويولّد إرشادات قصيرة للحالات الأخرى؛ تحدد قواعد الخادم الخطورة وتبقى الإجراءات خاضعة لمراجعة المختص.</Alert>
       {localModel.progress && <LocalModelProgress progress={localModel.progress} cancel={localModel.cancel} cancelLabel={localModel.preparing ? 'إلغاء التجهيز' : 'متابعة بالقواعد دون انتظار النموذج'} />}
       <Button variant="contained" onClick={runAnalysis} disabled={busy || localModel.preparing || (useLocal && !localModel.ready)} startIcon={busy ? <CircularProgress size={18} /> : <PsychologyIcon />} sx={{ mt: 3 }}>التحقق والتحليل</Button>
     </CardContent></Card>}
@@ -214,6 +217,7 @@ export default function MaintenancePage() {
         <Typography variant="body2">الجهاز: {analysis.device}</Typography>
         {analysis.customer_support.status !== 'SELECTED' && activeStep < 3 && <Button disabled={busy} onClick={() => {setAnalysis(null); setActiveStep(0); setDecision(''); setComments(''); setSuccess(''); setDecisionSaved(false); setActionTaken(''); setVerificationResult('');}} sx={{mt: 2}}>استكمال تفاصيل الطلب وإعادة التحليل</Button>}
       </CardContent></Card>}
+      <GeneratedGuidanceSummary guidance={analysis.generated_guidance} />
       <Grid container spacing={3}>
         <Grid item xs={12} md={5}><Card><CardContent>
           <Typography variant="h6" gutterBottom><SecurityIcon sx={{ verticalAlign: 'middle', mr: 1 }} />نتيجة التحقق والتصنيف</Typography>

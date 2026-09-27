@@ -21,6 +21,8 @@ import {
   CircularProgress,
   Select,
   FormControl,
+  FormControlLabel,
+  Switch,
   InputLabel,
 } from '@mui/material';
 import {
@@ -43,6 +45,7 @@ import { localModelConfig } from '../llm/localModelContract';
 import type { SupportContext } from '../llm/supportModelContract';
 import LocalModelProgress from '../components/LocalModelProgress';
 import LLMTriageSummary from '../components/LLMTriageSummary';
+import GeneratedGuidanceSummary from '../components/GeneratedGuidanceSummary';
 import CustomerSupportSummary from '../components/CustomerSupportSummary';
 
 interface FaultReport {
@@ -114,6 +117,7 @@ export default function FaultReportsPage() {
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const [decisionSaved, setDecisionSaved] = useState(false);
+  const [patientConnected, setPatientConnected] = useState(false);
   const localModel = useLocalModel();
   const [filterSeverity, setFilterSeverity] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
@@ -157,6 +161,7 @@ export default function FaultReportsPage() {
   };
 
   const handleOpenDialog = (report?: FaultReport) => {
+    setPatientConnected(false);
     setAiAnalysis(null); setDecisionSaved(false);
     if (report) {
       setEditingReport(report);
@@ -257,7 +262,8 @@ export default function FaultReportsPage() {
         fault: '',
         description: formData.error_message.trim(),
         customer_expertise: 'INTERMEDIATE',
-        patient_connected: false,
+        generate_guidance: useLlm,
+        patient_connected: patientConnected,
       };
       let support_context: SupportContext | undefined;
       if (useLlm) {
@@ -274,7 +280,7 @@ export default function FaultReportsPage() {
       const browser_llm = useLlm ? await localModel.run({
         report_text: supportRequest.description,
         device_type: selectedDevice.type.toUpperCase().replace(/[- ]/g, '_'),
-        patient_connected: false,
+        patient_connected: patientConnected,
         support_context,
       }, budget.inferenceMs()) : { status: 'disabled' as const, revision: localModelConfig.revision, latency_ms: 0 };
       if (!mounted.current) return;
@@ -285,6 +291,8 @@ export default function FaultReportsPage() {
         report_id: linkedReportId,
         alarm_code: '',
         error_message: formData.error_message.trim(),
+        patient_connected: patientConnected,
+        generate_guidance: useLlm,
         browser_llm: browser_llm || { status: 'disabled', revision: localModelConfig.revision, latency_ms: 0 },
       }, budget.requestOptions());
       setAiAnalysis(response.data);
@@ -606,6 +614,7 @@ export default function FaultReportsPage() {
                   />
                 </Grid>
               </Grid>
+              <FormControlLabel control={<Switch checked={patientConnected} onChange={event => setPatientConnected(event.target.checked)} disabled={analyzing} />} label="الجهاز موصول بالمريض حاليًا" />
               <Button
                 type="button"
                 variant="outlined"
@@ -621,7 +630,7 @@ export default function FaultReportsPage() {
                 تحليل سريع بالمراجع
               </Button>
               <Typography variant="caption" component="p" sx={{mt: 1}}>
-                جهّز النموذج أولًا لإضافة التصنيف واختيار المرجع. مهلة معالجة البلاغ بعد التجهيز 55 ثانية؛ التحليل السريع بالمراجع متاح دون تجهيز النموذج.
+                جهّز النموذج أولًا للتصنيف واختيار المرجع أو توليد إرشادات قصيرة للحالات الأخرى. مهلة معالجة البلاغ بعد التجهيز 55 ثانية؛ التحليل السريع بالمراجع متاح دون تجهيز النموذج.
               </Typography>
               <LocalModelPreparation model={localModel} disabled={analyzing} />
               {localModel.progress ? <LocalModelProgress progress={localModel.progress} cancel={localModel.cancel} cancelLabel={localModel.preparing ? 'إلغاء التجهيز' : 'متابعة بالمراجع دون انتظار النموذج'} />
@@ -649,6 +658,7 @@ export default function FaultReportsPage() {
               <Box sx={{ mt: 2 }}>
                 {error && <Alert severity="error" sx={{mb: 2}}>{error}</Alert>}
                 <LLMTriageSummary result={aiAnalysis} />
+                <GeneratedGuidanceSummary guidance={aiAnalysis.generated_guidance} />
                 {aiAnalysis.customer_support && <CustomerSupportSummary
                   support={aiAnalysis.customer_support} referenceFound={aiAnalysis.reference_found} />}
                 <Grid container spacing={2}>
