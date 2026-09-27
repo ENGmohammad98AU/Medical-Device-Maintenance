@@ -15,8 +15,8 @@ describe('bounded free generation', () => {
     const m = model();
     expect(await generateGuidance(m.instance, context, 40000)).toMatchObject({status: 'success', text});
     const options = m.createCompletion.mock.calls[0] as unknown as [{prompt: string; grammar?: string; max_tokens: number}];
-    expect(options[0].grammar).toContain('step ::= verb (" " word){2,4} "."');
-    expect(options[0].grammar).toContain('word ::= [^ ');
+    expect(options[0].grammar).toContain('step ::= verb " " [-a-zA-Z0-9 ');
+    expect(options[0].grammar).not.toContain('{2,4}');
     expect(options[0].grammar).not.toContain('"A"');
     expect(options[0].prompt).toContain(context.report_text);
     expect(options[0].max_tokens).toBe(config.max_new_tokens);
@@ -39,6 +39,7 @@ describe('bounded free generation', () => {
   it('requires Arabic when the report is Arabic', async () => {
     const m = model({...response, choices: [{text: '1. check the wheel for debris.\n2. inspect the visible axle.', finish_reason: 'stop'}]});
     expect((await generateGuidance(m.instance, {...context, report_text: 'عجلة العربة عالقة'}, 40000)).error_code).toBe('invalid_output');
+    expect(() => completeGuidance('1. Check the wheel for 磨损.\n2. Inspect the visible axle.')).toThrow('invalid_output');
   });
   it('does not spend tokens on blocked, oversized or exhausted requests', async () => {
     const m = model();

@@ -26,12 +26,11 @@ function prompt(context: GuidanceContext) {
 function guidanceGrammar(context: GuidanceContext) {
   const verbs = /[\u0600-\u06ff]/u.test(context.report_text)
     ? ['افحص', 'تحقق', 'سجل', 'سجّل'] : ['Check', 'Inspect', 'Record', 'Verify'];
-  // Only structure and inspection verbs are constrained. The model generates
-  // the component and check from the report; no stored answers are selected.
+  // Bound the format and script, not word spacing: a hard word count made the
+  // small model concatenate words. Components and checks remain generated.
   return 'root ::= "1. " step "\\n2. " step\n'
-    + 'step ::= verb (" " word){2,4} "."\n'
-    + 'verb ::= ' + verbs.map(verb => JSON.stringify(verb)).join(' | ') + '\n'
-    + 'word ::= [^ \\t\\r\\n<>.!?؟]{1,24}';
+    + 'step ::= verb " " [-a-zA-Z0-9 \\u0600-\\u06FF,;:\'()/]+ "."\n'
+    + 'verb ::= ' + verbs.map(verb => JSON.stringify(verb)).join(' | ') + '\n';
 }
 
 export function completeGuidance(text: string): string {
@@ -39,6 +38,7 @@ export function completeGuidance(text: string): string {
   // A cut-off sentence or a leaked reasoning/template token is not a draft.
   if (/(?:اسأل|اسال|استشر|اطلب من).{0,12}(?:المريض|مريض)|\b(?:ask|consult|question)\b.{0,15}\bpatient\b/iu.test(value)) throw new Error('invalid_output');
   if (value.length < 20 || value.length > 800 || /[<>]|https?:\/\//i.test(value)
+    || /[^\x20-\x7e\n\u0600-\u06ff]/u.test(value)
     || !/^1[.)] [^\n]+[.؟!?]\n+2[.)] [^\n]+[.؟!?]$/u.test(value)) throw new Error('invalid_output');
   return value;
 }
