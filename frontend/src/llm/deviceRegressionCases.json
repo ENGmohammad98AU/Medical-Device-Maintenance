@@ -1,0 +1,169 @@
+[
+  {
+    "name": "C6 / BATTARY LOW",
+    "model": "C6",
+    "manufacturer": "Hamilton Medical",
+    "device_name": "Hamilton C6 Ventilator",
+    "device_type": "VENTILATOR",
+    "report_text": "BATTARY LOW",
+    "expected_category": "POWER",
+    "expected_reference": "HAM-C6-001",
+    "expected_support": "A",
+    "candidates": [
+      {
+        "label": "A",
+        "reference_id": "HAM-C6-001",
+        "symptom": "Battery low / بطارية منخفضة"
+      },
+      {
+        "label": "B",
+        "reference_id": "HAM-C6-003",
+        "symptom": "Battery totally discharged / البطارية فارغة"
+      },
+      {
+        "label": "C",
+        "reference_id": "HAM-C6-002",
+        "symptom": "Battery power loss / لا توجد بطارية"
+      }
+    ]
+  },
+  {
+    "name": "C6 / Check flow sensor",
+    "model": "C6",
+    "manufacturer": "Hamilton Medical",
+    "device_name": "Hamilton C6 Ventilator",
+    "device_type": "VENTILATOR",
+    "report_text": "Check flow sensor",
+    "expected_category": "SENSOR",
+    "expected_reference": "HAM-C6-006",
+    "expected_support": "A",
+    "candidates": [
+      {
+        "label": "A",
+        "reference_id": "HAM-C6-006",
+        "symptom": "Check flow sensor / حساس التدفق"
+      },
+      {
+        "label": "B",
+        "reference_id": "HAM-C6-010",
+        "symptom": "Flow sensor calibration needed / معايرة حساس التدفق"
+      },
+      {
+        "label": "C",
+        "reference_id": "HAM-C6-008",
+        "symptom": "External flow sensor failed / تعطل حساس التدفق"
+      }
+    ]
+  },
+  {
+    "name": "MX800 / Resp LEADS OFF",
+    "model": "MX800",
+    "manufacturer": "Philips",
+    "device_name": "Philips IntelliVue MX800 Monitor",
+    "device_type": "PATIENT_MONITOR",
+    "report_text": "Resp LEADS OFF",
+    "expected_category": "SENSOR",
+    "expected_reference": "PH-MX800-013",
+    "expected_support": "A",
+    "candidates": [
+      {
+        "label": "A",
+        "reference_id": "PH-MX800-013",
+        "symptom": "Resp Leads Off / انفصال اقطاب التنفس"
+      }
+    ]
+  },
+  {
+    "name": "MX800 / SpO2 NO SENSOR",
+    "model": "MX800",
+    "manufacturer": "Philips",
+    "device_name": "Philips IntelliVue MX800 Monitor",
+    "device_type": "PATIENT_MONITOR",
+    "report_text": "SpO2 NO SENSOR",
+    "expected_category": "SENSOR",
+    "expected_reference": "PH-MX800-009",
+    "expected_support": "A",
+    "candidates": [
+      {
+        "label": "A",
+        "reference_id": "PH-MX800-009",
+        "symptom": "SpO2 No Sensor / حساس الاكسجة غير موصول"
+      },
+      {
+        "label": "B",
+        "reference_id": "PH-MX800-010",
+        "symptom": "SpO2 No Pulse / لا توجد نبضة spo2"
+      }
+    ]
+  },
+  {
+    "name": "MX800 / BATTARY LOW",
+    "model": "MX800",
+    "manufacturer": "Philips",
+    "device_name": "Philips IntelliVue MX800 Monitor",
+    "device_type": "PATIENT_MONITOR",
+    "report_text": "BATTARY LOW",
+    "expected_category": "POWER",
+    "expected_reference": null,
+    "expected_support": "D",
+    "candidates": []
+  },
+  {
+    "name": "Perfusor Space / BATTERY NEARLY EMPTY",
+    "model": "Perfusor Space",
+    "manufacturer": "B. Braun",
+    "device_name": "B. Braun Perfusor Space Syringe Pump",
+    "device_type": "SYRINGE_PUMP",
+    "report_text": "BATTERY NEARLY EMPTY",
+    "expected_category": "POWER",
+    "expected_reference": "BB-PS-002",
+    "expected_support": "A",
+    "candidates": [
+      {
+        "label": "A",
+        "reference_id": "BB-PS-002",
+        "symptom": "Battery nearly empty / بطارية منخفضة"
+      },
+      {
+        "label": "B",
+        "reference_id": "BB-PS-006",
+        "symptom": "Battery empty / نفاد البطارية"
+      },
+      {
+        "label": "C",
+        "reference_id": "BB-PS-001",
+        "symptom": "Syringe nearly empty / الحقنة قاربت علي النفاد"
+      }
+    ]
+  },
+  {
+    "name": "Perfusor Space / Syring drive blocked",
+    "model": "Perfusor Space",
+    "manufacturer": "B. Braun",
+    "device_name": "B. Braun Perfusor Space Syringe Pump",
+    "device_type": "SYRINGE_PUMP",
+    "report_text": "Syring drive blocked",
+    "expected_category": "MECHANICAL",
+    "expected_reference": "BB-PS-011",
+    "expected_support": "A",
+    "candidates": [
+      {
+        "label": "A",
+        "reference_id": "BB-PS-011",
+        "symptom": "Drive blocked / تعطل المحرك"
+      }
+    ]
+  },
+  {
+    "name": "MX800 / أريد معرفة سعر شراء الجهاز",
+    "model": "MX800",
+    "manufacturer": "Philips",
+    "device_name": "Philips IntelliVue MX800 Monitor",
+    "device_type": "PATIENT_MONITOR",
+    "report_text": "أريد معرفة سعر شراء الجهاز",
+    "expected_category": "UNKNOWN",
+    "expected_reference": null,
+    "expected_support": "E",
+    "candidates": []
+  }
+]

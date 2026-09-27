@@ -9,10 +9,11 @@ import { ArrowBack as ArrowBackIcon, CheckCircle as CheckCircleIcon, Psychology 
 import { useAuth } from '../hooks/useAuth';
 import api, { authService, isAuthenticationError } from '../services/auth';
 import LLMTriageSummary, { TriageMetadata } from '../components/LLMTriageSummary';
+import CustomerSupportSummary, {type CustomerSupportMetadata} from '../components/CustomerSupportSummary';
 import { useLocalModel } from '../hooks/useLocalModel';
 import LocalModelPreparation from '../components/LocalModelPreparation';
 import {createAnalysisBudget, ANALYSIS_TIMEOUT_TEXT} from '../llm/analysisBudget';
-import { localModelConfig, localErrorText, type LocalError } from '../llm/localModelContract';
+import { localModelConfig } from '../llm/localModelContract';
 import LocalModelProgress from '../components/LocalModelProgress';
 import type { SupportContext } from '../llm/supportModelContract';
 
@@ -27,8 +28,7 @@ interface AnalysisResult extends TriageMetadata {
   device: string; matched_fault: string; meaning: string; possible_causes: string;
   immediate_safety_action: string; recommended_solution: string; verification_before_return_to_service: string;
   source: string; reference_url: string; reference_page: string; match_confidence: number; match_status: string;
-  customer_support?: { status: string; scope: string; method: string; message: string;
-    questions: string[]; selected_reference_id?: string; result?: {error_code?: string} };
+  customer_support?: CustomerSupportMetadata;
   workflow?: { fault_report_id: number; outcome: string; total_processing_time_ms?: number } | null;
 }
 
@@ -210,11 +210,8 @@ export default function MaintenancePage() {
     {analysis && <>
       {analysis.customer_support && <Card sx={{mb: 3}}><CardContent>
         <Typography variant="h6" gutterBottom>نتيجة معالجة طلبك</Typography>
-        <Alert severity={analysis.customer_support.status === 'SELECTED' ? 'success' : 'info'}>{analysis.customer_support.message}</Alert>
-        {analysis.customer_support.result?.error_code && <Typography sx={{mt: 1}}>{localErrorText[analysis.customer_support.result.error_code as LocalError] || 'تعذر إكمال اختيار المرجع محليًا.'}</Typography>}
-        {analysis.customer_support.status === 'FALLBACK' && !analysis.reference_found && <Typography sx={{mt: 2}}>لا يوجد مرجع مطابق حاليًا. أضف رمز الإنذار ووصف الأعراض، أو اطلب مراجعة مهندس الأجهزة الطبية.</Typography>}
-        {analysis.customer_support.questions.map((question) => <Typography key={question} sx={{mt: 1}}>• {question}</Typography>)}
-        {analysis.customer_support.selected_reference_id && <Typography variant="body2" sx={{mt: 2}}>المرجع الذي اقترحه النموذج: {analysis.customer_support.selected_reference_id} — يحتاج اعتماد المختص.</Typography>}
+        <CustomerSupportSummary support={analysis.customer_support} referenceFound={analysis.reference_found} />
+        <Typography variant="body2">الجهاز: {analysis.device}</Typography>
         {analysis.customer_support.status !== 'SELECTED' && activeStep < 3 && <Button disabled={busy} onClick={() => {setAnalysis(null); setActiveStep(0); setDecision(''); setComments(''); setSuccess(''); setDecisionSaved(false); setActionTaken(''); setVerificationResult('');}} sx={{mt: 2}}>استكمال تفاصيل الطلب وإعادة التحليل</Button>}
       </CardContent></Card>}
       <Grid container spacing={3}>

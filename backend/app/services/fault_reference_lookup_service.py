@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.database.connection import SessionLocal
 from app.models.fault_reference_rule import FaultReferenceRule
+from app.services.fault_report_text import normalize_report_text
 
 
 NO_MATCH = {
@@ -55,7 +56,7 @@ class FaultReferenceLookupService:
 
     @staticmethod
     def _clean(value: str) -> str:
-        value = (value or "").casefold()
+        value = normalize_report_text(value or "").casefold()
         # Normalize common Arabic spelling variants so a natural report such as
         # "أقطاب" can match a verified alias written as "اقطاب".  Diacritics
         # and tatweel are presentation characters and must not affect lookup.
@@ -300,6 +301,14 @@ class FaultReferenceLookupService:
         if model and rule.model:
             if self._normalize_code(rule.model) != self._normalize_code(model):
                 return -1
+
+        # Similar wording (e.g. ECG vs Resp "leads off") must not cross an
+        # explicitly named measurement channel on the same monitor.
+        channels = {"ecg", "resp", "spo2", "nbp", "co2"}
+        query_channels = self._tokens(normalized_fault) & channels
+        rule_channels = self._tokens(rule.error_message) & channels
+        if query_channels and rule_channels and not query_channels & rule_channels:
+            return -1
 
         device_score = self._device_match_score(rule, normalized_device) if normalized_device else 1.0
 

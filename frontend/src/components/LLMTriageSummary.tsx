@@ -40,7 +40,9 @@ export default function LLMTriageSummary({ result }: { result: TriageMetadata })
     {result.llm?.reused_result && <Typography variant="body2" sx={{mb: 1}}>أُعيد استخدام نتيجة النموذج لنفس الوصف والسياق خلال هذه الجلسة، مع إعادة تحقق الخادم من المراجع.</Typography>}
     {result.llm?.client_reported && result.llm.status === 'success' && <Typography variant="caption" component="p" sx={{mb: 1}}>نتيجة أرسلها المتصفح؛ يتحقق الخادم من بنيتها وسياقها، ولا يثبت ذلك تنفيذ النموذج أو صحة اقتراحه.</Typography>}
     {unavailable && <Alert severity="warning" sx={{ mb: 1 }}>
-      {result.llm?.provider === 'browser-local'
+      {result.llm?.error_code === 'browser_prompt_mismatch'
+        ? 'تغير إصدار معالجة البلاغ. حدّث الصفحة وجهّز النموذج ثم أعد التحليل. '
+        : result.llm?.provider === 'browser-local'
         ? `${localErrorText[result.llm.error_code as LocalError] || 'لم تتوفر نتيجة محلية صالحة لهذا البلاغ.'} `
         : result.llm?.error_code === 'rate_limit'
         ? 'بلغ مزوّد النموذج حد الاستخدام المتاح مؤقتًا. يمكنك المحاولة لاحقًا. '

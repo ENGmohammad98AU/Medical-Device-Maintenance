@@ -16,6 +16,7 @@ class BrowserLLMResult(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     status: Literal["success", "error", "disabled"]
     revision: str = Field(max_length=40)
+    prompt_version: Optional[str] = Field(default=None, max_length=80)
     output_token: Optional[Literal["A", "B", "C", "D", "E", "F", "G", "H"]] = None
     input_sha256: Optional[str] = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     latency_ms: float = Field(default=0, ge=0, le=2700000, allow_inf_nan=False)
@@ -62,6 +63,11 @@ def browser_run(result: BrowserLLMResult, *, report_text: str, device_type: str,
         reused_result=result.reused_result,
     )
     if result.status != "success":
+        return run
+    if result.prompt_version != MANIFEST["prompt_version"]:
+        run.prompt_version = result.prompt_version or "legacy-unreported"
+        run.prompt_sha256 = ""
+        run.status, run.error_code = "invalid_response", "browser_prompt_mismatch"
         return run
     expected_hash = browser_input_hash(report_text, device_type, patient_connected)
     if result.revision != MANIFEST["revision"] or result.input_sha256 != expected_hash:

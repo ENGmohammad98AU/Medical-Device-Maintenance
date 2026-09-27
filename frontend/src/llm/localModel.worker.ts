@@ -65,6 +65,7 @@ self.addEventListener('message', async (event: MessageEvent<{id: number; input?:
     }
     self.postMessage({id, result: {
       status: 'success', revision: config.revision, output_token, support,
+      prompt_version: config.prompt_version,
       runtime: `wllama-3.6.1/${computeBackend}`,
       input_sha256: await inputHash(input), latency_ms: Math.round(performance.now() - started),
     }});

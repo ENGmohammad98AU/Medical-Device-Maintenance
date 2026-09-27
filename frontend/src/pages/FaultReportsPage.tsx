@@ -43,6 +43,7 @@ import { localModelConfig } from '../llm/localModelContract';
 import type { SupportContext } from '../llm/supportModelContract';
 import LocalModelProgress from '../components/LocalModelProgress';
 import LLMTriageSummary from '../components/LLMTriageSummary';
+import CustomerSupportSummary from '../components/CustomerSupportSummary';
 
 interface FaultReport {
   id: number;
@@ -328,13 +329,14 @@ export default function FaultReportsPage() {
     }
   };
 
-  const approveAnalysis = async () => {
+  const saveAnalysisDecision = async (decision: 'APPROVED' | 'ESCALATED') => {
     if (!aiAnalysis?.audit_log_id) return;
     try {
       await api.post(`/api/intelligent-support/audit-logs/${aiAnalysis.audit_log_id}/decision`, null, {
-        params: { decision: 'APPROVED', comments: 'Approved from fault report analysis view' },
+        params: { decision, comments: decision === 'APPROVED' ? 'Approved from fault report analysis view' : 'Missing reference; escalated for specialist review' },
       });
       setDecisionSaved(true);
+      void fetchReports();
     } catch (err: any) {
       setError(typeof err.response?.data?.detail === 'string' ? err.response.data.detail : 'تعذر حفظ قرار المختص');
     }
@@ -645,7 +647,10 @@ export default function FaultReportsPage() {
           <DialogContent>
             {aiAnalysis && (
               <Box sx={{ mt: 2 }}>
+                {error && <Alert severity="error" sx={{mb: 2}}>{error}</Alert>}
                 <LLMTriageSummary result={aiAnalysis} />
+                {aiAnalysis.customer_support && <CustomerSupportSummary
+                  support={aiAnalysis.customer_support} referenceFound={aiAnalysis.reference_found} />}
                 <Grid container spacing={2}>
                   <Grid item xs={12} sm={6}>
                     <Typography variant="subtitle2" gutterBottom>
@@ -681,7 +686,7 @@ export default function FaultReportsPage() {
                     <Typography variant="subtitle2" gutterBottom>
                       السبب المحتمل / Possible Cause:
                     </Typography>
-                    <Typography variant="body1">{aiAnalysis.possible_causes || aiAnalysis.customer_support?.message || 'لم يتوفر سبب مرجعي مناسب'}</Typography>
+                    <Typography variant="body1">{aiAnalysis.possible_causes || 'لم يتوفر سبب مرجعي مناسب'}</Typography>
                   </Grid>
                   <Grid item xs={12}>
                     <Typography variant="subtitle2" gutterBottom>
@@ -717,9 +722,13 @@ export default function FaultReportsPage() {
             )}
           </DialogContent>
           <DialogActions>
+            {aiAnalysis && !aiAnalysis.reference_found && <Button onClick={() => setAiDialogOpen(false)}>
+              استكمال الوصف وإعادة التحليل
+            </Button>}
             {aiAnalysis?.workflow?.fault_report_id && !decisionSaved && (
-              <Button color="success" variant="contained" onClick={approveAnalysis}>
-                اعتماد التوصية كمختص
+              <Button color={aiAnalysis.reference_found ? 'success' : 'warning'} variant="contained"
+                onClick={() => saveAnalysisDecision(aiAnalysis.reference_found ? 'APPROVED' : 'ESCALATED')}>
+                {aiAnalysis.reference_found ? 'اعتماد التوصية كمختص' : 'إحالة لمهندس الأجهزة الطبية'}
               </Button>
             )}
             {decisionSaved && <Chip color="success" label="تم حفظ قرار المختص" />}

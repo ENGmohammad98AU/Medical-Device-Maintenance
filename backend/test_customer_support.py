@@ -72,6 +72,8 @@ def test_abstention_suppresses_repairs_but_preserves_emergency(api_client, monke
     assert body["troubleshooting_steps"] == [] and not body["rag_sources"]
     assert body["is_emergency"] and body["routing_target"] == "CLINICAL_TEAM"
     assert body["customer_support"]["status"] == ("OUT_OF_SCOPE" if token == "E" else "NEEDS_DETAILS")
+    if token == "E":
+        assert body["customer_support"]["questions"] == []
 
 
 @pytest.mark.parametrize("change", [{"description": "Battery low but there is a different new symptom"}, {"patient_connected": True}, {"customer_expertise": "EXPERT"}])

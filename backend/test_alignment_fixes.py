@@ -77,7 +77,7 @@ def test_legacy_analysis_uses_reference_database():
         department="ICU", status=DeviceStatus.OPERATIONAL,
     )
     db.add(device); db.commit(); db.refresh(device)
-    assert FaultReferenceLookupService(db).load_rules_from_json("reference_data/medical_device_fault_reference.json") == 39
+    assert FaultReferenceLookupService(db).load_rules_from_json("reference_data/medical_device_fault_reference.json") == 45
     rule = db.query(FaultReferenceRule).filter(FaultReferenceRule.model == "C6").first()
     fault = rule.error_message or rule.alarm_code or rule.fault_code or rule.description
     result = AIService(db).analyze_fault(device.id, fault, rule.description or fault)

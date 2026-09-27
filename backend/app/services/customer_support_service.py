@@ -11,6 +11,7 @@ from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from app.services.fault_reference_lookup_service import FaultReferenceLookupService, NO_MATCH
 from app.services.llm_triage_service import redact_report
+from app.services.fault_report_text import normalize_report_text
 
 MANIFEST = json.loads((Path(__file__).parent / "support_llm_manifest.json").read_text(encoding="utf-8"))
 PROMPT_HASH = hashlib.sha256(json.dumps(MANIFEST, sort_keys=True).encode()).hexdigest()
@@ -57,6 +58,24 @@ def prepare_support(request, device, db):
     return context, references
 
 
+def clarification_questions(context):
+    questions = ["ما رسالة الخطأ أو رمز الإنذار كما يظهر على الجهاز؟",
+                 "متى بدأت المشكلة، وما السلوك الذي تلاحظه؟"]
+    identity = context["device_name"].casefold()
+    report = normalize_report_text(context["report_text"]).casefold()
+    if "philips" in identity and "mx800" in identity:
+        if "batt" in report or "بطاري" in report:
+            questions.append("هل إنذار البطارية صادر عن شاشة MX800 أم وحدة X2/X3 أو جهاز طاقة ملحق؟ حدّد اسم الوحدة وموديلها.")
+        else:
+            questions.append("ما قناة القياس التي يظهر فيها الإنذار: ECG أم Resp أم SpO2 أم NBP؟")
+    elif "hamilton" in identity and "c6" in identity:
+        questions.append("هل الجهاز يعمل على الكهرباء أم البطارية، وهل الإنذار متعلق بالطاقة أو الأكسجين أو دائرة التنفس؟")
+    elif "perfusor" in identity and "space" in identity:
+        questions.append("هل الإنذار متعلق بالبطارية أم تثبيت المحقنة أم ضغط خط التسريب؟ وهل الضخ متوقف؟")
+    questions.append("هل اسم الجهاز والمصنع والموديل المحدد صحيحة؟")
+    return questions
+
+
 def resolve_support(context, references, result, llm_run, fallback):
     """Return a server-owned reference, review metadata and fallback suppression."""
     metadata = {
@@ -65,10 +84,14 @@ def resolve_support(context, references, result, llm_run, fallback):
         "message": "النتيجة الحالية من البحث المرجعي؛ لم تتوفر مشاركة صالحة للنموذج في اختيار الحل.",
         "guards": [],
         "questions": [], "requires_review": True, "client_reported": result is not None,
+        "reference_status": "CANDIDATES_AVAILABLE" if references else "NO_MATCHING_REFERENCE",
         "prompt_version": MANIFEST["version"], "prompt_sha256": PROMPT_HASH,
         "model": llm_run.model, "model_revision": llm_run.model_revision,
         "runtime": llm_run.runtime, "result": result.model_dump() if result else None,
     }
+    if not references:
+        metadata["message"] = "لا يوجد مرجع فني مطابق لهذا البلاغ والجهاز في قاعدة المعرفة الحالية. يلزم استكمال التفاصيل أو مراجعة مهندس الأجهزة الطبية."
+        metadata["questions"] = clarification_questions(context)
     if result is None or result.status != "success":
         return fallback, metadata, False
     if (llm_run.status != "success" or result.version != MANIFEST["version"]
@@ -90,13 +113,12 @@ def resolve_support(context, references, result, llm_run, fallback):
                         message="اختار النموذج مرجعًا للأعراض المذكورة. الحل أدناه من نص المرجع ويتطلب اعتماد المختص.")
         return selected, metadata, True
     if token == "E":
-        metadata.update(status="OUT_OF_SCOPE", scope="OUT_OF_SCOPE",
+        metadata.update(status="OUT_OF_SCOPE", scope="OUT_OF_SCOPE", questions=[],
                         message="يبدو أن الطلب خارج نطاق الدعم الفني للأجهزة الطبية. وضّح إن كان يتعلق بعطل جهاز؛ أما العلاج أو الدواء فراجع الفريق السريري، والطلبات الإدارية تُوجّه إلى خدمة العملاء المختصة.")
     else:
         unclear = llm_run.browser_category == "UNKNOWN" or bool(references)
         metadata.update(status="NEEDS_DETAILS" if unclear else "NO_REFERENCE", scope="UNCONFIRMED" if unclear else "IN_SCOPE",
-                        message="لم يختر النموذج حلًا مرجعيًا مناسبًا. أضف التفاصيل التالية أو أحل الطلب إلى مهندس الأجهزة الطبية.",
-                        questions=["ما رسالة الخطأ أو رمز الإنذار كما يظهر على الجهاز؟",
-                                   "متى بدأت المشكلة، وما السلوك الذي تلاحظه؟",
-                                   "هل اسم الجهاز والمصنع والموديل المحدد صحيحة؟"])
+                        message=("لم يعتمد النموذج مرجعًا من المراجع المرشحة. أجب عن الأسئلة التالية لاستكمال التحليل."
+                                 if references else metadata["message"]),
+                        questions=clarification_questions(context))
     return dict(NO_MATCH), metadata, True
