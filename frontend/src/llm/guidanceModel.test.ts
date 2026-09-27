@@ -1,6 +1,6 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import type { Wllama } from '@wllama/wllama';
-import {generateGuidance, guidanceModelConfig as config} from './guidanceModel';
+import {completeGuidance, generateGuidance, guidanceModelConfig as config} from './guidanceModel';
 
 const context = {version: config.version, input_sha256: 'a'.repeat(64), device_name: 'Hamilton C6', report_text: 'The trolley wheel is jammed.'};
 const text = '1. افحص العجلة بصريًا بحثًا عن عائق.\n2. سجّل موضع التعليق وحالة الفرامل الظاهرة.';
@@ -25,6 +25,10 @@ describe('bounded free generation', () => {
       {...response, choices: [{text: text.slice(0, -4), finish_reason: 'stop'}]},
       {...response, choices: [{text: '<think>draft</think>' + text, finish_reason: 'stop'}]},
     ]) expect(await generateGuidance(model(value).instance, context, 40000)).toMatchObject({status: 'error', error_code: 'invalid_output'});
+  });
+  it('accepts Markdown line-break spaces without changing the generated sentences', () => {
+    expect(completeGuidance(text.replace('\n', '  \n'))).toBe(text);
+    expect(() => completeGuidance('1. check the wheel for debris.  \n2. inspect the visible axle.')).toThrow('invalid_output');
   });
   it('does not spend tokens on blocked, oversized or exhausted requests', async () => {
     const m = model();

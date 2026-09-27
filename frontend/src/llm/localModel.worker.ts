@@ -57,6 +57,7 @@ self.addEventListener('message', async (event: MessageEvent<{id: number; input?:
       guidance = output_token === 'H'
         ? {status: 'error', version: context.version, input_sha256: context.input_sha256, latency_ms: 0, error_code: 'out_of_scope'}
         : await generateGuidance(loaded, context, Math.min(45_000, event.data.inference_budget_ms ?? 45_000) - (performance.now() - inferenceStarted));
+      if (computeBackend === 'webgpu' && guidance.error_code === 'load_failed') throw new Error('generation_failed');
     } else if (input.support_context) {
       self.postMessage({id, progress: {stage: 'running', task: 'reference_selection', storage_mode: storageMode, compute_backend: computeBackend}});
       const supportStarted = performance.now();

@@ -98,9 +98,12 @@ def resolve_guidance(context, result, llm_run, *, patient_connected, is_emergenc
         metadata["error_code"] = result.error_code
         if result.error_code == "timeout":
             metadata["message"] = "انتهت مهلة التوليد دون مسودة مكتملة؛ لم يُعرض نص مقطوع. أعد المحاولة أو اطلب مراجعة المختص."
+        elif result.error_code == "input_too_long":
+            metadata["message"] = "الوصف أطول من سعة التوليد المحلي. اختصره مع إبقاء اسم الجزء ورسالة الخطأ والأعراض المهمة."
         return metadata
     text = result.text.strip()
-    if (UNSAFE.search(text) or not re.fullmatch(r"1[.)] [^\n]+[.؟!?]\n+2[.)] [^\n]+[.؟!?]", text)
+    if (UNSAFE.search(text) or not re.search(r"[\u0600-\u06ff]", text)
+            or not re.fullmatch(r"1[.)] [^\n]+[.؟!?]\n+2[.)] [^\n]+[.؟!?]", text)
             or redact_report(text) != text):
         metadata.update(status="BLOCKED", error_code="content_rejected",
                         message="لم تجتز المسودة فحص المحتوى؛ يلزم مهندس الأجهزة الطبية لاستكمال الإرشادات.")

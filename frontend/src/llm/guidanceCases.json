@@ -19,5 +19,12 @@
     "device_type": "SYRINGE_PUMP",
     "report_text": "The carrying handle is cracked near its hinge.",
     "relevance": "مقبض|مفصل|تشق|كسر|شرخ"
+  },
+  {
+    "name": "Hamilton C6 Arabic wheel report",
+    "device_name": "Hamilton C6 Ventilator (Hamilton Medical C6)",
+    "device_type": "VENTILATOR",
+    "report_text": "عجلة عربة جهاز التنفس عالقة ولا تدور.",
+    "relevance": "عجل|حرك|دور|فرامل"
   }
 ]
