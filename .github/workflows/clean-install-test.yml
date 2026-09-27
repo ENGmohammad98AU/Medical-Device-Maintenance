@@ -43,6 +43,20 @@ jobs:
       - name: Measure real generation for all three devices
         working-directory: frontend
         run: npm run benchmark:prepared -- --generation
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+      - name: Validate decoded answers through the production API
+        working-directory: backend
+        env:
+          DATABASE_URL: sqlite:///./database/medical_ai.db
+          SQLITE_FALLBACK: "true"
+          MDM_GENERATION_BENCHMARK: ../frontend/benchmark-results/prepared-generation.json
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pytest -q test_generation_benchmark.py
       - name: Save generation text and timing evidence
         if: always()
         uses: actions/upload-artifact@v4

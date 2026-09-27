@@ -1,6 +1,13 @@
 import {formatQwenMessages} from './ggufChoice.js';
 export {formatQwenMessages};
 
+export async function warmGgufPrefix(model, prompt) {
+  // One discarded token ensures the runtime evaluates and caches the prefix.
+  // It is replaced by the actual report, never reused as an answer.
+  await model.createCompletion({prompt, stream: false, max_tokens: 1,
+    temperature: 0, seed: 0, cache_prompt: true});
+}
+
 // One model with four prompt slots. The pinned runtime selects a slot by
 // prefix similarity; its C++ bridge does not forward explicit id_slot values.
 // The real-model benchmark verifies cache reuse across alternating tasks.

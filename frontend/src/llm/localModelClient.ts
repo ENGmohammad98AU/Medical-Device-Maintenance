@@ -15,7 +15,7 @@ export class LocalModelClient {
   private results = new Map<string, {at: number; result: LocalResult}>();
   prepare(onProgress: (progress: LocalProgress) => void): Promise<LocalResult> {
     if (this.ready && !this.pending) return Promise.resolve({status: 'success', revision: localModelConfig.revision,
-      latency_ms: 0, preparation_ms: 0});
+      latency_ms: 0, preparation_ms: 0, preparation_version: localModelConfig.preparation_version});
     return this.request(undefined, onProgress);
   }
   run(input: LocalInput, onProgress: (progress: LocalProgress) => void, budgetMs = LOCAL_INFERENCE_TIMEOUT_MS): Promise<LocalResult> {

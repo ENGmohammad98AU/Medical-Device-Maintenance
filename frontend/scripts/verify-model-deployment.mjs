@@ -25,6 +25,7 @@ async function verify() {
   const workerUrl = new URL(worker, new URL(entry, base)).href;
   const code = await (await resource(workerUrl)).text();
   if (!code.includes(engine + '/') || !code.includes(engine + '.wasm')) throw new Error('Waiting for the expected production worker');
+  if (expected.preparation_version && !code.includes(expected.preparation_version)) throw new Error('Waiting for the expected preparation worker');
   if (!app.includes(guidance.version) || !code.includes(guidance.version)) throw new Error('Waiting for the English generation frontend');
   const health = await (await resource('health', api)).json();
   if (health.status !== 'healthy' || health.guidance_version !== guidance.version || health.output_language !== 'en') {
@@ -43,6 +44,7 @@ async function verify() {
   }
   return {checked_at: new Date().toISOString(), origin: base, runtime: expected.runtime,
     model_revision: expected.revision, manifest_match: true, entry, worker, legacy_assets_present: true,
+    preparation_version: expected.preparation_version,
     guidance_version: guidance.version, output_language: health.output_language, api_origin: api, backend_healthy: true,
     scope: 'Public frontend assets and backend version only; authenticated report processing and GPU hardware are not checked.'};
 }

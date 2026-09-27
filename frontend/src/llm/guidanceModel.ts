@@ -1,6 +1,7 @@
 import type { Wllama } from '@wllama/wllama';
 import config from './guidanceModelConfig.json';
-import { formatQwenMessages } from './fastGgufChoice.js';
+import { formatQwenMessages, warmGgufPrefix } from './fastGgufChoice.js';
+import { formatQwenUserPrefix } from './ggufChoice.js';
 
 export { config as guidanceModelConfig };
 export interface GuidanceReference {
@@ -18,11 +19,19 @@ export interface GuidanceResult {
   error_code?: 'timeout' | 'input_too_long' | 'invalid_output' | 'load_failed' | 'not_allowed' | 'out_of_scope';
 }
 type Model = Pick<Wllama, 'createCompletion'>;
+const ENGLISH_INSTRUCTION = 'Answer in English only, in fewer than 65 words. '
+  + 'Do not repeat the device name. Give only external checks; never recommend repair or replacement of parts, even if the reference mentions them. '
+  + 'If reference is null, state that the cause is unconfirmed. Suggest one external visual check of the part named in the report. '
+  + 'Do not invent components, observations or causes. You have not inspected this device. Do not request alarm details when no alarm is reported.\n';
 
 function prompt(context: GuidanceContext, referenceId?: string | null) {
   if (context.version !== config.version) throw new Error('invalid_output');
   // Bound prefill work without silently truncating the report.
   if (context.report_text.length > 1600 || context.device_name.length > 400) throw new Error('input_too_long');
+  // Server contexts append the manufacturer and model in parentheses after the
+  // display name. Send that exact identity once; the full name stays bound to
+  // the server context and visible in the UI. Unformatted names are preserved.
+  const device = context.device_name.match(/\(([^()]+)\)$/)?.[1] || context.device_name;
   const reference = context.references?.find(item => item.reference_id === referenceId);
   if (referenceId && !reference) throw new Error('invalid_output');
   if (reference && reference.evidence.length > 6000) throw new Error('input_too_long');
@@ -33,11 +42,10 @@ function prompt(context: GuidanceContext, referenceId?: string | null) {
     field => ({'possible_causes:': 'Causes:', 'immediate_safety_action:': 'Safety:',
       'recommended_solution:': 'Solution:', 'verification_before_return_to_service:': 'Verification:'}[field]!));
   return formatQwenMessages([{role: 'system', content: config.system_prompt},
-    {role: 'user', content: 'Answer in English only, in fewer than 65 words.\n'
-      + JSON.stringify({device: context.device_name, report: context.report_text,
+    {role: 'user', content: ENGLISH_INSTRUCTION
+      + JSON.stringify({device, report: context.report_text,
       reference: reference ? {symptom: reference.symptom, evidence} : null})
-      + (reference ? ''
-        : '\nNo manufacturer reference matched. State that the cause is unconfirmed. Suggest one external visual check of the part named in the report. Do not invent components, observations or causes. You have not inspected this device. Do not request alarm details when no alarm is reported.')
+      + (reference ? '\nNo replacement advice.' : '')
       }]);
 }
 
@@ -57,9 +65,8 @@ export function completeGuidance(text: string): string {
 }
 
 export async function warmGuidance(model: Model) {
-  const options = {prompt: prompt({version: config.version, input_sha256: '', device_name: '', report_text: ''}),
-    stream: false as const, max_tokens: 1, temperature: 0, cache_prompt: true, seed: 0};
-  await model.createCompletion(options);
+  await warmGgufPrefix(model, formatQwenUserPrefix([{role: 'system', content: config.system_prompt}],
+    ENGLISH_INSTRUCTION + '{"device":"'));
 }
 
 export async function generateGuidance(model: Model, context: GuidanceContext, budgetMs: number,

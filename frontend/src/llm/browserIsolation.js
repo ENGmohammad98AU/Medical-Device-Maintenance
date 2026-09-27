@@ -34,6 +34,10 @@ export async function prepareIsolation(workerUrl) {
 }
 
 export function inferenceThreads() {
-  return globalThis.crossOriginIsolated && typeof SharedArrayBuffer !== 'undefined'
-    ? Math.max(1, Math.min(4, navigator.hardwareConcurrency || 1)) : 1;
+  if (!globalThis.crossOriginIsolated || typeof SharedArrayBuffer === 'undefined') return 1;
+  const cores = Math.max(1, navigator.hardwareConcurrency || 1);
+  const mobile = navigator.userAgentData?.mobile || /Android|iPhone|iPad/i.test(navigator.userAgent || '');
+  // Keep the existing cap on smaller/mobile devices. Larger desktops can use
+  // more cores, while reserving a logical processor for the application UI.
+  return !mobile && cores >= 8 ? Math.min(8, cores - 1) : Math.min(4, cores);
 }

@@ -37,8 +37,8 @@ Classification, selection and generation share the existing 45-second inference
 budget. A timeout or token cutoff returns an explicit failure, not truncated text.
 Preparation and the first model download are separate. Longer free text costs
 more inference than a reference-selection token; timing depends on the device.
-The shared language instruction is warmed before report submission, and only
-evidence field labels are shortened; the full manufacturer sentences are retained.
+Shared language and no-reference instructions are warmed before report
+submission, and only evidence field labels are shortened; the full manufacturer sentences are retained.
 
 After updating both backend and frontend, restart the backend, refresh the browser
 and prepare the model again. Old prompt versions are rejected. Report-entry
@@ -63,7 +63,10 @@ The generation benchmark uses synthetic development cases for all three devices,
 including an Arabic report and selected manufacturer evidence. It checks actual
 decoding, English output, relevance, selected source identifier and timing. It is
 not an independent factual-accuracy or clinical-safety evaluation. The fixed
-40-case classification benchmark is unchanged.
+40-case classification benchmark is unchanged. CI also replays the actual
+decoded text through the isolated production API to check acceptance and source
+binding. See [Model preparation](MODEL_PREPARATION.md) for the faster warmup,
+measured timings and the v13 component-replacement instruction.
 
 Runtime references: [Qwen3-1.7B model card](https://huggingface.co/Qwen/Qwen3-1.7B)
 and [wllama completion API](https://github.ngxson.com/wllama/docs/classes/Wllama.html).
