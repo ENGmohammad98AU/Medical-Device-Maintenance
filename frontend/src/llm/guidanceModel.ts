@@ -20,12 +20,13 @@ function prompt(context: GuidanceContext) {
   if (context.report_text.length > 1600 || context.device_name.length > 400) throw new Error('input_too_long');
   return formatQwenMessages([{role: 'system', content: config.system_prompt},
     {role: 'user', content: JSON.stringify({device: context.device_name, report: context.report_text})
-      + (/[\u0600-\u06ff]/u.test(context.report_text) ? '\nاكتب الخطوتين بالعربية لهذا العطل تحديدًا.' : '\nWrite the two steps in English for this fault.')}]);
+      + (/[\u0600-\u06ff]/u.test(context.report_text) ? '\nاكتب خطوتين بالعربية لفني الصيانة الذي يفحص الجهاز.' : '\nWrite the two steps in English for this fault.')}]);
 }
 
 export function completeGuidance(text: string): string {
   const value = text.trim().split('\n').map(line => line.trim()).join('\n');
   // A cut-off sentence or a leaked reasoning/template token is not a draft.
+  if (/(?:اسأل|اسال|استشر|اطلب من).{0,12}(?:المريض|مريض)|\b(?:ask|consult|question)\b.{0,15}\bpatient\b/iu.test(value)) throw new Error('invalid_output');
   if (value.length < 20 || value.length > 800 || /[<>]|https?:\/\//i.test(value)
     || !/^1[.)] [^\n]+[.؟!?]\n+2[.)] [^\n]+[.؟!?]$/u.test(value)) throw new Error('invalid_output');
   return value;

@@ -93,7 +93,8 @@ def test_patient_and_unclear_guards_suppress_even_forged_complete_text(api_clien
 
 @pytest.mark.parametrize('text', ['1. افتح الغطاء وأصلح اللوحة.\n2. أعد تشغيل الجهاز.',
                                   '1. Adjust the alarm limit.\n2. Return the device to use.',
-                                  '1. افحص العجلة بصريًا.\n2. إذا وجدت تلفًا فلا'])
+                                  '1. افحص العجلة بصريًا.\n2. إذا وجدت تلفًا فلا',
+                                  '1. افحص العجلة بصريًا.\n2. اسأل المريض عن حالة العجلة.'])
 def test_dangerous_and_truncated_drafts_are_not_displayed(api_client, text):
     client, _, _ = api_client
     request, context = prepare(client)

@@ -62,6 +62,7 @@ def prepare_guidance(request, device, references):
 # Reject intrusive/clinical procedures, invented links and leaked instructions.
 # A draft that passes still requires a qualified human review before any action.
 UNSAFE = re.compile(
+    r"(?:اسأل|اسال|استشر|اطلب من).{0,12}(?:المريض|مريض)|\b(?:ask|consult|question)\b.{0,15}\bpatient\b|"
     r"https?://|[<>]|(?:open|remove|unscrew).{0,25}(?:cover|housing|case)|"
     r"\b(?:calibrat\w*|reboot|reset|bypass|dosage|dose|sedat\w*|solder\w*)\b|"
     r"(?:disable|silence|change|adjust).{0,25}(?:alarm|limit|flow|rate|pressure|voltage)|"

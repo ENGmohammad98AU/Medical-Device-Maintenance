@@ -30,6 +30,10 @@ describe('bounded free generation', () => {
     expect(completeGuidance(text.replace('\n', '  \n'))).toBe(text);
     expect(completeGuidance('1. check the wheel for debris.  \n2. inspect the visible axle.')).toBe('1. check the wheel for debris.\n2. inspect the visible axle.');
   });
+  it('rejects instructions addressed to a patient in an off-patient technical draft', () => {
+    expect(() => completeGuidance('1. افحص العجلة بصريًا.\n2. اسأل المريض عن حالة العجلة.')).toThrow('invalid_output');
+    expect(() => completeGuidance('1. Check the wheel for debris.\n2. Ask the patient about the wheel.')).toThrow('invalid_output');
+  });
   it('requires Arabic when the report is Arabic', async () => {
     const m = model({...response, choices: [{text: '1. check the wheel for debris.\n2. inspect the visible axle.', finish_reason: 'stop'}]});
     expect((await generateGuidance(m.instance, {...context, report_text: 'عجلة العربة عالقة'}, 40000)).error_code).toBe('invalid_output');
