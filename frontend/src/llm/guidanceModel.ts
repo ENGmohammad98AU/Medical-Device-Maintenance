@@ -25,7 +25,7 @@ function prompt(context: GuidanceContext) {
 
 function guidanceGrammar(context: GuidanceContext) {
   const verbs = /[\u0600-\u06ff]/u.test(context.report_text)
-    ? ['افحص', 'تحقق', 'سجل', 'سجّل'] : ['Check', 'Inspect', 'Record', 'Verify'];
+    ? ['افحص', 'سجل', 'سجّل'] : ['Check', 'Inspect', 'Record', 'Verify'];
   // Bound the format and script, not word spacing: a hard word count made the
   // small model concatenate words. Components and checks remain generated.
   return 'root ::= "1. " step "\\n2. " step\n'

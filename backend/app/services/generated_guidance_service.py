@@ -26,7 +26,7 @@ class BrowserGuidanceResult(BaseModel):
     text: Optional[str] = Field(default=None, min_length=20, max_length=800)
     finish_reason: Optional[Literal["stop"]] = None
     prompt_tokens: Optional[int] = Field(default=None, ge=1, le=1024)
-    completion_tokens: Optional[int] = Field(default=None, ge=1, le=64)
+    completion_tokens: Optional[int] = Field(default=None, ge=1, le=80)
     error_code: Optional[Literal["timeout", "input_too_long", "invalid_output", "load_failed", "not_allowed", "out_of_scope"]] = None
 
     @model_validator(mode="after")
