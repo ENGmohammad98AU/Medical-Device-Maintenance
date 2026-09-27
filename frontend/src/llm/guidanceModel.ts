@@ -26,12 +26,19 @@ function prompt(context: GuidanceContext, referenceId?: string | null) {
   const reference = context.references?.find(item => item.reference_id === referenceId);
   if (referenceId && !reference) throw new Error('invalid_output');
   if (reference && reference.evidence.length > 6000) throw new Error('input_too_long');
+  // Shorten field labels only; retain every sentence of manufacturer evidence.
+  // Put the shared language instruction before report data so preparation can
+  // cache it instead of evaluating it again on each slower CPU request.
+  const evidence = reference?.evidence.replace(/^(possible_causes|immediate_safety_action|recommended_solution|verification_before_return_to_service):/gm,
+    field => ({'possible_causes:': 'Causes:', 'immediate_safety_action:': 'Safety:',
+      'recommended_solution:': 'Solution:', 'verification_before_return_to_service:': 'Verification:'}[field]!));
   return formatQwenMessages([{role: 'system', content: config.system_prompt},
-    {role: 'user', content: JSON.stringify({device: context.device_name, report: context.report_text,
-      reference: reference ? {symptom: reference.symptom, evidence: reference.evidence} : null})
+    {role: 'user', content: 'Answer in English only, in fewer than 65 words.\n'
+      + JSON.stringify({device: context.device_name, report: context.report_text,
+      reference: reference ? {symptom: reference.symptom, evidence} : null})
       + (reference ? ''
         : '\nNo manufacturer reference matched. State that the cause is unconfirmed. Suggest one external visual check of the part named in the report. Do not invent components, observations or causes. You have not inspected this device. Do not request alarm details when no alarm is reported.')
-      + '\nAnswer in English only, in fewer than 65 words.'}]);
+      }]);
 }
 
 // Restrict the output script only. Sentence structure, wording and number of

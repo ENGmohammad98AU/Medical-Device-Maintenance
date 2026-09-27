@@ -109,15 +109,15 @@ try {
   await page.goto('http://127.0.0.1:4174/local-model',{waitUntil:'commit'});
   await page.getByRole('button',{name:'تشغيل النموذج مجانًا',exact:true}).click();
   await page.getByText(/The model completed on this browser/).waitFor({timeout:35*60_000});
-  await page.getByText(/قرار النموذج للطلب: المرجع B/).waitFor({timeout:5000});
-  assert.equal(await page.getByText(/لم يكتمل اختيار المرجع|اختلف اختيار النموذج/).count(),0);
+  await page.getByText(/Model selection: Reference B/).waitFor({timeout:5000});
+  assert.equal(await page.getByText(/Reference selection did not finish|The model selected a different result/).count(),0);
   // A repeated production request must preserve the decision and avoid WASM
   // inference. This timing measures session reuse, not fresh model performance.
   const firstDuration=await page.getByText(/المدة بما فيها التجهيز/).innerText();
   const repeatStarted=performance.now();
   await page.getByRole('button',{name:'تشغيل النموذج مجانًا',exact:true}).click();
-  await page.getByText(/أُعيد استخدام نتيجة النموذج المطابقة/).waitFor({timeout:5000});
-  await page.getByText(/قرار النموذج للطلب: المرجع B/).waitFor({timeout:5000});
+  await page.getByText(/Reused the matching result from this session/).waitFor({timeout:5000});
+  await page.getByText(/Model selection: Reference B/).waitFor({timeout:5000});
   const repeatedDuration=await page.getByText(/المدة بما فيها التجهيز/).innerText();
   assert.match(repeatedDuration,/0\.0/);
   const reuse={kind:'session-result-reuse', first_duration_text:firstDuration,

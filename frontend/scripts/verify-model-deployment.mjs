@@ -1,11 +1,13 @@
-// Read-only check of public frontend model assets. No sign-in or maintenance API calls.
+// Read-only check of public model assets and backend version. No sign-in or maintenance writes.
 import {readFile, writeFile} from 'node:fs/promises';
 const base = 'https://medical-app-frontend-8iiq.onrender.com/';
+const api = 'https://medical-app-api-inl9.onrender.com/';
 const expected = JSON.parse(await readFile(new URL('../src/llm/localModelConfig.json', import.meta.url), 'utf8'));
+const guidance = JSON.parse(await readFile(new URL('../src/llm/guidanceModelConfig.json', import.meta.url), 'utf8'));
 const engine = expected.runtime.split('/')[0];
-async function resource(path) {
-  const url = new URL(path, base);
-  if (url.origin !== new URL(base).origin) throw new Error('Unexpected asset origin');
+async function resource(path, origin = base) {
+  const url = new URL(path, origin);
+  if (url.origin !== new URL(origin).origin) throw new Error('Unexpected asset origin');
   const response = await fetch(url, {headers: {'Cache-Control': 'no-cache'}, redirect: 'error', signal: AbortSignal.timeout(10000)});
   if ([401, 403, 429].includes(response.status)) { const error = new Error('Public deployment check refused: HTTP ' + response.status); error.fatal = true; throw error; }
   if (!response.ok) throw new Error('Deployment asset HTTP ' + response.status);
@@ -23,6 +25,11 @@ async function verify() {
   const workerUrl = new URL(worker, new URL(entry, base)).href;
   const code = await (await resource(workerUrl)).text();
   if (!code.includes(engine + '/') || !code.includes(engine + '.wasm')) throw new Error('Waiting for the expected production worker');
+  if (!app.includes(guidance.version) || !code.includes(guidance.version)) throw new Error('Waiting for the English generation frontend');
+  const health = await (await resource('health', api)).json();
+  if (health.status !== 'healthy' || health.guidance_version !== guidance.version || health.output_language !== 'en') {
+    throw new Error('Waiting for the matching English generation backend');
+  }
   for (const name of [engine + '.wasm', 'wllama.wasm', 'wllama-multi.wasm']) {
     const response = await resource('llm/' + name);
     const reader = response.body.getReader();
@@ -36,7 +43,8 @@ async function verify() {
   }
   return {checked_at: new Date().toISOString(), origin: base, runtime: expected.runtime,
     model_revision: expected.revision, manifest_match: true, entry, worker, legacy_assets_present: true,
-    scope: 'Public frontend model assets only; authenticated backend and GPU hardware are not checked.'};
+    guidance_version: guidance.version, output_language: health.output_language, api_origin: api, backend_healthy: true,
+    scope: 'Public frontend assets and backend version only; authenticated report processing and GPU hardware are not checked.'};
 }
 let failure;
 for (let attempt = 1; attempt <= 24; attempt++) {

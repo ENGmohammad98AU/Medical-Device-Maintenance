@@ -37,10 +37,14 @@ Classification, selection and generation share the existing 45-second inference
 budget. A timeout or token cutoff returns an explicit failure, not truncated text.
 Preparation and the first model download are separate. Longer free text costs
 more inference than a reference-selection token; timing depends on the device.
+The shared language instruction is warmed before report submission, and only
+evidence field labels are shortened; the full manufacturer sentences are retained.
 
 After updating both backend and frontend, restart the backend, refresh the browser
 and prepare the model again. Old prompt versions are rejected. Report-entry
 controls retain their existing UI language; analysis text is English.
+The deployment check verifies the generation version in both frontend bundles
+and the public backend health response before reporting a successful rollout.
 
 Validation commands:
 
