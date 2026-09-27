@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from app.services.fault_reference_lookup_service import FaultReferenceLookupService, NO_MATCH
 from app.services.llm_triage_service import redact_report
 from app.services.fault_report_text import normalize_report_text
+from app.services.llm_reference_context import load_llm_context
 
 MANIFEST = json.loads((Path(__file__).parent / "support_llm_manifest.json").read_text(encoding="utf-8"))
 PROMPT_HASH = hashlib.sha256(json.dumps(MANIFEST, sort_keys=True).encode()).hexdigest()
@@ -41,6 +42,7 @@ def prepare_support(request, device, db):
     references = FaultReferenceLookupService(db).support_candidates(
         device_query=device.name, manufacturer=device.manufacturer, model=device.model,
         device_type=device_type, description=request.description, fault_query=request.fault,
+        llm_context_records=load_llm_context(),
     )
     context = {
         "version": MANIFEST["version"], "report_text": redact_report(report_text),
@@ -92,6 +94,12 @@ def resolve_support(context, references, result, llm_run, fallback):
     if not references:
         metadata["message"] = "لا يوجد مرجع فني مطابق لهذا البلاغ والجهاز في قاعدة المعرفة الحالية. يلزم استكمال التفاصيل أو مراجعة مهندس الأجهزة الطبية."
         metadata["questions"] = clarification_questions(context)
+    elif references[0].get("reference_origin") == "LLM_CONTEXT":
+        metadata.update(status="LLM_REQUIRED", method="LOCAL_LLM_REQUIRED",
+                        message="هذا الإنذار خارج قائمة الأعطال الـ39. يلزم تشغيل النموذج لاختيار إجابة من السياق الفني المتاح، أو مراجعة مهندس الأجهزة الطبية.",
+                        questions=clarification_questions(context))
+        # Context-only answers must not leak through a rules/cloud fallback.
+        fallback = dict(NO_MATCH)
     if result is None or result.status != "success":
         return fallback, metadata, False
     if (llm_run.status != "success" or result.version != MANIFEST["version"]
@@ -110,7 +118,11 @@ def resolve_support(context, references, result, llm_run, fallback):
             return dict(NO_MATCH), metadata, True
         selected = references[index]
         metadata.update(status="SELECTED", scope="IN_SCOPE", selected_reference_id=selected["reference_id"],
+                        reference_origin=selected.get("reference_origin", "CATALOGUE"), questions=[],
                         message="اختار النموذج مرجعًا للأعراض المذكورة. الحل أدناه من نص المرجع ويتطلب اعتماد المختص.")
+        if selected.get("reference_origin") == "LLM_CONTEXT":
+            metadata.update(method="LOCAL_LLM_CONTEXT_SELECTION",
+                            message="اختار النموذج إجابة من سياق دليل الشركة لهذا الإنذار خارج قائمة الأعطال الـ39. يلزم اعتماد المختص.")
         return selected, metadata, True
     if token == "E":
         metadata.update(status="OUT_OF_SCOPE", scope="OUT_OF_SCOPE", questions=[],

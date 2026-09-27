@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.database.connection import SessionLocal
 from app.models.fault_reference_rule import FaultReferenceRule
 from app.services.fault_report_text import normalize_report_text
+from app.services.llm_reference_context import CATALOGUE_PATH, RETIRED_CATALOGUE_IDS
 
 
 NO_MATCH = {
@@ -89,7 +90,7 @@ class FaultReferenceLookupService:
         self,
         json_path: str = "./reference_data/medical_device_fault_reference.json",
     ) -> int:
-        """Upsert reference rules from JSON without inventing missing data."""
+        """Upsert rules and retire only the six additions moved to LLM context."""
         path = Path(json_path)
         if not path.exists():
             print(f"No reference data found at {path}")
@@ -107,6 +108,11 @@ class FaultReferenceLookupService:
             records = payload["rules"]
         else:
             raise ValueError("Expected a list of rules or an object with a top-level 'rules' list.")
+
+        if path.resolve() == CATALOGUE_PATH.resolve():
+            self.db.query(FaultReferenceRule).filter(
+                FaultReferenceRule.rule_id.in_(RETIRED_CATALOGUE_IDS)
+            ).delete(synchronize_session="fetch")
 
         imported = 0
         for index, record in enumerate(records, start=1):
@@ -197,7 +203,9 @@ class FaultReferenceLookupService:
             return dict(NO_MATCH)
 
         ranked: List[tuple[float, FaultReferenceRule]] = []
-        for rule in session.query(FaultReferenceRule).all():
+        for rule in session.query(FaultReferenceRule).filter(
+            ~FaultReferenceRule.rule_id.in_(RETIRED_CATALOGUE_IDS)
+        ).all():
             score = self._score_rule(
                 rule=rule,
                 normalized_fault=normalized_fault,
@@ -228,14 +236,22 @@ class FaultReferenceLookupService:
         return payload
 
     def support_candidates(self, *, device_query: str, manufacturer: str, model: str,
-                           device_type: str, description: str, fault_query: str = "") -> List[Dict[str, Any]]:
+                           device_type: str, description: str, fault_query: str = "",
+                           llm_context_records: Sequence[Dict[str, Any]] = ()) -> List[Dict[str, Any]]:
         """Shortlist sourced, device-bound references; the LLM may select or abstain.
 
         This deliberately retains the lexical threshold. A semantic choice cannot
         authorize a reference from another model or bypass missing source metadata.
         """
         ranked = []
-        for rule in self.db.query(FaultReferenceRule).all():
+        catalogue = self.db.query(FaultReferenceRule).filter(
+            ~FaultReferenceRule.rule_id.in_(RETIRED_CATALOGUE_IDS)
+        ).all()
+        # Context objects remain transient: they are never added to the session.
+        rules = [(rule, "CATALOGUE") for rule in catalogue]
+        rules.extend((self._model_from_record(record["reference_id"], record), "LLM_CONTEXT")
+                     for record in llm_context_records)
+        for rule, origin in rules:
             if rule.match_status != "VERIFIED_MANUFACTURER" or not rule.source or not rule.reference_url:
                 continue
             if not rule.reference_url.startswith("https://") or not rule.recommended_solution:
@@ -257,7 +273,8 @@ class FaultReferenceLookupService:
             arabic = next((a for a in aliases if re.search(r"[\u0600-\u06ff]", a)), "")
             symptom = " / ".join(s for s in [rule.error_message or rule.description or rule.fault_code, arabic] if s)
             payload = self._rule_payload(rule, score)
-            payload.update(matched=True, match_status="MATCHED", reference_id=rule.rule_id, symptom=symptom[:220])
+            payload.update(matched=True, match_status="MATCHED", reference_id=rule.rule_id,
+                           reference_origin=origin, symptom=symptom[:220])
             ranked.append((score, rule.rule_id, payload))
         ranked.sort(key=lambda item: (-item[0], item[1]))
         return [item[2] for item in ranked[:3]]
