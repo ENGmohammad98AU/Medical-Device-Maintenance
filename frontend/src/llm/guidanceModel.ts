@@ -20,7 +20,7 @@ function prompt(context: GuidanceContext) {
   if (context.report_text.length > 1600 || context.device_name.length > 400) throw new Error('input_too_long');
   return formatQwenMessages([{role: 'system', content: config.system_prompt},
     {role: 'user', content: JSON.stringify({device: context.device_name, report: context.report_text})
-      + (/[\u0600-\u06ff]/u.test(context.report_text) ? '\nاكتب خطوتين بالعربية لفني الصيانة الذي يفحص الجهاز.' : '\nWrite the two steps in English for this fault.')}]);
+      + (/[\u0600-\u06ff]/u.test(context.report_text) ? '\nبالعربية للفني: أمرَا فحص قصيران فقط، دون أسئلة.' : '\nWrite the two steps in English for this fault.')}]);
 }
 
 export function completeGuidance(text: string): string {

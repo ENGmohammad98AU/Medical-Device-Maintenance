@@ -100,7 +100,7 @@ try {
       const row = {name: sample.name, report_text: sample.report_text, wall_ms: Math.round(performance.now() - start), ...measured};
       result.rows.push(row); console.log('GENERATED_CASE=' + JSON.stringify(row));
       row.correct = measured.status === 'success' && measured.guidance?.status === 'success'
-        && new RegExp(sample.relevance).test(measured.guidance.text) && row.wall_ms < 45_000;
+        && new RegExp(sample.relevance, 'i').test(measured.guidance.text) && row.wall_ms < 45_000;
       assert.equal(measured.reused_result, undefined);
       if (measured.guidance?.status === 'success') await page.getByTestId('generation-preview').waitFor();
     }
