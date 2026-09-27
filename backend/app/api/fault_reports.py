@@ -29,6 +29,7 @@ class FaultAnalysisRequest(BaseModel):
     patient_connected: bool = False
     customer_expertise: str = "INTERMEDIATE"
     browser_llm: Optional[BrowserLLMResult] = None
+    generate_guidance: bool = False
 
 
 class ResolutionVerificationRequest(BaseModel):
@@ -122,6 +123,7 @@ def analyze_fault(
         patient_connected=request.patient_connected,
         customer_expertise=request.customer_expertise,
         browser_llm=request.browser_llm,
+        generate_guidance=request.generate_guidance,
     )
     return analyze_intelligent_fault(intelligent_request, db=db, current_user=current_user)
 

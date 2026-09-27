@@ -10,11 +10,13 @@ import {tmpdir, cpus, platform} from 'node:os';
 import {chromium} from 'playwright';
 
 const baseline = process.argv.includes('--baseline');
+const generation = process.argv.includes('--generation');
 const root = resolve(process.env.BENCHMARK_DIST || 'dist');
 const config = JSON.parse(await readFile('src/llm/localModelConfig.json', 'utf8'));
 const cases = JSON.parse(await readFile('src/llm/supportSmokeCases.json', 'utf8'));
 const deviceCases = JSON.parse(await readFile('src/llm/deviceRegressionCases.json', 'utf8'));
 const supportConfig = JSON.parse(await readFile('src/llm/supportModelConfig.json', 'utf8'));
+const generationCases = JSON.parse(await readFile('src/llm/guidanceCases.json', 'utf8'));
 const localModel = process.env.LLM_MODEL_FILE;
 if (localModel) {
   const hash = createHash('sha256');
@@ -48,7 +50,10 @@ const context = await chromium.launchPersistentContext(profile, {headless: true,
   executablePath: process.env.BROWSER_EXECUTABLE || undefined, args: ['--no-sandbox']});
 const page = context.pages()[0];
 page.on('pageerror', error => console.error(error.message));
-page.on('console', msg => { if (msg.type() === 'warning' || msg.type() === 'error') console.log(msg.text().slice(0, 300)); });
+page.on('console', msg => {
+  if (msg.type() === 'warning' || msg.type() === 'error')
+    console.log(msg.text().slice(0, msg.text().startsWith('GENERATION_TRACE=') ? 6000 : 300));
+});
 await context.addInitScript(() => {
   // Collect real worker results without replacing inference or timers.
   window.__modelResults = [];
@@ -57,13 +62,14 @@ await context.addInitScript(() => {
     constructor(...args) { super(...args);
       if (String(args[0]).includes('localModel.worker')) window.__localModelWorker = this;
       this.addEventListener('message', event => {
+      if (event.data.progress?.stage === 'running') console.warn('INFERENCE_STAGE=' + JSON.stringify({id: event.data.id, task: event.data.progress.task}));
       if (event.data.result) window.__modelResults.push(event.data.result);
     }); }
   };
 });
 if (localModel) await context.route(`https://huggingface.co/${config.model}/resolve/${config.revision}/${config.model_file}`,
   route => route.fulfill({status: 307, headers: {location: origin + '/benchmark-model.gguf', 'Access-Control-Allow-Origin': '*'}}));
-const result = {kind: baseline ? 'unprepared-baseline' : 'prepared-production', model: config.model,
+const result = {kind: generation ? 'prepared-generation' : baseline ? 'unprepared-baseline' : 'prepared-production', model: config.model,
   revision: config.revision, model_sha256: config.model_file_sha256, browser: context.browser().version(),
   measured_at: new Date().toISOString(), machine: {os: platform(), cpu: cpus()[0]?.model, logical_cpus: cpus().length},
   model_source: localModel ? 'SHA-verified local file; Internet download excluded' : 'model host',
@@ -81,9 +87,35 @@ try {
     result.preparation_ms = Math.round(performance.now() - start);
     console.log('PREPARATION_MS=' + result.preparation_ms);
   }
+  if (generation) {
+    await page.getByRole('combobox').nth(0).click();
+    await page.getByRole('option', {name: 'توليد إرشادات نصية قصيرة', exact: true}).click();
+    // Exercise sourced answers and both input languages and devices on the same
+    // prepared worker. Every case still must independently pass the deadline.
+    for (const sample of [...generationCases.slice(-1), ...generationCases.slice(0, -1)]) {
+      console.log('GENERATION_CASE_START=' + sample.name);
+      await page.getByRole('combobox').nth(1).click();
+      await page.getByRole('option', {name: sample.name, exact: true}).click();
+      const before = await page.evaluate(() => window.__modelResults.length);
+      const start = performance.now();
+      await page.getByRole('button', {name: 'تشغيل النموذج مجانًا', exact: true}).click();
+      await page.waitForFunction(n => window.__modelResults.length > n, before, {timeout: 50_000});
+      const measured = await page.evaluate(() => window.__modelResults.at(-1));
+      const row = {name: sample.name, report_text: sample.report_text, wall_ms: Math.round(performance.now() - start), ...measured};
+      result.rows.push(row); console.log('GENERATED_CASE=' + JSON.stringify(row));
+      row.correct = measured.status === 'success' && measured.guidance?.status === 'success'
+        && new RegExp(sample.relevance, 'i').test(measured.guidance.text)
+        && !/[^\x20-\x7e\n]/u.test(measured.guidance.text)
+        && measured.guidance.reference_id === (sample.references?.[0]?.reference_id || null)
+        && row.wall_ms < 45_000;
+      assert.equal(measured.reused_result, undefined);
+      if (measured.guidance?.status === 'success') await page.getByTestId('generation-preview').waitFor();
+    }
+    assert.ok(result.rows.every(row => row.correct), JSON.stringify(result.rows.filter(row => !row.correct)));
+  }
   // Alternate references and no-reference requests, then return to references.
   // Every report is distinct; no exact-result cache can satisfy these requests.
-  for (const index of [0, 2, 1, 4, 3, 5]) {
+  for (const index of (generation ? [] : [0, 2, 1, 4, 3, 5])) {
     const sample = cases[index];
     await page.getByRole('combobox').nth(1).click();
     await page.getByRole('option', {name: sample.name, exact: true}).click();
@@ -99,13 +131,13 @@ try {
     assert.equal(measured.support?.output_token, sample.expected);
     assert.equal(measured.reused_result, undefined);
     if (!baseline) assert.ok(row.wall_ms < 45_000, 'Fresh classification and reference selection must finish within the shared inference budget');
-    await page.getByText(/اكتمل تشغيل النموذج على هذا المتصفح/).waitFor();
+    await page.getByText(/The model completed on this browser/).waitFor();
   }
   // Exercise production inference for the three supported device types. These
   // synthetic contexts are checked against the real server candidate builder
   // by test_device_support_regressions.py; no classification is mocked here.
   result.device_rows = [];
-  for (const [index, sample] of (baseline ? [] : deviceCases).entries()) {
+  for (const [index, sample] of (baseline || generation ? [] : deviceCases).entries()) {
     const start = performance.now();
     const measured = await page.evaluate(async ({sample, version, id}) => {
       const worker = window.__localModelWorker;

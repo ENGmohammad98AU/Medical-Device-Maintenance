@@ -65,7 +65,7 @@ describe('local inference lifecycle', () => {
   it('prepares without a report, reuses the worker and records preparation separately', async () => {
     const client = new LocalModelClient(); const preparing = client.prepare(vi.fn());
     const worker = FakeWorker.instances[0];
-    expect(worker.postMessage).toHaveBeenCalledWith({id: 1, input: undefined, force_cpu: false});
+    expect(worker.postMessage).toHaveBeenCalledWith({id: 1, input: undefined, force_cpu: false, inference_budget_ms: LOCAL_INFERENCE_TIMEOUT_MS});
     vi.advanceTimersByTime(120_000);
     worker.message({id: 1, progress: {stage: 'warming'}});
     worker.message({id: 1, ready: true, result: {status: 'success', revision: localModelConfig.revision, latency_ms: 120_000}});
@@ -107,7 +107,7 @@ describe('local inference lifecycle', () => {
     gpu.message({id: 1, retry_cpu: true});
     expect(gpu.terminate).toHaveBeenCalledOnce();
     const cpu = FakeWorker.instances[1];
-    expect(cpu.postMessage).toHaveBeenCalledWith({id: 1, input, force_cpu: true});
+    expect(cpu.postMessage).toHaveBeenCalledWith({id: 1, input, force_cpu: true, inference_budget_ms: LOCAL_INFERENCE_TIMEOUT_MS});
     gpu.message({id: 1, result: {...success, output_token: 'H'}});
     gpu.onerror?.();
     cpu.message({id: 1, result: {...success, runtime: 'wllama-3.6.1/wasm'}});
@@ -183,5 +183,23 @@ describe('local inference lifecycle', () => {
     const second = client.run(request, vi.fn());
     expect(FakeWorker.instances[0].postMessage).toHaveBeenCalledTimes(2);
     client.cancel(); await second;
+  });
+  it('caches only completed generation and invalidates changed generation context', async () => {
+    const client = new LocalModelClient();
+    const guidance = {version: 'g1', input_sha256: 'a'.repeat(64), device_name: 'Ventilator', report_text: input.report_text};
+    const request = {...input, support_context: {...guidance, candidates: [], guidance}};
+    const first = client.run(request, vi.fn()); const worker = FakeWorker.instances[0];
+    worker.message({id: 1, result: {...success, guidance: {...guidance, status: 'error', error_code: 'timeout'}}});
+    await first;
+    const second = client.run(request, vi.fn());
+    expect(worker.postMessage).toHaveBeenCalledTimes(2);
+    worker.message({id: 2, result: {...success, guidance: {...guidance, status: 'success', text: 'Completed draft', latency_ms: 12000}}});
+    await second;
+    const reused = await client.run(request, vi.fn());
+    expect(reused.reused_result).toBe(true); expect(reused.guidance?.latency_ms).toBe(0);
+    expect(worker.postMessage).toHaveBeenCalledTimes(2);
+    const changed = client.run({...request, support_context: {...request.support_context, guidance: {...guidance, input_sha256: 'b'.repeat(64)}}}, vi.fn());
+    expect(worker.postMessage).toHaveBeenCalledTimes(3);
+    client.cancel(); await changed; client.dispose();
   });
 });

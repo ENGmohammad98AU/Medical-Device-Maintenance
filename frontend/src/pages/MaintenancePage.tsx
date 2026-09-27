@@ -9,6 +9,7 @@ import { ArrowBack as ArrowBackIcon, CheckCircle as CheckCircleIcon, Psychology 
 import { useAuth } from '../hooks/useAuth';
 import api, { authService, isAuthenticationError } from '../services/auth';
 import LLMTriageSummary, { TriageMetadata } from '../components/LLMTriageSummary';
+import GeneratedGuidanceSummary, {type GeneratedGuidance} from '../components/GeneratedGuidanceSummary';
 import CustomerSupportSummary, {type CustomerSupportMetadata} from '../components/CustomerSupportSummary';
 import { useLocalModel } from '../hooks/useLocalModel';
 import LocalModelPreparation from '../components/LocalModelPreparation';
@@ -29,6 +30,7 @@ interface AnalysisResult extends TriageMetadata {
   immediate_safety_action: string; recommended_solution: string; verification_before_return_to_service: string;
   source: string; reference_url: string; reference_page: string; match_confidence: number; match_status: string;
   customer_support?: CustomerSupportMetadata;
+  generated_guidance?: GeneratedGuidance;
   workflow?: { fault_report_id: number; outcome: string; total_processing_time_ms?: number } | null;
 }
 
@@ -109,6 +111,7 @@ export default function MaintenancePage() {
         customer_expertise: expertise,
         device_location: selectedDevice.location || selectedDevice.department,
         patient_connected: patientConnected,
+        generate_guidance: useLocal,
       };
       let support_context: SupportContext | undefined;
       if (useLocal) {
@@ -198,55 +201,56 @@ export default function MaintenancePage() {
       </Grid>
       <FormControlLabel control={<Switch checked={useLocal} disabled={busy} onChange={(event) => setUseLocal(event.target.checked)} />} label="معالجة الطلب واختيار المرجع بنموذج محلي مجاني" />
       {useLocal && <LocalModelPreparation model={localModel} disabled={busy} />}
-      <Alert severity="info" sx={{mt: 2}}>لا يحتاج النموذج إلى حساب خارجي أو مفتاح API. التنزيل الأول نحو 1.1 غيغابايت، ثم يعمل على جهازك. يصنّف الطلب ويقترح المرجع المناسب؛ تحدد قواعد الخادم الخطورة وتبقى الإجراءات خاضعة لمراجعة المختص.</Alert>
+      <Alert severity="info" sx={{mt: 2}}>لا يحتاج النموذج إلى حساب خارجي أو مفتاح API. التنزيل الأول نحو 1.1 غيغابايت، ثم يعمل على جهازك. يصنّف الطلب ويختار المرجع ويولّد شرحًا حرًا بالإنكليزية يستند إلى الأدلة المتاحة؛ تحدد قواعد الخادم الخطورة وتبقى الإجراءات خاضعة لمراجعة المختص.</Alert>
       {localModel.progress && <LocalModelProgress progress={localModel.progress} cancel={localModel.cancel} cancelLabel={localModel.preparing ? 'إلغاء التجهيز' : 'متابعة بالقواعد دون انتظار النموذج'} />}
       <Button variant="contained" onClick={runAnalysis} disabled={busy || localModel.preparing || (useLocal && !localModel.ready)} startIcon={busy ? <CircularProgress size={18} /> : <PsychologyIcon />} sx={{ mt: 3 }}>التحقق والتحليل</Button>
     </CardContent></Card>}
 
     {analysis && !analysis.reference_found && !analysis.customer_support && <Card><CardContent>
-      <Alert severity="info">لا توجد حالياً معلومات مرجعية كافية لتشخيص هذا العطل. يرجى إضافة المرجع الفني الخاص بالجهاز.</Alert>
+      <Alert severity="info">Insufficient reference information is available to diagnose this fault. Add the technical reference for this device.</Alert>
     </CardContent></Card>}
 
     {analysis && <>
-      {analysis.customer_support && <Card sx={{mb: 3}}><CardContent>
-        <Typography variant="h6" gutterBottom>نتيجة معالجة طلبك</Typography>
+      {analysis.customer_support && <Card dir="ltr" lang="en" sx={{mb: 3, textAlign: 'left'}}><CardContent>
+        <Typography variant="h6" gutterBottom>Request analysis</Typography>
         <CustomerSupportSummary support={analysis.customer_support} referenceFound={analysis.reference_found} />
-        <Typography variant="body2">الجهاز: {analysis.device}</Typography>
+        <Typography variant="body2">Device: {analysis.device}</Typography>
         {analysis.customer_support.status !== 'SELECTED' && activeStep < 3 && <Button disabled={busy} onClick={() => {setAnalysis(null); setActiveStep(0); setDecision(''); setComments(''); setSuccess(''); setDecisionSaved(false); setActionTaken(''); setVerificationResult('');}} sx={{mt: 2}}>استكمال تفاصيل الطلب وإعادة التحليل</Button>}
       </CardContent></Card>}
-      <Grid container spacing={3}>
+      <GeneratedGuidanceSummary guidance={analysis.generated_guidance} />
+      <Grid container spacing={3} dir="ltr" lang="en" sx={{textAlign: 'left'}}>
         <Grid item xs={12} md={5}><Card><CardContent>
-          <Typography variant="h6" gutterBottom><SecurityIcon sx={{ verticalAlign: 'middle', mr: 1 }} />نتيجة التحقق والتصنيف</Typography>
+          <Typography variant="h6" gutterBottom><SecurityIcon sx={{ verticalAlign: 'middle', mr: 1 }} />Validation and classification</Typography>
           <LLMTriageSummary result={analysis} />
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}><Chip label={`الخطورة: ${analysis.severity}`} color={analysis.is_emergency ? 'error' : 'warning'} /><Chip label={`المستوى: ${analysis.fault_level}`} /><Chip label={analysis.escalation_required ? 'يتطلب إحالة' : 'دعم اعتيادي'} color={analysis.escalation_required ? 'error' : 'success'} /></Box>
-          <Typography variant="body2" sx={{ mb: 1 }}><strong>الأثر على السلامة:</strong> {analysis.safety_impact}</Typography><Typography variant="body2"><strong>الإجراء المقترح:</strong> {analysis.recommended_action}</Typography>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}><Chip label={`Severity: ${analysis.severity}`} color={analysis.is_emergency ? 'error' : 'warning'} /><Chip label={`Level: ${analysis.fault_level}`} /><Chip label={analysis.escalation_required ? 'Referral required' : 'Routine support'} color={analysis.escalation_required ? 'error' : 'success'} /></Box>
+          <Typography variant="body2" sx={{ mb: 1 }}><strong>Safety impact:</strong> {analysis.safety_impact}</Typography><Typography variant="body2"><strong>Recommended action:</strong> {analysis.recommended_action}</Typography>
           {analysis.warning_message && <Alert severity="warning" sx={{ mt: 2 }}>{analysis.warning_message}</Alert>}
-          <Typography variant="subtitle2" sx={{ mt: 3 }}>الكيانات الفنية المستخرجة</Typography>
-          {Object.entries(analysis.extracted_entities).filter(([key]) => key !== 'confidence_scores').map(([key, values]) => <Typography variant="body2" key={key}>{key}: {values.map((value) => value.value).join('، ') || 'غير محدد'}</Typography>)}
+          <Typography variant="subtitle2" sx={{ mt: 3 }}>Extracted technical entities</Typography>
+          {Object.entries(analysis.extracted_entities).filter(([key]) => key !== 'confidence_scores').map(([key, values]) => <Typography variant="body2" key={key}>{key}: {values.map((value) => value.value).join('، ') || 'Not specified'}</Typography>)}
         </CardContent></Card></Grid>
         {analysis.reference_found && <Grid item xs={12} md={7}><Card><CardContent>
-          <Typography variant="h6" gutterBottom>الإجابة الفنية ومصادرها</Typography>
-          {analysis.matched_fault && <Alert severity="success" sx={{ mb: 2 }}><strong>العطل المرجعي المطابق:</strong> {analysis.matched_fault}</Alert>}
-          {analysis.meaning && <Typography sx={{ whiteSpace: 'pre-line' }}><strong>المعنى:</strong> {analysis.meaning}</Typography>}
-          {analysis.possible_causes && <Typography sx={{ whiteSpace: 'pre-line', mt: 2 }}><strong>الأسباب المحتملة:</strong> {analysis.possible_causes}</Typography>}
-          {analysis.immediate_safety_action && <Alert severity="warning" sx={{ mt: 2 }}><strong>إجراء السلامة الفوري:</strong> {analysis.immediate_safety_action}</Alert>}
-          {!analysis.meaning && <Typography sx={{ whiteSpace: 'pre-line' }}>{analysis.rag_response || analysis.error_code_meaning || 'لم يتم العثور على عطل مطابق ضمن الملفات المرجعية المتوفرة. يرجى إضافة وصف أكثر تفصيلاً.'}</Typography>}
-          {analysis.error_code_meaning && !analysis.meaning && <Alert severity="info" sx={{ mt: 2 }}><strong>معنى كود الخطأ:</strong> {analysis.error_code_meaning}</Alert>}
+          <Typography variant="h6" gutterBottom>Reference evidence</Typography>
+          {analysis.matched_fault && <Alert severity="success" sx={{ mb: 2 }}><strong>Matched reference fault:</strong> {analysis.matched_fault}</Alert>}
+          {analysis.meaning && <Typography sx={{ whiteSpace: 'pre-line' }}><strong>Meaning:</strong> {analysis.meaning}</Typography>}
+          {analysis.possible_causes && <Typography sx={{ whiteSpace: 'pre-line', mt: 2 }}><strong>Possible causes:</strong> {analysis.possible_causes}</Typography>}
+          {analysis.immediate_safety_action && <Alert severity="warning" sx={{ mt: 2 }}><strong>Immediate safety action:</strong> {analysis.immediate_safety_action}</Alert>}
+          {!analysis.meaning && <Typography sx={{ whiteSpace: 'pre-line' }}>{analysis.rag_response || analysis.error_code_meaning || 'No fault matched the available reference files. Please provide more detail.'}</Typography>}
+          {analysis.error_code_meaning && !analysis.meaning && <Alert severity="info" sx={{ mt: 2 }}><strong>Error code meaning:</strong> {analysis.error_code_meaning}</Alert>}
           {analysis.troubleshooting_steps.length > 0 && <>
-            <Typography variant="subtitle2" sx={{ mt: 3 }}>خطوات استكشاف العطل</Typography>
+            <Typography variant="subtitle2" sx={{ mt: 3 }}>Troubleshooting steps</Typography>
             {analysis.troubleshooting_steps.map((step, index) => <Typography variant="body2" key={`${step}-${index}`}>{index + 1}. {step}</Typography>)}
           </>}
-          {analysis.recommended_solution && <Typography sx={{ whiteSpace: 'pre-line', mt: 3 }}><strong>الحل الموصى به:</strong> {analysis.recommended_solution}</Typography>}
-          {analysis.verification_before_return_to_service && <Typography sx={{ whiteSpace: 'pre-line', mt: 2 }}><strong>التحقق قبل إعادة الجهاز للخدمة:</strong> {analysis.verification_before_return_to_service}</Typography>}
+          {analysis.recommended_solution && <Typography sx={{ whiteSpace: 'pre-line', mt: 3 }}><strong>Recommended solution:</strong> {analysis.recommended_solution}</Typography>}
+          {analysis.verification_before_return_to_service && <Typography sx={{ whiteSpace: 'pre-line', mt: 2 }}><strong>Verification before return to service:</strong> {analysis.verification_before_return_to_service}</Typography>}
           {analysis.safety_precautions.length > 0 && <>
-            <Typography variant="subtitle2" sx={{ mt: 3 }}>احتياطات السلامة</Typography>
+            <Typography variant="subtitle2" sx={{ mt: 3 }}>Safety precautions</Typography>
             {analysis.safety_precautions.map((precaution) => <Typography variant="body2" key={precaution}>• {precaution}</Typography>)}
           </>}
-          <Typography variant="subtitle2" sx={{ mt: 3 }}>المصادر المرجعية</Typography>
-          {analysis.source && <Typography variant="body2">• {analysis.source}{analysis.reference_page ? ` — الصفحة ${analysis.reference_page}` : ''}</Typography>}
+          <Typography variant="subtitle2" sx={{ mt: 3 }}>Reference sources</Typography>
+          {analysis.source && <Typography variant="body2">• {analysis.source}{analysis.reference_page ? ` — page ${analysis.reference_page}` : ''}</Typography>}
           {analysis.rag_sources.filter((source) => !analysis.source || !source.includes(analysis.source)).map((source) => <Typography variant="body2" key={source}>• {source}</Typography>)}
-          {analysis.reference_url && <Button component="a" href={analysis.reference_url} target="_blank" rel="noopener noreferrer" size="small" sx={{ mt: 1 }}>فتح المرجع الأصلي</Button>}
-          <Box><Typography variant="caption" color="text.secondary">درجة المطابقة النصية: {Math.round((analysis.match_confidence || analysis.rag_confidence) * 100)}% | الحالة: {analysis.match_status} — لا تمثل دقة النموذج اللغوي.</Typography></Box>
+          {analysis.reference_url && <Button component="a" href={analysis.reference_url} target="_blank" rel="noopener noreferrer" size="small" sx={{ mt: 1 }}>Open original reference</Button>}
+          <Box><Typography variant="caption" color="text.secondary">Text match score: {Math.round((analysis.match_confidence || analysis.rag_confidence) * 100)}% | Status: {analysis.match_status} — This is not model accuracy.</Typography></Box>
         </CardContent></Card></Grid>}
       </Grid>
       <Card sx={{ mt: 3 }}><CardContent><Typography variant="h6" gutterBottom>3. مراجعة المختص وحفظ القرار</Typography>

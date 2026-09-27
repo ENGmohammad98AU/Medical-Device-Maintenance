@@ -8,37 +8,37 @@ describe('LLM classification provenance', () => {
       classification_source: 'BROWSER_LLM_CATEGORY_WITH_RULE_GUARDS', fault_category: 'POWER',
       llm: {status: 'success', provider: 'browser-local', model: 'Qwen3', client_reported: true},
     }} />);
-    expect(html).toContain('الخطورة: قواعد الخادم');
-    expect(html).toContain('الطاقة والبطارية');
-    expect(html).toContain('نتيجة أرسلها المتصفح');
+    expect(html).toContain('severity: server rules');
+    expect(html).toContain('Power and battery');
+    expect(html).toContain('Browser-reported result');
   });
   it('shows a genuine LLM result and proposed review destination', () => {
     const html = renderToStaticMarkup(<LLMTriageSummary result={{
       classification_source: 'LLM_WITH_RULE_GUARDS', routing_target: 'MANUFACTURER_SUPPORT',
       llm: { status: 'success', model: 'test-model' },
     }} />);
-    expect(html).toContain('نموذج لغوي مع قواعد السلامة');
+    expect(html).toContain('LLM with safety rules');
     expect(html).toContain('test-model');
-    expect(html).toContain('دعم الشركة المصنّعة');
-    expect(html).toContain('جهة المراجعة المقترحة');
+    expect(html).toContain('Manufacturer support');
+    expect(html).toContain('Proposed review destination');
   });
   it('does not label fallback results as model outputs', () => {
     const html = renderToStaticMarkup(<LLMTriageSummary result={{ classification_source: 'RULES', llm: { status: 'error' } }} />);
-    expect(html).toContain('تعذر استخدام النموذج');
-    expect(html).toContain('التصنيف: القواعد المرجعية');
-    expect(html).not.toContain('التصنيف: نموذج لغوي');
+    expect(html).toContain('The language model was unavailable');
+    expect(html).toContain('Classification: reference rules');
+    expect(html).not.toContain('Classification: LLM');
   });
   it('shows abstention without claiming a successful classification', () => {
     const html = renderToStaticMarkup(<LLMTriageSummary result={{ classification_source: 'REVIEW_REQUIRED', llm: { status: 'success' } }} />);
-    expect(html).toContain('يرجى توضيح الأعراض');
-    expect(html).not.toContain('التصنيف: نموذج لغوي');
+    expect(html).toContain('Please clarify the symptoms');
+    expect(html).not.toContain('Classification: LLM');
   });
   it('explains quota exhaustion and labels the fallback as rules', () => {
     const html = renderToStaticMarkup(<LLMTriageSummary result={{
       classification_source: 'RULES', llm: { status: 'error', provider: 'groq', error_code: 'rate_limit' },
     }} />);
-    expect(html).toContain('حد الاستخدام المتاح مؤقتًا');
-    expect(html).toContain('التصنيف: القواعد المرجعية');
-    expect(html).not.toContain('التصنيف: نموذج لغوي');
+    expect(html).toContain('temporary usage limit');
+    expect(html).toContain('Classification: reference rules');
+    expect(html).not.toContain('Classification: LLM');
   });
 });

@@ -23,6 +23,34 @@ permissions:
   contents: read
 
 jobs:
+  generated-guidance:
+    name: Free generation timing on Windows
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install and build production frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build -- --mode benchmark
+          npx playwright install chromium
+      - name: Measure real generation for all three devices
+        working-directory: frontend
+        run: npm run benchmark:prepared -- --generation
+      - name: Save generation text and timing evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-guidance-evaluation
+          path: frontend/benchmark-results/
+          if-no-files-found: warn
+
   backend-clean-install:
     name: Backend clean install on Windows
     runs-on: windows-latest

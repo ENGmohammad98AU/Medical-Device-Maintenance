@@ -61,20 +61,20 @@ def prepare_support(request, device, db):
 
 
 def clarification_questions(context):
-    questions = ["ما رسالة الخطأ أو رمز الإنذار كما يظهر على الجهاز؟",
-                 "متى بدأت المشكلة، وما السلوك الذي تلاحظه؟"]
+    questions = ["What exact error message or alarm code is displayed on the device?",
+                 "When did the problem start, and what behavior do you observe?"]
     identity = context["device_name"].casefold()
     report = normalize_report_text(context["report_text"]).casefold()
     if "philips" in identity and "mx800" in identity:
         if "batt" in report or "بطاري" in report:
-            questions.append("هل إنذار البطارية صادر عن شاشة MX800 أم وحدة X2/X3 أو جهاز طاقة ملحق؟ حدّد اسم الوحدة وموديلها.")
+            questions.append("Does the battery alarm come from the MX800, an X2/X3 module, or an external power accessory? Specify the module and model.")
         else:
-            questions.append("ما قناة القياس التي يظهر فيها الإنذار: ECG أم Resp أم SpO2 أم NBP؟")
+            questions.append("Which measurement channel shows the alarm: ECG, Resp, SpO2, or NBP?")
     elif "hamilton" in identity and "c6" in identity:
-        questions.append("هل الجهاز يعمل على الكهرباء أم البطارية، وهل الإنذار متعلق بالطاقة أو الأكسجين أو دائرة التنفس؟")
+        questions.append("Is the device using AC or battery power? Does the alarm concern power, oxygen, or the breathing circuit?")
     elif "perfusor" in identity and "space" in identity:
-        questions.append("هل الإنذار متعلق بالبطارية أم تثبيت المحقنة أم ضغط خط التسريب؟ وهل الضخ متوقف؟")
-    questions.append("هل اسم الجهاز والمصنع والموديل المحدد صحيحة؟")
+        questions.append("Does the alarm concern the battery, syringe placement, or infusion-line pressure? Has pumping stopped?")
+    questions.append("Are the selected device name, manufacturer, and model correct?")
     return questions
 
 
@@ -83,7 +83,7 @@ def resolve_support(context, references, result, llm_run, fallback):
     metadata = {
         "status": "FALLBACK", "scope": "UNCONFIRMED", "method": "REFERENCE_RULES",
         "selected_reference_id": None, "candidate_ids": [r["reference_id"] for r in references],
-        "message": "النتيجة الحالية من البحث المرجعي؛ لم تتوفر مشاركة صالحة للنموذج في اختيار الحل.",
+        "message": "This result comes from reference lookup; no valid model selection was available.",
         "guards": [],
         "questions": [], "requires_review": True, "client_reported": result is not None,
         "reference_status": "CANDIDATES_AVAILABLE" if references else "NO_MATCHING_REFERENCE",
@@ -92,11 +92,11 @@ def resolve_support(context, references, result, llm_run, fallback):
         "runtime": llm_run.runtime, "result": result.model_dump() if result else None,
     }
     if not references:
-        metadata["message"] = "لا يوجد مرجع فني مطابق لهذا البلاغ والجهاز في قاعدة المعرفة الحالية. يلزم استكمال التفاصيل أو مراجعة مهندس الأجهزة الطبية."
+        metadata["message"] = "No technical reference matches this report and device in the current knowledge base. Provide more details or consult a biomedical engineer."
         metadata["questions"] = clarification_questions(context)
     elif references[0].get("reference_origin") == "LLM_CONTEXT":
         metadata.update(status="LLM_REQUIRED", method="LOCAL_LLM_REQUIRED",
-                        message="هذا الإنذار خارج قائمة الأعطال الـ39. يلزم تشغيل النموذج لاختيار إجابة من السياق الفني المتاح، أو مراجعة مهندس الأجهزة الطبية.",
+                        message="This alarm is outside the 39-fault catalogue. Run the local model to select from the available technical evidence, or consult a biomedical engineer.",
                         questions=clarification_questions(context))
         # Context-only answers must not leak through a rules/cloud fallback.
         fallback = dict(NO_MATCH)
@@ -104,7 +104,7 @@ def resolve_support(context, references, result, llm_run, fallback):
         return fallback, metadata, False
     if (llm_run.status != "success" or result.version != MANIFEST["version"]
             or result.input_sha256 != context["input_sha256"]):
-        metadata.update(status="INVALID_RESULT", message="تغير سياق الطلب أو المراجع. أعد التحليل للحصول على اقتراح مرتبط بالبيانات الحالية.")
+        metadata.update(status="INVALID_RESULT", message="The report or reference context has changed. Run the analysis again using the current data.")
         return dict(NO_MATCH), metadata, True
     metadata["method"] = "LOCAL_LLM_REFERENCE_SELECTION"
     token = result.output_token
@@ -114,23 +114,23 @@ def resolve_support(context, references, result, llm_run, fallback):
     if token in "ABC":
         index = "ABC".index(token)
         if index >= len(references):
-            metadata.update(status="INVALID_RESULT", message="تعذر قبول المرجع المقترح. أعد وصف المشكلة أو اطلب مراجعة المختص.")
+            metadata.update(status="INVALID_RESULT", message="The proposed reference could not be accepted. Describe the problem again or request specialist review.")
             return dict(NO_MATCH), metadata, True
         selected = references[index]
         metadata.update(status="SELECTED", scope="IN_SCOPE", selected_reference_id=selected["reference_id"],
                         reference_origin=selected.get("reference_origin", "CATALOGUE"), questions=[],
-                        message="اختار النموذج مرجعًا للأعراض المذكورة. الحل أدناه من نص المرجع ويتطلب اعتماد المختص.")
+                        message="The model selected a reference for the reported symptoms. The source text below requires specialist review.")
         if selected.get("reference_origin") == "LLM_CONTEXT":
             metadata.update(method="LOCAL_LLM_CONTEXT_SELECTION",
-                            message="اختار النموذج إجابة من سياق دليل الشركة لهذا الإنذار خارج قائمة الأعطال الـ39. يلزم اعتماد المختص.")
+                            message="The model selected manufacturer evidence for an alarm outside the 39-fault catalogue. Specialist review is required.")
         return selected, metadata, True
     if token == "E":
         metadata.update(status="OUT_OF_SCOPE", scope="OUT_OF_SCOPE", questions=[],
-                        message="يبدو أن الطلب خارج نطاق الدعم الفني للأجهزة الطبية. وضّح إن كان يتعلق بعطل جهاز؛ أما العلاج أو الدواء فراجع الفريق السريري، والطلبات الإدارية تُوجّه إلى خدمة العملاء المختصة.")
+                        message="This request appears outside medical-device technical support. Clarify any device fault; direct treatment or medication questions to the clinical team and administrative requests to the appropriate service.")
     else:
         unclear = llm_run.browser_category == "UNKNOWN" or bool(references)
         metadata.update(status="NEEDS_DETAILS" if unclear else "NO_REFERENCE", scope="UNCONFIRMED" if unclear else "IN_SCOPE",
-                        message=("لم يعتمد النموذج مرجعًا من المراجع المرشحة. أجب عن الأسئلة التالية لاستكمال التحليل."
+                        message=("The model did not select a candidate reference. Answer the following questions to continue the analysis."
                                  if references else metadata["message"]),
                         questions=clarification_questions(context))
     return dict(NO_MATCH), metadata, True

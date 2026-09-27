@@ -6,6 +6,8 @@ import { categoryLabels, localErrorText, localModelConfig as config, type LocalR
 import cases from '../llm/smokeCases.json';
 import LocalModelProgress from '../components/LocalModelProgress';
 import LocalModelPreparation from '../components/LocalModelPreparation';
+import guidanceCases from '../llm/guidanceCases.json';
+import { guidanceModelConfig } from '../llm/guidanceModel';
 import supportCases from '../llm/supportSmokeCases.json';
 import { supportModelConfig, type SupportCandidate } from '../llm/supportModelContract';
 
@@ -15,12 +17,17 @@ export default function LocalModelPage() {
   const [result, setResult] = useState<LocalResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState('support');
-  const examples = mode === 'support' ? supportCases : cases;
+  const examples = mode === 'generation' ? guidanceCases : mode === 'support' ? supportCases : cases;
   const run = async () => {
     setBusy(true); setResult(null);
     try {
       const support = supportCases[selected];
-      setResult(await local.run(mode === 'support' ? {
+      setResult(await local.run(mode === 'generation' ? {
+        ...guidanceCases[selected], patient_connected: false,
+        support_context: {version: supportModelConfig.version, input_sha256: '0'.repeat(64),
+          report_text: guidanceCases[selected].report_text, device_name: guidanceCases[selected].device_name, candidates: guidanceCases[selected].candidates as SupportCandidate[],
+          guidance: {...guidanceCases[selected], version: guidanceModelConfig.version, input_sha256: '0'.repeat(64)}},
+      } : mode === 'support' ? {
         report_text: support.report_text, device_type: 'VENTILATOR', patient_connected: false,
         support_context: {version: supportModelConfig.version, input_sha256: '0'.repeat(64),
           report_text: support.report_text, device_name: 'Medical ventilator', candidates: support.candidates as SupportCandidate[]},
@@ -29,7 +36,8 @@ export default function LocalModelPage() {
   };
   const category = result?.output_token ? config.categories[result.output_token] : undefined;
   const selectedReference = result?.support?.output_token
-    ? supportCases[selected]?.candidates.find((c) => c.label === result.support?.output_token) : undefined;
+    ? (mode === 'generation' ? guidanceCases[selected]?.candidates : supportCases[selected]?.candidates)
+      ?.find((c) => c.label === result.support?.output_token) : undefined;
   return <Container maxWidth="sm" dir="rtl"><Box sx={{py: 5}}>
     <Typography component="h1" variant="h4" gutterBottom>تجربة النموذج المجاني</Typography>
     <Typography sx={{mb: 3}}>تجربة مباشرة دون حساب أو مفتاح API، باستخدام أوصاف اصطناعية فقط.</Typography>
@@ -37,7 +45,7 @@ export default function LocalModelPage() {
       <Typography variant="h6">Qwen3‑1.7B المحلي</Typography>
       <Typography variant="body2" color="text.secondary" sx={{mb: 2}}>يعمل داخل المتصفح. التنزيل الأول نحو 1.1 غيغابايت. يحتاج إلى Chrome أو Edge حديث واتصال جيد وذاكرة متاحة؛ وقد يحتفظ المتصفح بالملفات للاستخدام التالي.</Typography>
       <TextField fullWidth select label="نوع التجربة" value={mode} disabled={busy} sx={{mb: 2}} onChange={(e) => {setMode(e.target.value); setSelected(0); setResult(null);}}>
-        <MenuItem value="support">معالجة الطلب واختيار المرجع</MenuItem><MenuItem value="classification">تصنيف العطل فقط</MenuItem>
+        <MenuItem value="generation">توليد إرشادات نصية قصيرة</MenuItem><MenuItem value="support">معالجة الطلب واختيار المرجع</MenuItem><MenuItem value="classification">تصنيف العطل فقط</MenuItem>
       </TextField>
       <TextField fullWidth select label="مثال الاختبار" value={selected} disabled={busy} onChange={(e) => {setSelected(Number(e.target.value)); setResult(null);}}>
         {examples.map((c, i) => <MenuItem key={c.name} value={i}>{c.name}</MenuItem>)}
@@ -50,14 +58,17 @@ export default function LocalModelPage() {
       <LocalModelPreparation model={local} disabled={busy} />
       <Button variant="contained" onClick={run} disabled={busy || local.preparing}>تشغيل النموذج مجانًا</Button>
       {local.progress && <LocalModelProgress progress={local.progress} cancel={local.cancel} />}
-      {result?.status === 'success' && <Alert severity="success" sx={{mt: 2}}>اكتمل تشغيل النموذج على هذا المتصفح. الفئة المقترحة: {categoryLabels[category!]}.</Alert>}
-      {result?.reused_result && <Alert severity="info" sx={{mt: 1}}>أُعيد استخدام نتيجة النموذج المطابقة من هذه الجلسة دون إعادة الاستدلال.</Alert>}
-      {result?.status === 'success' && mode === 'classification' && category !== cases[selected].expected && <Alert severity="warning" sx={{mt: 1}}>اختلفت الفئة عن المتوقع لهذا المثال. نجاح التشغيل لا يثبت صحة التصنيف.</Alert>}
-      {result?.support?.status === 'success' && <Alert severity="info" sx={{mt: 1}}>قرار النموذج للطلب: {selectedReference
-        ? `المرجع ${selectedReference.label}: ${selectedReference.symptom}`
-        : result.support.output_token === 'E' ? 'خارج نطاق الدعم الفني للأجهزة الطبية' : 'تفاصيل إضافية أو مرجع مناسب مطلوب'}.</Alert>}
-      {result?.support?.status === 'success' && result.support.output_token !== supportCases[selected].expected && <Alert severity="warning" sx={{mt: 1}}>اختلف اختيار النموذج عن المتوقع لهذا المثال؛ يحتاج الاقتراح إلى مراجعة.</Alert>}
-      {result?.support?.status === 'error' && <Alert severity="warning" sx={{mt: 1}}>لم يكتمل اختيار المرجع: {localErrorText[result.support.error_code || 'load_failed']}</Alert>}
+      {result?.status === 'success' && <Alert dir="ltr" severity="success" sx={{mt: 2}}>The model completed on this browser. Proposed category: {categoryLabels[category!]}.</Alert>}
+      {result?.reused_result && <Alert severity="info" sx={{mt: 1}}>Reused the matching result from this session without repeating inference.</Alert>}
+      {result?.status === 'success' && mode === 'classification' && category !== cases[selected].expected && <Alert severity="warning" sx={{mt: 1}}>The category differs from the expected answer. Successful execution does not establish accuracy.</Alert>}
+      {result?.support?.status === 'success' && <Alert dir="ltr" severity="info" sx={{mt: 1}}>Model selection: {selectedReference
+        ? `Reference ${selectedReference.label}: ${selectedReference.symptom}`
+        : result.support.output_token === 'E' ? 'Outside medical-device technical support' : 'More details or suitable evidence needed'}.</Alert>}
+      {mode === 'support' && result?.support?.status === 'success' && result.support.output_token !== supportCases[selected].expected && <Alert severity="warning" sx={{mt: 1}}>The model selected a different result from the expected answer. Review is required.</Alert>}
+      {result?.guidance?.status === 'success' && <Alert dir="ltr" lang="en" severity="info" sx={{mt: 2, whiteSpace: 'pre-line', textAlign: 'left'}} data-testid="generation-preview">Unverified generated test answer, for review only:
+        {'\n' + result.guidance.text}</Alert>}
+      {result?.guidance?.status === 'error' && <Alert severity="warning" sx={{mt: 2}}>Answer generation did not finish: {result.guidance.error_code}</Alert>}
+      {result?.support?.status === 'error' && <Alert severity="warning" sx={{mt: 1}}>Reference selection did not finish: {localErrorText[result.support.error_code || 'load_failed']}</Alert>}
       {result?.status === 'error' && <Alert severity="warning" sx={{mt: 2}}>{localErrorText[result.error_code || 'load_failed']}</Alert>}
       {result?.status === 'success' && <Typography variant="body2" sx={{mt: 1}}>المدة بما فيها التجهيز: {(result.latency_ms / 1000).toFixed(1)} ثانية</Typography>}
       {result?.inference_ms !== undefined && <Typography variant="body2">زمن التحليل بعد التجهيز: {(result.inference_ms / 1000).toFixed(1)} ثانية</Typography>}

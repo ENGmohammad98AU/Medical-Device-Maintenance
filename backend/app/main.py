@@ -19,6 +19,7 @@ from app.database.seed import (
     sync_postgres_device_type_enum,
 )
 from app.services.fault_reference_lookup_service import FaultReferenceLookupService
+from app.services.generated_guidance_service import MANIFEST as GUIDANCE_MANIFEST
 
 # Import models to register them with SQLAlchemy
 # Import relationship targets before the Device model so the Device
@@ -134,7 +135,9 @@ async def health_check():
         "status": "healthy",
         "app_name": settings.APP_NAME,
         "version": settings.APP_VERSION,
-        "ai_mode": settings.AI_MODE
+        "ai_mode": settings.AI_MODE,
+        "guidance_version": GUIDANCE_MANIFEST["version"],
+        "output_language": GUIDANCE_MANIFEST["output_language"],
     }
 
 

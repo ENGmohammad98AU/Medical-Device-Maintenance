@@ -38,6 +38,7 @@ export class LocalModelClient {
       result.inference_ms = 0;
       result.preparation_ms = 0;
       if (result.support) result.support.latency_ms = 0;
+      if (result.guidance) result.guidance.latency_ms = 0;
       return Promise.resolve(result);
     }
     return new Promise((resolve) => {
@@ -82,7 +83,9 @@ export class LocalModelClient {
           if (data.result) this.finish(data.result);
         };
         worker.onerror = () => { if (worker === this.worker) this.finish(localFailure('load_failed')); };
-        worker.postMessage({id, input, force_cpu: this.forceCpu});
+        worker.postMessage({id, input, force_cpu: this.forceCpu,
+          inference_budget_ms: this.pending.inferenceStarted === undefined ? this.pending.inferenceBudget
+            : Math.max(0, this.pending.deadline - performance.now())});
       } catch { this.finish(localFailure('load_failed')); }
   }
   private armTimeout() {
@@ -100,7 +103,8 @@ export class LocalModelClient {
         inference_ms: pending.inferenceStarted === undefined ? 0 : Math.round(performance.now() - pending.inferenceStarted)};
     }
     if (pending?.key && result.status === 'success'
-      && (!pending.input?.support_context || result.support?.status === 'success')) {
+      && (pending.input?.support_context?.guidance ? result.guidance?.status === 'success'
+        : !pending.input?.support_context || result.support?.status === 'success')) {
       this.results.set(pending.key, {at: Date.now(), result: structuredClone(result)});
       if (this.results.size > 12) this.results.delete(this.results.keys().next().value!);
     }
