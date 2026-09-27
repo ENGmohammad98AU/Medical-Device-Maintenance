@@ -5,6 +5,7 @@ import { useLocalModel } from '../hooks/useLocalModel';
 import { categoryLabels, localErrorText, localModelConfig as config, type LocalResult } from '../llm/localModelContract';
 import cases from '../llm/smokeCases.json';
 import LocalModelProgress from '../components/LocalModelProgress';
+import LocalModelPreparation from '../components/LocalModelPreparation';
 import supportCases from '../llm/supportSmokeCases.json';
 import { supportModelConfig, type SupportCandidate } from '../llm/supportModelContract';
 
@@ -46,7 +47,8 @@ export default function LocalModelPage() {
         {supportCases[selected].candidates.map((c) => <Typography variant="body2" key={c.label}>{c.label}: {c.symptom}</Typography>)}
         {!supportCases[selected].candidates.length && <Typography variant="body2">لا توجد مراجع في هذا المثال.</Typography>}
       </Box>}
-      <Button variant="contained" onClick={run} disabled={busy}>تشغيل النموذج مجانًا</Button>
+      <LocalModelPreparation model={local} disabled={busy} />
+      <Button variant="contained" onClick={run} disabled={busy || local.preparing}>تشغيل النموذج مجانًا</Button>
       {local.progress && <LocalModelProgress progress={local.progress} cancel={local.cancel} />}
       {result?.status === 'success' && <Alert severity="success" sx={{mt: 2}}>اكتمل تشغيل النموذج على هذا المتصفح. الفئة المقترحة: {categoryLabels[category!]}.</Alert>}
       {result?.reused_result && <Alert severity="info" sx={{mt: 1}}>أُعيد استخدام نتيجة النموذج المطابقة من هذه الجلسة دون إعادة الاستدلال.</Alert>}
@@ -58,6 +60,7 @@ export default function LocalModelPage() {
       {result?.support?.status === 'error' && <Alert severity="warning" sx={{mt: 1}}>لم يكتمل اختيار المرجع: {localErrorText[result.support.error_code || 'load_failed']}</Alert>}
       {result?.status === 'error' && <Alert severity="warning" sx={{mt: 2}}>{localErrorText[result.error_code || 'load_failed']}</Alert>}
       {result?.status === 'success' && <Typography variant="body2" sx={{mt: 1}}>المدة بما فيها التجهيز: {(result.latency_ms / 1000).toFixed(1)} ثانية</Typography>}
+      {result?.inference_ms !== undefined && <Typography variant="body2">زمن التحليل بعد التجهيز: {(result.inference_ms / 1000).toFixed(1)} ثانية</Typography>}
     </CardContent></Card>
     <Alert severity="info" sx={{my: 2}}>هذه أمثلة تطوير اصطناعية وليست تشخيصًا أو قياسًا للدقة الطبية، ولا تنشئ طلب صيانة. في صفحة الصيانة يتحقق الخادم من الجهاز والمراجع ويُحفظ الاقتراح لمراجعة المختص.</Alert>
     <Typography variant="caption" component="p" dir="ltr" sx={{overflowWrap: 'anywhere'}}>Model: {config.model}<br />Revision: {config.revision}<br />Runtime: {result?.runtime || config.runtime}; {config.dtype}</Typography>

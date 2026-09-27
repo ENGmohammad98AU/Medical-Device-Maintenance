@@ -10,6 +10,8 @@ import { useAuth } from '../hooks/useAuth';
 import api, { authService, isAuthenticationError } from '../services/auth';
 import LLMTriageSummary, { TriageMetadata } from '../components/LLMTriageSummary';
 import { useLocalModel } from '../hooks/useLocalModel';
+import LocalModelPreparation from '../components/LocalModelPreparation';
+import {createAnalysisBudget, ANALYSIS_TIMEOUT_TEXT} from '../llm/analysisBudget';
 import { localModelConfig, localErrorText, type LocalError } from '../llm/localModelContract';
 import LocalModelProgress from '../components/LocalModelProgress';
 import type { SupportContext } from '../llm/supportModelContract';
@@ -65,6 +67,7 @@ export default function MaintenancePage() {
   const selectedDevice = devices.find((device) => device.id === Number(deviceId));
 
   const runAnalysis = async () => {
+    if (busy || localModel.preparing || (useLocal && !localModel.ready)) return;
     if (!selectedDevice) {
       setError('يرجى اختيار الجهاز'); return;
     }
@@ -77,8 +80,9 @@ export default function MaintenancePage() {
     setBusy(true); setError(''); setSuccess('');
     setDecisionSaved(false); setDecision(''); setComments('');
     setActionTaken(''); setVerificationResult(''); setOutcome('RESOLVED');
+    const budget = createAnalysisBudget(localModel.cancel);
     try {
-      await authService.getCurrentUser();
+      await authService.getCurrentUser(budget.requestOptions());
       if (!mounted.current) return;
       let currentReportId = reportId;
       if (!currentReportId) {
@@ -87,7 +91,7 @@ export default function MaintenancePage() {
           error_message: description.trim(),
           description: description.trim(),
           severity: 'medium',
-        });
+        }, budget.requestOptions());
         currentReportId = created.data.id;
         setReportId(currentReportId);
       }
@@ -110,7 +114,7 @@ export default function MaintenancePage() {
       if (useLocal) {
         // A rolling deployment or a transient preparation failure still permits
         // classification and an explicitly labelled reference-rule fallback.
-        try { support_context = (await api.post('/api/intelligent-support/prepare-support', requestData, {timeout: 90000})).data; }
+        try { support_context = (await api.post('/api/intelligent-support/prepare-support', requestData, budget.requestOptions(6_000))).data; }
         catch (error) {
           if (isAuthenticationError(error)) throw error;
           support_context = undefined;
@@ -121,17 +125,17 @@ export default function MaintenancePage() {
         report_text: requestData.description, device_type: selectedDevice.type.toUpperCase().replace(/[- ]/g, '_'),
         patient_connected: requestData.patient_connected,
         support_context,
-      }) : {status: 'disabled', revision: localModelConfig.revision, latency_ms: 0};
+      }, budget.inferenceMs()) : {status: 'disabled', revision: localModelConfig.revision, latency_ms: 0};
       if (!mounted.current) return;
-      const response = await api.post('/api/intelligent-support/analyze-fault', {...requestData, browser_llm}, { timeout: 90000 });
+      const response = await api.post('/api/intelligent-support/analyze-fault', {...requestData, browser_llm}, budget.requestOptions());
       setAnalysis(response.data);
       if (response.data.workflow?.fault_report_id) setReportId(response.data.workflow.fault_report_id);
       setActiveStep(1);
     } catch (err: any) {
       const detail = err.response?.data?.detail;
-      setError(typeof detail === 'string' ? detail : 'تعذر تحليل البلاغ. تحقق من الوصف وأعد المحاولة.');
+      setError(budget.expired ? ANALYSIS_TIMEOUT_TEXT : typeof detail === 'string' ? detail : 'تعذر تحليل البلاغ. تحقق من الوصف وأعد المحاولة.');
     }
-    finally { setBusy(false); }
+    finally { budget.dispose(); setBusy(false); }
   };
 
   const saveDecision = async () => {
@@ -193,9 +197,10 @@ export default function MaintenancePage() {
         <Grid item xs={12}><FormControlLabel control={<Switch disabled={busy} checked={patientConnected} onChange={(event) => setPatientConnected(event.target.checked)} />} label="المريض متصل بالجهاز حاليًا" /></Grid>
       </Grid>
       <FormControlLabel control={<Switch checked={useLocal} disabled={busy} onChange={(event) => setUseLocal(event.target.checked)} />} label="معالجة الطلب واختيار المرجع بنموذج محلي مجاني" />
+      {useLocal && <LocalModelPreparation model={localModel} disabled={busy} />}
       <Alert severity="info" sx={{mt: 2}}>لا يحتاج النموذج إلى حساب خارجي أو مفتاح API. التنزيل الأول نحو 1.1 غيغابايت، ثم يعمل على جهازك. يصنّف الطلب ويقترح المرجع المناسب؛ تحدد قواعد الخادم الخطورة وتبقى الإجراءات خاضعة لمراجعة المختص.</Alert>
-      {localModel.progress && <LocalModelProgress progress={localModel.progress} cancel={localModel.cancel} cancelLabel="متابعة بالقواعد دون انتظار النموذج" />}
-      <Button variant="contained" onClick={runAnalysis} disabled={busy} startIcon={busy ? <CircularProgress size={18} /> : <PsychologyIcon />} sx={{ mt: 3 }}>التحقق والتحليل</Button>
+      {localModel.progress && <LocalModelProgress progress={localModel.progress} cancel={localModel.cancel} cancelLabel={localModel.preparing ? 'إلغاء التجهيز' : 'متابعة بالقواعد دون انتظار النموذج'} />}
+      <Button variant="contained" onClick={runAnalysis} disabled={busy || localModel.preparing || (useLocal && !localModel.ready)} startIcon={busy ? <CircularProgress size={18} /> : <PsychologyIcon />} sx={{ mt: 3 }}>التحقق والتحليل</Button>
     </CardContent></Card>}
 
     {analysis && !analysis.reference_found && !analysis.customer_support && <Card><CardContent>

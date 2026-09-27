@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LocalModelClient } from './localModelClient';
-import { localModelConfig } from './localModelContract';
+import { LOCAL_INFERENCE_TIMEOUT_MS, LOCAL_PREPARATION_TIMEOUT_MS, localModelConfig } from './localModelContract';
 
 class FakeWorker {
   static instances: FakeWorker[] = [];
@@ -15,7 +15,7 @@ const input = {report_text: 'Battery does not charge', device_type: 'VENTILATOR'
 const success = {status: 'success', revision: localModelConfig.revision, output_token: 'A', latency_ms: 20};
 describe('local inference lifecycle', () => {
   beforeEach(() => {
-    vi.useFakeTimers(); FakeWorker.instances = [];
+    vi.useFakeTimers({toFake: ['setTimeout', 'clearTimeout', 'Date', 'performance']}); FakeWorker.instances = [];
     vi.stubGlobal('Worker', FakeWorker); vi.stubGlobal('crypto', {subtle: {}});
   });
   afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
@@ -39,8 +39,63 @@ describe('local inference lifecycle', () => {
   it('bounds inference time and terminates computation', async () => {
     const client = new LocalModelClient(); const result = client.run(input, vi.fn());
     FakeWorker.instances[0].message({id: 1, progress: {stage: 'running'}});
-    vi.advanceTimersByTime(15 * 60_000);
+    vi.advanceTimersByTime(LOCAL_INFERENCE_TIMEOUT_MS);
     expect((await result).error_code).toBe('timeout'); expect(FakeWorker.instances[0].terminate).toHaveBeenCalledOnce();
+  });
+  it('does not restart the deadline when reference selection begins or progress repeats', async () => {
+    const client = new LocalModelClient(); const result = client.run(input, vi.fn());
+    const worker = FakeWorker.instances[0];
+    worker.message({id: 1, progress: {stage: 'running', task: 'classification'}});
+    vi.advanceTimersByTime(30_000);
+    worker.message({id: 1, progress: {stage: 'running', task: 'reference_selection'}});
+    vi.advanceTimersByTime(LOCAL_INFERENCE_TIMEOUT_MS - 30_000);
+    expect(await result).toMatchObject({error_code: 'timeout', inference_ms: LOCAL_INFERENCE_TIMEOUT_MS});
+    expect(worker.terminate).toHaveBeenCalledOnce();
+  });
+  it('keeps the inference deadline through a GPU retry and subsequent loading messages', async () => {
+    const client = new LocalModelClient(); const result = client.run(input, vi.fn());
+    FakeWorker.instances[0].message({id: 1, progress: {stage: 'running'}});
+    vi.advanceTimersByTime(40_000);
+    FakeWorker.instances[0].message({id: 1, retry_cpu: true});
+    const cpu = FakeWorker.instances[1];
+    cpu.message({id: 1, progress: {stage: 'loading'}});
+    vi.advanceTimersByTime(LOCAL_INFERENCE_TIMEOUT_MS - 40_000);
+    expect((await result).error_code).toBe('timeout'); expect(cpu.terminate).toHaveBeenCalledOnce();
+  });
+  it('prepares without a report, reuses the worker and records preparation separately', async () => {
+    const client = new LocalModelClient(); const preparing = client.prepare(vi.fn());
+    const worker = FakeWorker.instances[0];
+    expect(worker.postMessage).toHaveBeenCalledWith({id: 1, input: undefined, force_cpu: false});
+    vi.advanceTimersByTime(120_000);
+    worker.message({id: 1, progress: {stage: 'warming'}});
+    worker.message({id: 1, ready: true, result: {status: 'success', revision: localModelConfig.revision, latency_ms: 120_000}});
+    expect(await preparing).toMatchObject({preparation_ms: 120_000, inference_ms: 0});
+    expect(client.isReady).toBe(true);
+    expect((await client.prepare(vi.fn())).latency_ms).toBe(0);
+    const result = client.run(input, vi.fn());
+    vi.advanceTimersByTime(20_000);
+    worker.message({id: 2, result: success});
+    expect(await result).toMatchObject({preparation_ms: 0, inference_ms: 20_000});
+    expect(FakeWorker.instances).toHaveLength(1);
+    client.dispose(); expect(client.isReady).toBe(false);
+  });
+  it('bounds preparation without renewing it at each warmup task', async () => {
+    const client = new LocalModelClient(); const result = client.prepare(vi.fn());
+    vi.advanceTimersByTime(LOCAL_PREPARATION_TIMEOUT_MS - 1);
+    FakeWorker.instances[0].message({id: 1, progress: {stage: 'warming'}});
+    vi.advanceTimersByTime(1);
+    expect((await result).error_code).toBe('timeout'); expect(client.isReady).toBe(false);
+  });
+  it('honors a smaller workflow budget and refuses invalid or exhausted budgets', async () => {
+    const client = new LocalModelClient();
+    for (const budget of [0, -1, NaN, Infinity]) {
+      expect((await client.run(input, vi.fn(), budget)).error_code).toBe('timeout');
+    }
+    expect(FakeWorker.instances).toHaveLength(0);
+    const result = client.run(input, vi.fn(), 12_000);
+    FakeWorker.instances[0].message({id: 1, progress: {stage: 'running'}});
+    vi.advanceTimersByTime(12_000);
+    expect((await result).error_code).toBe('timeout');
   });
   it('handles runtime crashes without an unresolved request', async () => {
     const client = new LocalModelClient(); const result = client.run(input, vi.fn());

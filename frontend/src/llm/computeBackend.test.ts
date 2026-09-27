@@ -29,9 +29,9 @@ describe('local compute selection', () => {
     await vi.advanceTimersByTimeAsync(3000);
     expect(await selected).toBe('wasm');
   });
-  it('provides two bounded contexts and disables silent truncation', () => {
-    const options = runtimeLoadOptions({context_tokens: 3072, batch_tokens: 512}, 4, 'wasm');
-    expect(options).toMatchObject({n_ctx: 3072, n_parallel: 2, kv_unified: false, ctx_shift: false,
+  it('keeps classification, reference and scope prefixes in three bounded contexts', () => {
+    const options = runtimeLoadOptions({context_tokens: 4608, batch_tokens: 512, parallel_slots: 3}, 4, 'wasm');
+    expect(options).toMatchObject({n_ctx: 4608, n_parallel: 3, kv_unified: false, ctx_shift: false,
       n_threads: 4, n_batch: 512, n_ubatch: 512, n_gpu_layers: 0});
   });
 });

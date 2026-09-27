@@ -13,16 +13,25 @@ export class LocalModelSession {
     clearTimeout(this.idleTimer);
     this.users++;
     const id = Symbol();
+    const client = this.client;
     let released = false;
     const cancel = () => {
       if (this.owner === id) { this.owner = undefined; this.client.cancel(); }
     };
     return {
-      run: async (input: LocalInput, progress: (value: LocalProgress) => void) => {
+      get isReady() { return !released && client.isReady; },
+      prepare: async (progress: (value: LocalProgress) => void) => {
         if (released) return localFailure('cancelled');
         if (this.owner) return localFailure('load_failed');
         this.owner = id;
-        try { return await this.client.run(input, progress); }
+        try { return await this.client.prepare(progress); }
+        finally { if (this.owner === id) this.owner = undefined; }
+      },
+      run: async (input: LocalInput, progress: (value: LocalProgress) => void, budgetMs?: number) => {
+        if (released) return localFailure('cancelled');
+        if (this.owner) return localFailure('load_failed');
+        this.owner = id;
+        try { return await this.client.run(input, progress, budgetMs); }
         finally { if (this.owner === id) this.owner = undefined; }
       },
       cancel,

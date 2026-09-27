@@ -1,4 +1,4 @@
-import axios, { AxiosError } from 'axios';
+import axios, { AxiosError, type AxiosRequestConfig } from 'axios';
 import { LoginRequest, RegisterRequest, AuthResponse, User } from '../types/auth';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? 'http://localhost:8000' : '');
@@ -83,8 +83,8 @@ export const authService = {
     return response.data;
   },
 
-  async getCurrentUser(): Promise<User> {
-    const response = await api.get<User>('/api/auth/me', {timeout: 90000});
+  async getCurrentUser(options: AxiosRequestConfig = {}): Promise<User> {
+    const response = await api.get<User>('/api/auth/me', {timeout: 90000, ...options});
     return response.data;
   },
 
