@@ -113,10 +113,34 @@ separate production generation gate failed. No CPU policy change was adopted.
 Raw measurements are in
 [qwen17-attention-settings-20260928.json](qwen17-attention-settings-20260928.json).
 
-Final status: 100 frontend unit tests and the build passed locally and in the
+Status before the session lifecycle follow-up: 100 frontend unit tests and the build passed locally and in the
 Windows source run; backend clean installation passed. Browser preparation and
 therefore generated-answer/API-replay performance remain unverified. The PR
-stays draft and main/live hosting are unchanged. The useful next decision is
-whether native local execution is acceptable or execution must remain entirely
-inside the browser; that changes the integration architecture and installation
-requirements. A working user-device GPU still needs direct runtime validation.
+stays draft and main/live hosting are unchanged. A working user-device GPU still
+needs direct runtime validation.
+
+The user subsequently confirmed that the GitHub project is the version submitted
+to the evaluation committee. That code is the reference for further work. The
+session lifecycle follow-up retains the existing model, model bytes, runtime,
+prompts, inference budgets and validation; it adds no cloud or native inference.
+
+Code inspection found an avoidable repeat cost: releasing a route's model lease
+cancelled preparation along with report inference, destroying the worker and
+partially prepared prefixes. Returning to the model screen therefore restarted
+preparation even though preparation contains only static prompts.
+
+Preparation now belongs to the browser model session. A new model screen joins
+the same in-flight preparation and receives its latest progress; leaving a screen
+removes that screen's listener without discarding the work. Report inference
+still cancels when its requesting screen leaves. Explicit cancellation, logout
+and the ten-minute idle limit still release the worker. A cancellation without an
+active request no longer destroys an already prepared model.
+
+The five new lifecycle regressions cover reuse across navigation, detached
+progress listeners, explicit cancellation and immediate retry, idle disposal,
+logout before scheduled startup, and idle cancellation of a prepared worker.
+All 105 frontend tests and the TypeScript/production build passed locally. These
+tests verify that the avoidable
+restart is removed; they are not timings from a real Windows model run. This
+change does not reduce the computation required for the first preparation and
+does not resolve the previously measured cold CPU preparation timeout.
