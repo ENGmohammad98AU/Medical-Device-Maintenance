@@ -239,6 +239,10 @@ jobs:
         working-directory: frontend
         run: npm run benchmark:prepared
 
+      - name: Verify the production classifier retains at least 38 of 40 development cases
+        working-directory: frontend
+        run: npm run benchmark:prepared -- --classification
+
       - name: Save browser benchmark evidence
         if: always()
         uses: actions/upload-artifact@v4

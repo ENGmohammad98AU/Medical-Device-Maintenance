@@ -14,7 +14,7 @@ import CustomerSupportSummary, {type CustomerSupportMetadata} from '../component
 import { useLocalModel } from '../hooks/useLocalModel';
 import LocalModelPreparation from '../components/LocalModelPreparation';
 import {createAnalysisBudget, ANALYSIS_TIMEOUT_TEXT} from '../llm/analysisBudget';
-import { localModelConfig } from '../llm/localModelContract';
+import { localModelConfig, serverModelResult } from '../llm/localModelContract';
 import LocalModelProgress from '../components/LocalModelProgress';
 import type { SupportContext } from '../llm/supportModelContract';
 
@@ -124,11 +124,11 @@ export default function MaintenancePage() {
         }
       }
       if (!mounted.current) return;
-      const browser_llm = useLocal ? await localModel.run({
+      const browser_llm = useLocal ? serverModelResult(await localModel.run({
         report_text: requestData.description, device_type: selectedDevice.type.toUpperCase().replace(/[- ]/g, '_'),
         patient_connected: requestData.patient_connected,
         support_context,
-      }, budget.inferenceMs()) : {status: 'disabled', revision: localModelConfig.revision, latency_ms: 0};
+      }, budget.inferenceMs())) : {status: 'disabled', revision: localModelConfig.revision, latency_ms: 0};
       if (!mounted.current) return;
       const response = await api.post('/api/intelligent-support/analyze-fault', {...requestData, browser_llm}, budget.requestOptions());
       setAnalysis(response.data);

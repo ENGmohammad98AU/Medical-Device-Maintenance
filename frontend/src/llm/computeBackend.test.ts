@@ -25,9 +25,11 @@ describe('local compute selection', () => {
   });
   it('does not leave analysis waiting on an unresponsive GPU probe', async () => {
     vi.useFakeTimers(); browser({}).mockReturnValue(new Promise(() => {}));
-    const selected = selectComputeBackend();
+    const diagnostic = vi.fn();
+    const selected = selectComputeBackend(false, diagnostic);
     await vi.advanceTimersByTimeAsync(3000);
     expect(await selected).toBe('wasm');
+    expect(diagnostic).toHaveBeenCalledWith('GPU adapter lookup exceeded 3 seconds.');
   });
   it('keeps classification, reference and scope prefixes in three bounded contexts', () => {
     const options = runtimeLoadOptions({context_tokens: 4608, batch_tokens: 512, parallel_slots: 3}, 4, 'wasm');

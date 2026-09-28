@@ -93,7 +93,14 @@ try {
   if (!baseline) {
     const start = performance.now();
     await page.getByRole('button', {name: 'تجهيز النموذج مسبقًا', exact: true}).click();
-    await page.getByText('النموذج جاهز.', {exact: false}).waitFor({timeout: 15 * 60_000});
+    // Fail as soon as the client stops preparation, instead of waiting another
+    // fifteen minutes for a ready message that can no longer appear.
+    await Promise.race([
+      page.getByText('النموذج جاهز.', {exact: false}).waitFor({timeout: 17 * 60_000}),
+      page.getByTestId('model-preparation-error').waitFor({timeout: 17 * 60_000}).then(async () => {
+        throw new Error(await page.getByTestId('model-preparation-error').innerText());
+      }),
+    ]);
     result.preparation_ms = Math.round(performance.now() - start);
     const preparation = await page.evaluate(() => window.__modelResults.at(-1));
     result.preparation_version = preparation.preparation_version || 'legacy-full-prompts';

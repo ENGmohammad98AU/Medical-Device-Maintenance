@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import { Wllama } from '@wllama/wllama';
+import { Wllama, LogLevel } from '@wllama/wllama';
 import { inferenceThreads } from './browserIsolation.js';
 import { loadGgufModel, type StorageMode } from './modelStorage.js';
 import {selectComputeBackend, runtimeLoadOptions, type ComputeBackend} from './computeBackend.js';
@@ -14,6 +14,15 @@ Object.defineProperty(globalThis, 'document', {value: {baseURI: self.location.hr
 let generator: Promise<Wllama> | undefined;
 let storageMode: StorageMode | undefined;
 let computeBackend: ComputeBackend = 'wasm';
+const preparationLog: string[] = [];
+let recordPreparation = false;
+const cleanDiagnostic = (message: string) => message.replace(/https?:\/\/\S+/g, '[model asset]').replace(/\s+/g, ' ').slice(0, 600);
+function rememberPreparation(...args: unknown[]) {
+  if (!recordPreparation) return;
+  const text = cleanDiagnostic(args.map(arg => typeof arg === 'string' ? arg : arg instanceof Error ? arg.message : '').join(' '));
+  if (text) preparationLog.push(text);
+  if (preparationLog.length > 4) preparationLog.shift();
+}
 self.addEventListener('message', async (event: MessageEvent<{id: number; input?: LocalInput; force_cpu?: boolean; inference_budget_ms?: number}>) => {
   const {id, input} = event.data;
   const started = performance.now();
@@ -22,21 +31,35 @@ self.addEventListener('message', async (event: MessageEvent<{id: number; input?:
     if (!generator) self.postMessage({id, progress: {stage: 'loading', storage_mode: storageMode}});
     if (!WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,5,3,1,4,1]))) throw new Error('unsupported_browser');
     generator ??= (async () => {
-      computeBackend = await selectComputeBackend(event.data.force_cpu);
-      const model = new Wllama({
-        default: new URL(`${import.meta.env.BASE_URL}llm/wllama-3.6.1.wasm`, self.location.origin).href},
-      {suppressNativeLog: true, logger: {debug() {}, log() {}, warn() {}, error() {}}});
-      await loadGgufModel(model, `https://huggingface.co/${config.model}/resolve/${config.revision}/${config.model_file}`, {
-        ...runtimeLoadOptions(config, inferenceThreads(), computeBackend),
-        progressCallback: ({loaded, total}) => self.postMessage({id, progress: {stage: 'loading', storage_mode: storageMode, compute_backend: computeBackend,
-          percent: total ? Math.min(100, 100 * loaded / total) : undefined}}),
-      }, config.model_file_bytes, mode => {
-        storageMode = mode;
-        self.postMessage({id, progress: {stage: 'loading', storage_mode: mode, compute_backend: computeBackend}});
-      });
-      await warmLocalPrompts(model, task => self.postMessage({id, progress: {
-        stage: 'warming', task, storage_mode: storageMode, compute_backend: computeBackend}}));
-      return model;
+      computeBackend = await selectComputeBackend(event.data.force_cpu,
+        reason => self.postMessage({id, diagnostic: reason}));
+      preparationLog.length = 0;
+      recordPreparation = true;
+      let initializing = false;
+      try {
+        const model = new Wllama({
+          default: new URL(`${import.meta.env.BASE_URL}llm/wllama-3.6.1.wasm`, self.location.origin).href},
+        {suppressNativeLog: false, logger: {debug() {}, log() {}, warn: rememberPreparation, error: rememberPreparation}});
+        await loadGgufModel(model, `https://huggingface.co/${config.model}/resolve/${config.revision}/${config.model_file}`, {
+          ...runtimeLoadOptions(config, inferenceThreads(), computeBackend),
+          log_level: LogLevel.WARN,
+          progressCallback: ({loaded, total}) => self.postMessage({id, progress: {stage: initializing ? 'initializing' : 'loading', storage_mode: storageMode, compute_backend: computeBackend,
+            percent: total ? Math.min(100, 100 * loaded / total) : undefined}}),
+        }, config.model_file_bytes, mode => {
+          storageMode = mode;
+          self.postMessage({id, progress: {stage: 'loading', storage_mode: mode, compute_backend: computeBackend}});
+        }, () => {
+          initializing = true;
+          self.postMessage({id, progress: {stage: 'initializing', storage_mode: storageMode, compute_backend: computeBackend}});
+        });
+        await warmLocalPrompts(model, task => self.postMessage({id, progress: {
+          stage: 'warming', task, storage_mode: storageMode, compute_backend: computeBackend}}));
+        return model;
+      } finally {
+        // The logger must not retain report text during later inference. This
+        // flag belongs to the model initialization, not the first request.
+        recordPreparation = false;
+      }
     })();
     const loaded = await generator;
     self.postMessage({id, ready: true});
@@ -90,14 +113,16 @@ self.addEventListener('message', async (event: MessageEvent<{id: number; input?:
     if (computeBackend === 'webgpu' && message !== 'input_too_long' && message !== 'invalid_output') {
       // The client terminates this entire worker before a single CPU retry,
       // releasing the failed GPU runtime instead of keeping two models loaded.
-      self.postMessage({id, retry_cpu: true});
+      const detail = loading ? cleanDiagnostic([message, ...preparationLog].filter(Boolean).join(' | '))
+        : error instanceof Error ? error.name : 'runtime error';
+      self.postMessage({id, retry_cpu: true, diagnostic: `GPU ${loading ? 'preparation' : 'inference'} failed: ${detail || 'runtime failure'}`});
       return;
     }
     const code: LocalError = error instanceof Error && error.name === 'QuotaExceededError' ? 'insufficient_storage'
       : message === 'input_too_long' || message === 'invalid_output' || message === 'unsupported_browser' ? message : 'load_failed';
     // Loading has no report text. Keep diagnostics local and strip resource URLs;
     // inference failures expose only the exception name, never user input.
-    const diagnostic = loading ? message.replace(/https?:\/\/\S+/g, '[model asset]').slice(0, 500)
+    const diagnostic = loading ? cleanDiagnostic([message, ...preparationLog].filter(Boolean).join(' | '))
       : error instanceof Error ? error.name : 'runtime error';
     self.postMessage({id, diagnostic: `${loading ? 'load' : 'inference'}: ${diagnostic}`});
     self.postMessage({id, result: {...localFailure(code), latency_ms: Math.round(performance.now() - started)}});

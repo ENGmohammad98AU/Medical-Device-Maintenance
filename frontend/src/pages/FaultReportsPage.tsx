@@ -41,7 +41,7 @@ import { filterFaultReports, normalizeEnumValue } from '../utils/faultReportFilt
 import { useLocalModel } from '../hooks/useLocalModel';
 import LocalModelPreparation from '../components/LocalModelPreparation';
 import {createAnalysisBudget, ANALYSIS_TIMEOUT_TEXT} from '../llm/analysisBudget';
-import { localModelConfig } from '../llm/localModelContract';
+import { localModelConfig, serverModelResult } from '../llm/localModelContract';
 import type { SupportContext } from '../llm/supportModelContract';
 import LocalModelProgress from '../components/LocalModelProgress';
 import LLMTriageSummary from '../components/LLMTriageSummary';
@@ -277,12 +277,12 @@ export default function FaultReportsPage() {
       }
       if (!mounted.current) return;
 
-      const browser_llm = useLlm ? await localModel.run({
+      const browser_llm = useLlm ? serverModelResult(await localModel.run({
         report_text: supportRequest.description,
         device_type: selectedDevice.type.toUpperCase().replace(/[- ]/g, '_'),
         patient_connected: patientConnected,
         support_context,
-      }, budget.inferenceMs()) : { status: 'disabled' as const, revision: localModelConfig.revision, latency_ms: 0 };
+      }, budget.inferenceMs())) : { status: 'disabled' as const, revision: localModelConfig.revision, latency_ms: 0 };
       if (!mounted.current) return;
       setAnalysisStage('التحقق من المراجع وحفظ التحليل…');
 

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Alert, Box, Button, Card, CardContent, Container, MenuItem, TextField, Typography } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { useLocalModel } from '../hooks/useLocalModel';
-import { categoryLabels, localErrorText, localModelConfig as config, type LocalResult } from '../llm/localModelContract';
+import { categoryLabels, localErrorText, localResultError, localModelConfig as config, type LocalResult } from '../llm/localModelContract';
 import cases from '../llm/smokeCases.json';
 import LocalModelProgress from '../components/LocalModelProgress';
 import LocalModelPreparation from '../components/LocalModelPreparation';
@@ -69,12 +69,18 @@ export default function LocalModelPage() {
         {'\n' + result.guidance.text}</Alert>}
       {result?.guidance?.status === 'error' && <Alert severity="warning" sx={{mt: 2}}>Answer generation did not finish: {result.guidance.error_code}</Alert>}
       {result?.support?.status === 'error' && <Alert severity="warning" sx={{mt: 1}}>Reference selection did not finish: {localErrorText[result.support.error_code || 'load_failed']}</Alert>}
-      {result?.status === 'error' && <Alert severity="warning" sx={{mt: 2}}>{localErrorText[result.error_code || 'load_failed']}</Alert>}
+      {result?.status === 'error' && <Alert severity="warning" sx={{mt: 2}}>{localResultError(result)}</Alert>}
       {result?.status === 'success' && <Typography variant="body2" sx={{mt: 1}}>المدة بما فيها التجهيز: {(result.latency_ms / 1000).toFixed(1)} ثانية</Typography>}
       {result?.inference_ms !== undefined && <Typography variant="body2">زمن التحليل بعد التجهيز: {(result.inference_ms / 1000).toFixed(1)} ثانية</Typography>}
     </CardContent></Card>
     <Alert severity="info" sx={{my: 2}}>هذه أمثلة تطوير اصطناعية وليست تشخيصًا أو قياسًا للدقة الطبية، ولا تنشئ طلب صيانة. في صفحة الصيانة يتحقق الخادم من الجهاز والمراجع ويُحفظ الاقتراح لمراجعة المختص.</Alert>
-    <Typography variant="caption" component="p" dir="ltr" sx={{overflowWrap: 'anywhere'}}>Model: {config.model}<br />Revision: {config.revision}<br />Runtime: {result?.runtime || config.runtime}; {config.dtype}</Typography>
+    <Typography variant="caption" component="p" dir="ltr" sx={{overflowWrap: 'anywhere'}}>Model: {config.model}<br />Revision: {config.revision}<br />Runtime: {result?.runtime || local.preparation?.runtime || config.runtime}; {config.dtype}</Typography>
+    {(result?.compute_diagnostic || local.preparation?.compute_diagnostic) && <Box component="details" sx={{mt: 1}}>
+      <Box component="summary">تفاصيل محرك التشغيل</Box>
+      <Typography variant="caption" component="p" dir="ltr" sx={{overflowWrap: 'anywhere'}}>
+        {result?.compute_diagnostic || local.preparation?.compute_diagnostic}
+      </Typography>
+    </Box>}
     <Button component={Link} to="/login" sx={{mt: 2}}>الدخول إلى نظام الصيانة</Button>
   </Box></Container>;
 }
