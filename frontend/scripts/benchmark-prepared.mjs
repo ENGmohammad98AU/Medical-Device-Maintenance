@@ -13,7 +13,8 @@ const baseline = process.argv.includes('--baseline');
 const generation = process.argv.includes('--generation');
 const classification = process.argv.includes('--classification');
 const probe = process.argv.includes('--probe');
-const runtimeProbe = process.env.LLM_THREADS ? {threads: Number(process.env.LLM_THREADS), ubatch: Number(process.env.LLM_UBATCH || 512)} : null;
+const runtimeProbe = process.env.LLM_THREADS ? {threads: Number(process.env.LLM_THREADS), ubatch: Number(process.env.LLM_UBATCH || 512),
+  ...(process.env.LLM_FLASH_ATTN === '0' ? {flash_attn: false} : {})} : null;
 const resultSuffix = process.env.BENCHMARK_RESULT_SUFFIX || '';
 assert.match(resultSuffix, /^[a-z0-9-]*$/);
 const root = resolve(process.env.BENCHMARK_DIST || 'dist');

@@ -1,0 +1,200 @@
+{
+  "model": "unsloth/Qwen3-1.7B-GGUF",
+  "revision": "d7f544eead698dbd1f15126ef60b45a1e1933222",
+  "sha256": "b139949c5bd74937ad8ed8c8cf3d9ffb1e99c866c823204dc42c0d91fa181897",
+  "note": "Same Windows host; real production worker; same prompts and 120s preparation/45s inference deadlines. Download excluded from phase sums. No exact-answer reuse.",
+  "rows": [
+    {
+      "threads": 4,
+      "ubatch": 512,
+      "exit_code": 1,
+      "preparation_compute_ms": 120137,
+      "result": {
+        "kind": "prepared-generation",
+        "model": "unsloth/Qwen3-1.7B-GGUF",
+        "revision": "d7f544eead698dbd1f15126ef60b45a1e1933222",
+        "model_sha256": "b139949c5bd74937ad8ed8c8cf3d9ffb1e99c866c823204dc42c0d91fa181897",
+        "browser": "147.0.7727.15",
+        "measured_at": "2026-09-28T21:28:45.940Z",
+        "machine": {
+          "os": "win32",
+          "cpu": "AMD EPYC 7763 64-Core Processor                ",
+          "logical_cpus": 4
+        },
+        "model_source": "SHA-verified local file; Internet download excluded",
+        "requested_runtime": {
+          "threads": 4,
+          "ubatch": 512
+        },
+        "preparation_ms": 135676,
+        "rows": [],
+        "browser_threads": 4,
+        "isolated": true,
+        "error": "Error: Model initialization and preparation exceeded 120 seconds on this device. The running model was stopped; cached model files were not deleted. You can continue with reference analysis.",
+        "preparation_diagnostics": [],
+        "preparation_stages": [
+          {
+            "stage": "loading",
+            "ms": 15436,
+            "completed": true
+          },
+          {
+            "stage": "initializing",
+            "ms": 5920,
+            "completed": true
+          },
+          {
+            "stage": "classification",
+            "ms": 114217,
+            "completed": false
+          }
+        ]
+      }
+    },
+    {
+      "threads": 2,
+      "ubatch": 512,
+      "exit_code": 1,
+      "preparation_compute_ms": 120202,
+      "result": {
+        "kind": "prepared-generation",
+        "model": "unsloth/Qwen3-1.7B-GGUF",
+        "revision": "d7f544eead698dbd1f15126ef60b45a1e1933222",
+        "model_sha256": "b139949c5bd74937ad8ed8c8cf3d9ffb1e99c866c823204dc42c0d91fa181897",
+        "browser": "147.0.7727.15",
+        "measured_at": "2026-09-28T21:31:04.724Z",
+        "machine": {
+          "os": "win32",
+          "cpu": "AMD EPYC 7763 64-Core Processor                ",
+          "logical_cpus": 4
+        },
+        "model_source": "SHA-verified local file; Internet download excluded",
+        "requested_runtime": {
+          "threads": 2,
+          "ubatch": 512
+        },
+        "preparation_ms": 132267,
+        "rows": [],
+        "browser_threads": 4,
+        "isolated": true,
+        "error": "Error: Model initialization and preparation exceeded 120 seconds on this device. The running model was stopped; cached model files were not deleted. You can continue with reference analysis.",
+        "preparation_diagnostics": [],
+        "preparation_stages": [
+          {
+            "stage": "loading",
+            "ms": 11972,
+            "completed": true
+          },
+          {
+            "stage": "initializing",
+            "ms": 5070,
+            "completed": true
+          },
+          {
+            "stage": "classification",
+            "ms": 115132,
+            "completed": false
+          }
+        ]
+      }
+    },
+    {
+      "threads": 1,
+      "ubatch": 512,
+      "exit_code": 1,
+      "preparation_compute_ms": 120298,
+      "result": {
+        "kind": "prepared-generation",
+        "model": "unsloth/Qwen3-1.7B-GGUF",
+        "revision": "d7f544eead698dbd1f15126ef60b45a1e1933222",
+        "model_sha256": "b139949c5bd74937ad8ed8c8cf3d9ffb1e99c866c823204dc42c0d91fa181897",
+        "browser": "147.0.7727.15",
+        "measured_at": "2026-09-28T21:33:21.155Z",
+        "machine": {
+          "os": "win32",
+          "cpu": "AMD EPYC 7763 64-Core Processor                ",
+          "logical_cpus": 4
+        },
+        "model_source": "SHA-verified local file; Internet download excluded",
+        "requested_runtime": {
+          "threads": 1,
+          "ubatch": 512
+        },
+        "preparation_ms": 132157,
+        "rows": [],
+        "browser_threads": 4,
+        "isolated": true,
+        "error": "Error: Model initialization and preparation exceeded 120 seconds on this device. The running model was stopped; cached model files were not deleted. You can continue with reference analysis.",
+        "preparation_diagnostics": [],
+        "preparation_stages": [
+          {
+            "stage": "loading",
+            "ms": 11739,
+            "completed": true
+          },
+          {
+            "stage": "initializing",
+            "ms": 6051,
+            "completed": true
+          },
+          {
+            "stage": "classification",
+            "ms": 114247,
+            "completed": false
+          }
+        ]
+      }
+    },
+    {
+      "threads": 2,
+      "ubatch": 128,
+      "exit_code": 1,
+      "preparation_compute_ms": 120245,
+      "result": {
+        "kind": "prepared-generation",
+        "model": "unsloth/Qwen3-1.7B-GGUF",
+        "revision": "d7f544eead698dbd1f15126ef60b45a1e1933222",
+        "model_sha256": "b139949c5bd74937ad8ed8c8cf3d9ffb1e99c866c823204dc42c0d91fa181897",
+        "browser": "147.0.7727.15",
+        "measured_at": "2026-09-28T21:35:36.855Z",
+        "machine": {
+          "os": "win32",
+          "cpu": "AMD EPYC 7763 64-Core Processor                ",
+          "logical_cpus": 4
+        },
+        "model_source": "SHA-verified local file; Internet download excluded",
+        "requested_runtime": {
+          "threads": 2,
+          "ubatch": 128
+        },
+        "preparation_ms": 130693,
+        "rows": [],
+        "browser_threads": 4,
+        "isolated": true,
+        "error": "Error: Model initialization and preparation exceeded 120 seconds on this device. The running model was stopped; cached model files were not deleted. You can continue with reference analysis.",
+        "preparation_diagnostics": [],
+        "preparation_stages": [
+          {
+            "stage": "loading",
+            "ms": 10342,
+            "completed": true
+          },
+          {
+            "stage": "initializing",
+            "ms": 5355,
+            "completed": true
+          },
+          {
+            "stage": "classification",
+            "ms": 114890,
+            "completed": false
+          }
+        ]
+      }
+    }
+  ],
+  "completed": true,
+  "source_workflow": "https://github.com/ENGmohammad98AU/Medical-Device-Maintenance/actions/runs/36486136072",
+  "source_commit": "303418fb6dc6e3fc19532b402ec1491ae03f45cf",
+  "interpretation": "All four variants timed out during preparation; censored values must not be ranked as complete preparation times. No decoded answers were produced."
+}

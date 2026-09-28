@@ -9,10 +9,17 @@ describe('local compute selection', () => {
     return requestAdapter;
   }
   it('uses WebGPU only when a hardware adapter and JSPI are available', async () => {
-    browser({info: {isFallbackAdapter: false}});
+    const probe = browser({info: {isFallbackAdapter: false}, features: new Set(['shader-f16'])});
     expect(await selectComputeBackend()).toBe('webgpu');
+    expect(probe).toHaveBeenCalledWith();
     vi.stubGlobal('WebAssembly', {});
     expect(await selectComputeBackend()).toBe('wasm');
+  });
+  it('rejects an available adapter that the pinned runtime cannot use', async () => {
+    browser({features: new Set(['subgroups'])});
+    const diagnostic = vi.fn();
+    expect(await selectComputeBackend(false, diagnostic)).toBe('wasm');
+    expect(diagnostic).toHaveBeenCalledWith('The GPU adapter lacks shader-f16, which this model runtime requires.');
   });
   it('uses CPU for unavailable, software or rejected adapters and forced retry', async () => {
     for (const adapter of [null, {isFallbackAdapter: true}, {info: {isFallbackAdapter: true}}]) {

@@ -24,7 +24,7 @@ function rememberPreparation(...args: unknown[]) {
   if (preparationLog.length > 4) preparationLog.shift();
 }
 self.addEventListener('message', async (event: MessageEvent<{id: number; input?: LocalInput; force_cpu?: boolean; inference_budget_ms?: number;
-  benchmark_runtime?: {threads: number; ubatch: number}}>) => {
+  benchmark_runtime?: {threads: number; ubatch: number; flash_attn?: boolean}}>) => {
   const {id, input} = event.data;
   const started = performance.now();
   let loading = true;
@@ -49,6 +49,7 @@ self.addEventListener('message', async (event: MessageEvent<{id: number; input?:
           if (![1, 2, 3, 4, 8].includes(threads) || ![128, 256, 512].includes(ubatch)) throw new Error('invalid_benchmark_runtime');
           options.n_threads = threads;
           options.n_ubatch = ubatch;
+          if (event.data.benchmark_runtime.flash_attn === false) options.flash_attn = false;
         }
         await loadGgufModel(model, `https://huggingface.co/${config.model}/resolve/${config.revision}/${config.model_file}`, {
           ...options,

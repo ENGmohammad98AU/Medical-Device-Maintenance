@@ -69,7 +69,7 @@ export default function LocalModelPage() {
         {'\n' + result.guidance.text}</Alert>}
       {result?.guidance?.status === 'error' && <Alert severity="warning" sx={{mt: 2}}>Answer generation did not finish: {result.guidance.error_code}</Alert>}
       {result?.support?.status === 'error' && <Alert severity="warning" sx={{mt: 1}}>Reference selection did not finish: {localErrorText[result.support.error_code || 'load_failed']}</Alert>}
-      {result?.status === 'error' && <Alert severity="warning" sx={{mt: 2}}>{localResultError(result)}</Alert>}
+      {result?.status === 'error' && <Alert severity="warning" sx={{mt: 2}} data-testid="model-run-error">{localResultError(result)}</Alert>}
       {result?.status === 'success' && <Typography variant="body2" sx={{mt: 1}}>المدة بما فيها التجهيز: {(result.latency_ms / 1000).toFixed(1)} ثانية</Typography>}
       {result?.inference_ms !== undefined && <Typography variant="body2">زمن التحليل بعد التجهيز: {(result.inference_ms / 1000).toFixed(1)} ثانية</Typography>}
     </CardContent></Card>

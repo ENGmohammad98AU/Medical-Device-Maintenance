@@ -40,9 +40,9 @@ jobs:
           npm ci
           npm run build -- --mode benchmark
           npx playwright install chromium
-      - name: Compare threads and microbatch on identical model bytes
+      - name: Compare CPU attention kernels on identical model bytes
         working-directory: frontend
-        run: node scripts/benchmark-runtime.mjs
+        run: node scripts/benchmark-runtime.mjs --attention
       - name: Save successful and failed runtime measurements
         if: always()
         uses: actions/upload-artifact@v4

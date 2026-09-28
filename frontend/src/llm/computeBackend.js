@@ -7,11 +7,16 @@ export async function selectComputeBackend(forceCpu = false, onReason = () => {}
   let timedOut = false;
   try {
     const adapter = await Promise.race([
-      navigator.gpu.requestAdapter({powerPreference: 'high-performance'}),
+      // Match the pinned llama.cpp WebGPU backend, which requests the default
+      // adapter. Probing a different adapter can advertise unusable GPU support.
+      navigator.gpu.requestAdapter(),
       new Promise(resolve => {timer = setTimeout(() => { timedOut = true; resolve(null); }, 3000);}),
     ]);
     if (!adapter) return cpu(timedOut ? 'GPU adapter lookup exceeded 3 seconds.' : 'The browser returned no GPU adapter.');
     if (adapter.isFallbackAdapter || adapter.info?.isFallbackAdapter) return cpu('The browser supplied a software GPU adapter.');
+    // The pinned native backend registers no GPU device without ShaderF16.
+    // Adapter availability alone must not label a CPU run as GPU acceleration.
+    if (!adapter.features?.has('shader-f16')) return cpu('The GPU adapter lacks shader-f16, which this model runtime requires.');
     return 'webgpu';
   } catch { return cpu('GPU adapter lookup failed.'); }
   finally { clearTimeout(timer); }
