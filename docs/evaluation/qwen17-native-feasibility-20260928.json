@@ -1,0 +1,71 @@
+{
+  "kind": "native-generation-feasibility",
+  "runtime": "official llama.cpp b11236 CPU CLI",
+  "model": "unsloth/Qwen3-1.7B-GGUF",
+  "revision": "d7f544eead698dbd1f15126ef60b45a1e1933222",
+  "model_sha256": "b139949c5bd74937ad8ed8c8cf3d9ffb1e99c866c823204dc42c0d91fa181897",
+  "os": "Linux",
+  "threads": 4,
+  "n_ctx": 6144,
+  "n_batch": 512,
+  "n_ubatch": 512,
+  "sampling": {
+    "temperature": 0.2,
+    "top_p": 0.8,
+    "top_k": 20,
+    "repeat_penalty": 1.05,
+    "seed": 0,
+    "max_tokens": 128
+  },
+  "limitations": [
+    "Two synthetic generation prompts only, captured from unchanged production generateGuidance().",
+    "Different Linux host and runtime from the Windows browser comparison; do not calculate a browser speedup from these figures.",
+    "Fresh process per sample; model download excluded. Prompt and decoding times exclude model loading.",
+    "No browser UI, classifier, reference selection, API replay, Windows or user-device measurement. This is feasibility evidence, not an implemented native integration or a release gate.",
+    "Automatic CLI conversation formatting was disabled; literal prompt escapes were preserved."
+  ],
+  "rows": [
+    {
+      "sample": "Hamilton C6 trolley wheel",
+      "prompt_sha256": "ed0e05f4669c343f88d5a193e95262179ea8fd74c0aea574c1bd202d54b53db8",
+      "answer": "The trolley caster wheel is jammed. Check for debris or obstructions. Cause unconfirmed.",
+      "eos_marker_observed": true,
+      "load_ms": 10695.46,
+      "prompt_eval_ms": 8225.68,
+      "decode_ms": 2579.18,
+      "inference_total_ms": 10921.22,
+      "native_metrics": [
+        "0.22.915.959 I common_perf_print:    sampling time =     102.37 ms",
+        "0.22.915.961 I common_perf_print:    samplers time =      86.41 ms /   317 tokens",
+        "0.22.915.978 I common_perf_print:        load time =   10695.46 ms",
+        "0.22.915.981 I common_perf_print: prompt eval time =    8225.68 ms /   296 tokens (   27.79 ms per token,    35.98 tokens per second)",
+        "0.22.915.983 I common_perf_print:        eval time =    2579.18 ms /    20 runs   (  128.96 ms per token,     7.75 tokens per second)",
+        "0.22.915.984 I common_perf_print:       total time =   10921.22 ms /   316 tokens",
+        "0.22.915.986 I common_perf_print: unaccounted time =      13.99 ms /   0.1 %      (total - sampling - prompt eval - eval) / (total)",
+        "0.22.915.987 I common_perf_print:    graphs reused =         19"
+      ]
+    },
+    {
+      "sample": "Philips MX800 sourced Resp answer",
+      "prompt_sha256": "0c2478e57fa3ea1b3fb0d49acb33168790e698e44c83bab1a828670cecbf4c92",
+      "answer": "The reported issue is \"Resp Leads Off,\" indicating disconnected respiration electrodes. A specialist should check RA, LA, and LL connections. No replacement advice.",
+      "eos_marker_observed": true,
+      "load_ms": 11055.51,
+      "prompt_eval_ms": 10528.77,
+      "decode_ms": 3383.57,
+      "inference_total_ms": 14081.06,
+      "native_metrics": [
+        "0.26.385.696 I common_perf_print:    sampling time =     146.61 ms",
+        "0.26.385.698 I common_perf_print:    samplers time =     123.11 ms /   411 tokens",
+        "0.26.385.703 I common_perf_print:        load time =   11055.51 ms",
+        "0.26.385.706 I common_perf_print: prompt eval time =   10528.77 ms /   379 tokens (   27.78 ms per token,    36.00 tokens per second)",
+        "0.26.385.708 I common_perf_print:        eval time =    3383.57 ms /    31 runs   (  109.15 ms per token,     9.16 tokens per second)",
+        "0.26.385.709 I common_perf_print:       total time =   14081.06 ms /   410 tokens",
+        "0.26.385.711 I common_perf_print: unaccounted time =      22.11 ms /   0.2 %      (total - sampling - prompt eval - eval) / (total)",
+        "0.26.385.712 I common_perf_print:    graphs reused =         30"
+      ]
+    }
+  ],
+  "architecture": "x86_64",
+  "cpu": "Intel(R) Xeon(R) CPU E5-2673 v4 @ 2.30GHz"
+}

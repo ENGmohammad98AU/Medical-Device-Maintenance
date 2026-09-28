@@ -89,3 +89,34 @@ only in the benchmark build; production resource limits remain fixed. This
 experiment cannot count as a successful release gate: all six generation cases,
 at least 38/40 development classifications and API answer validation must still
 pass before a runtime policy is adopted.
+
+A separate native-runtime feasibility probe used the exact GGUF weights and two
+unchanged production generation prompts in official llama.cpp b11236 on a Linux
+Intel Xeon E5-2673 v4, with four CPU threads. Inference took 10.921 s and 14.081 s;
+separate model loads took 10.695 s and 11.056 s. Raw prompts were supplied with
+CLI conversation formatting disabled. See
+[qwen17-native-feasibility-20260928.json](qwen17-native-feasibility-20260928.json).
+This is not a same-host speed comparison, an integrated application test, or a
+Windows result. Classification, reference selection and API replay were not
+part of this two-prompt feasibility probe. A native local option would require
+user installation and separate end-to-end quality validation; no native service
+or report-routing change has been deployed.
+
+The CPU attention follow-up completed in Windows run
+[36487725217](https://github.com/ENGmohammad98AU/Medical-Device-Maintenance/actions/runs/36487725217).
+Four threads with automatic attention / microbatch 512, disabled Flash Attention
+/ 512, and disabled Flash Attention / 128 all timed out during classifier
+preparation. The native load plus unfinished warmup reached 120.351, 120.394 and
+120.226 seconds, respectively. These are failure cutoffs, not completed timings.
+The diagnostic job finished successfully because it recorded all failures; the
+separate production generation gate failed. No CPU policy change was adopted.
+Raw measurements are in
+[qwen17-attention-settings-20260928.json](qwen17-attention-settings-20260928.json).
+
+Final status: 100 frontend unit tests and the build passed locally and in the
+Windows source run; backend clean installation passed. Browser preparation and
+therefore generated-answer/API-replay performance remain unverified. The PR
+stays draft and main/live hosting are unchanged. The useful next decision is
+whether native local execution is acceptable or execution must remain entirely
+inside the browser; that changes the integration architecture and installation
+requirements. A working user-device GPU still needs direct runtime validation.
