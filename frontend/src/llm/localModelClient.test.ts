@@ -36,6 +36,17 @@ describe('local inference lifecycle', () => {
     const second = client.run(input, vi.fn()); FakeWorker.instances[1].message({id: 2, result: success});
     expect((await second).status).toBe('success'); client.dispose();
   });
+  it('keeps a prepared worker when cancellation has no active request', async () => {
+    const client = new LocalModelClient(); const preparing = client.prepare(vi.fn());
+    const worker = FakeWorker.instances[0];
+    worker.message({id: 1, ready: true, result: {status: 'success'}});
+    await preparing; client.cancel();
+    expect(client.isReady).toBe(true); expect(worker.terminate).not.toHaveBeenCalled();
+    const result = client.run(input, vi.fn());
+    worker.message({id: 2, result: success});
+    expect((await result).status).toBe('success'); expect(FakeWorker.instances).toHaveLength(1);
+    client.dispose(); expect(worker.terminate).toHaveBeenCalledOnce();
+  });
   it('bounds inference time and terminates computation', async () => {
     const client = new LocalModelClient(); const result = client.run(input, vi.fn());
     FakeWorker.instances[0].message({id: 1, progress: {stage: 'running'}});
