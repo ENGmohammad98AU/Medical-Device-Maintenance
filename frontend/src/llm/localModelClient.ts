@@ -111,6 +111,6 @@ export class LocalModelClient {
     if (result.status !== 'success') { this.worker?.terminate(); this.worker = undefined; this.ready = false; }
     pending?.resolve(result);
   }
-  cancel() { this.finish(localFailure('cancelled')); }
+  cancel() { if (this.pending) this.finish(localFailure('cancelled')); }
   dispose() { this.cancel(); this.worker?.terminate(); this.worker = undefined; this.ready = false; this.results.clear(); }
 }
