@@ -12,6 +12,10 @@ import {chromium} from 'playwright';
 const baseline = process.argv.includes('--baseline');
 const generation = process.argv.includes('--generation');
 const classification = process.argv.includes('--classification');
+const probe = process.argv.includes('--probe');
+const runtimeProbe = process.env.LLM_THREADS ? {threads: Number(process.env.LLM_THREADS), ubatch: Number(process.env.LLM_UBATCH || 512)} : null;
+const resultSuffix = process.env.BENCHMARK_RESULT_SUFFIX || '';
+assert.match(resultSuffix, /^[a-z0-9-]*$/);
 const root = resolve(process.env.BENCHMARK_DIST || 'dist');
 const config = JSON.parse(await readFile('src/llm/localModelConfig.json', 'utf8'));
 const cases = JSON.parse(await readFile('src/llm/supportSmokeCases.json', 'utf8'));
@@ -49,42 +53,53 @@ await new Promise(resolve => server.listen(4175, '127.0.0.1', resolve));
 const origin = 'http://127.0.0.1:4175';
 const profile = await mkdtemp(join(tmpdir(), 'prepared-llm-'));
 const context = await chromium.launchPersistentContext(profile, {headless: true,
-  executablePath: process.env.BROWSER_EXECUTABLE || undefined, args: ['--no-sandbox']});
+  executablePath: process.env.BROWSER_EXECUTABLE || undefined});
 const page = context.pages()[0];
 page.on('pageerror', error => console.error(error.message));
 page.on('console', msg => {
   if (msg.type() === 'warning' || msg.type() === 'error')
     console.log(msg.text().slice(0, msg.text().startsWith('GENERATION_TRACE=') ? 6000 : 300));
 });
-await context.addInitScript(() => {
+await context.addInitScript(runtimeProbe => {
   // Collect real worker results without replacing inference or timers.
   window.__modelResults = [];
   window.__preparationEvents = [];
+  window.__preparationDiagnostics = [];
   const NativeWorker = window.Worker;
   window.Worker = class extends NativeWorker {
     constructor(...args) { super(...args);
-      if (String(args[0]).includes('localModel.worker')) window.__localModelWorker = this;
+      if (!String(args[0]).includes('localModel.worker')) return;
+      window.__localModelWorker = this;
+      if (runtimeProbe) {
+        const post = this.postMessage.bind(this);
+        this.postMessage = (message, ...transfer) => post({...message, force_cpu: true, benchmark_runtime: runtimeProbe}, ...transfer);
+      }
       this.addEventListener('message', event => {
+      if (event.data.diagnostic) window.__preparationDiagnostics.push(event.data.diagnostic);
       if (event.data.id === 1 && (event.data.progress || event.data.ready)) {
         const stage = event.data.ready ? 'ready' : event.data.progress.stage;
         const task = event.data.progress?.task;
         const previous = window.__preparationEvents.at(-1);
-        if (stage !== previous?.stage || task !== previous?.task)
+        if (stage !== previous?.stage || task !== previous?.task) {
           window.__preparationEvents.push({stage, task, at: performance.now()});
+          console.warn('PREPARATION_STAGE=' + JSON.stringify({stage, task}));
+        }
       }
       if (event.data.progress?.stage === 'running') console.warn('INFERENCE_STAGE=' + JSON.stringify({id: event.data.id, task: event.data.progress.task}));
       if (event.data.result) window.__modelResults.push(event.data.result);
     }); }
   };
-});
+}, runtimeProbe);
 if (localModel) await context.route(`https://huggingface.co/${config.model}/resolve/${config.revision}/${config.model_file}`,
   route => route.fulfill({status: 307, headers: {location: origin + '/benchmark-model.gguf', 'Access-Control-Allow-Origin': '*'}}));
 const result = {kind: generation ? 'prepared-generation' : classification ? 'prepared-classification' : baseline ? 'unprepared-baseline' : 'prepared-production', model: config.model,
   revision: config.revision, model_sha256: config.model_file_sha256, browser: context.browser().version(),
   measured_at: new Date().toISOString(), machine: {os: platform(), cpu: cpus()[0]?.model, logical_cpus: cpus().length},
   model_source: localModel ? 'SHA-verified local file; Internet download excluded' : 'model host',
-  preparation_ms: 0, rows: []};
+  requested_runtime: runtimeProbe, preparation_ms: 0, rows: []};
 await mkdir('benchmark-results', {recursive: true});
+let preparationStarted;
+let preparationFinished;
 try {
   await page.goto(origin + '/local-model');
   result.browser_threads = await page.evaluate(async () => (await import('/llm/isolation.js')).inferenceThreads());
@@ -92,19 +107,22 @@ try {
   assert.equal(result.isolated, true);
   if (!baseline) {
     const start = performance.now();
+    preparationStarted = start;
     await page.getByRole('button', {name: 'تجهيز النموذج مسبقًا', exact: true}).click();
     // Fail as soon as the client stops preparation, instead of waiting another
     // fifteen minutes for a ready message that can no longer appear.
     await Promise.race([
-      page.getByText('النموذج جاهز.', {exact: false}).waitFor({timeout: 17 * 60_000}),
-      page.getByTestId('model-preparation-error').waitFor({timeout: 17 * 60_000}).then(async () => {
+      page.getByText('النموذج جاهز.', {exact: false}).waitFor({timeout: (probe ? 4 : 17) * 60_000}),
+      page.getByTestId('model-preparation-error').waitFor({timeout: (probe ? 4 : 17) * 60_000}).then(async () => {
         throw new Error(await page.getByTestId('model-preparation-error').innerText());
       }),
     ]);
     result.preparation_ms = Math.round(performance.now() - start);
+    preparationFinished = true;
     const preparation = await page.evaluate(() => window.__modelResults.at(-1));
     result.preparation_version = preparation.preparation_version || 'legacy-full-prompts';
     result.browser_threads = preparation.preparation_threads || result.browser_threads;
+    if (runtimeProbe) assert.equal(result.browser_threads, runtimeProbe.threads, 'Runtime comparison requires a benchmark build');
     const events = await page.evaluate(() => window.__preparationEvents);
     result.preparation_stages = events.slice(0, -1).map((event, index) => ({
       stage: event.task || event.stage, ms: Math.round(events[index + 1].at - event.at),
@@ -117,7 +135,8 @@ try {
     await page.getByRole('option', {name: 'توليد إرشادات نصية قصيرة', exact: true}).click();
     // Exercise sourced answers and both input languages and devices on the same
     // prepared worker. Every case still must independently pass the deadline.
-    for (const sample of [...generationCases.slice(-1), ...generationCases.slice(0, -1)]) {
+    const orderedCases = [...generationCases.slice(-1), ...generationCases.slice(0, -1)];
+    for (const sample of (probe ? orderedCases.slice(0, 2) : orderedCases)) {
       console.log('GENERATION_CASE_START=' + sample.name);
       await page.getByRole('combobox').nth(1).click();
       await page.getByRole('option', {name: sample.name, exact: true}).click();
@@ -221,8 +240,20 @@ try {
   result.completed = true;
 } catch (error) { result.error = String(error); throw error; }
 finally {
-  await writeFile(`benchmark-results/${result.kind}.json`, JSON.stringify(result, null, 2) + '\n');
-  await page.screenshot({path: `benchmark-results/${result.kind}.png`, fullPage: true}).catch(() => {});
+  // Preserve the last unfinished phase too: a timeout is diagnostic evidence,
+  // not a zero-duration preparation with an empty result.
+  if (preparationStarted !== undefined && !preparationFinished) result.preparation_ms = Math.round(performance.now() - preparationStarted);
+  const trace = await page.evaluate(() => ({events: window.__preparationEvents, diagnostics: window.__preparationDiagnostics, end: performance.now()})).catch(() => null);
+  if (trace) {
+    result.preparation_diagnostics = trace.diagnostics;
+    result.preparation_stages = trace.events.filter(event => event.stage !== 'ready').map((event, index) => ({
+      stage: event.task || event.stage, ms: Math.round((trace.events[index + 1]?.at ?? trace.end) - event.at),
+      completed: Boolean(trace.events[index + 1]),
+    }));
+  }
+  console.log('PREPARATION_RESULT=' + JSON.stringify({preparation_ms: result.preparation_ms, stages: result.preparation_stages, error: result.error}));
+  await writeFile(`benchmark-results/${result.kind}${resultSuffix}.json`, JSON.stringify(result, null, 2) + '\n');
+  await page.screenshot({path: `benchmark-results/${result.kind}${resultSuffix}.png`, fullPage: true}).catch(() => {});
   await context.close(); await new Promise(resolve => server.close(resolve));
   await rm(profile, {recursive: true, force: true, maxRetries: 3, retryDelay: 200});
 }

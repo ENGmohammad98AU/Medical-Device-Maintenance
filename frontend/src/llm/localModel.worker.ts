@@ -23,7 +23,8 @@ function rememberPreparation(...args: unknown[]) {
   if (text) preparationLog.push(text);
   if (preparationLog.length > 4) preparationLog.shift();
 }
-self.addEventListener('message', async (event: MessageEvent<{id: number; input?: LocalInput; force_cpu?: boolean; inference_budget_ms?: number}>) => {
+self.addEventListener('message', async (event: MessageEvent<{id: number; input?: LocalInput; force_cpu?: boolean; inference_budget_ms?: number;
+  benchmark_runtime?: {threads: number; ubatch: number}}>) => {
   const {id, input} = event.data;
   const started = performance.now();
   let loading = true;
@@ -40,8 +41,17 @@ self.addEventListener('message', async (event: MessageEvent<{id: number; input?:
         const model = new Wllama({
           default: new URL(`${import.meta.env.BASE_URL}llm/wllama-3.6.1.wasm`, self.location.origin).href},
         {suppressNativeLog: false, logger: {debug() {}, log() {}, warn: rememberPreparation, error: rememberPreparation}});
+        const options = runtimeLoadOptions(config, inferenceThreads(), computeBackend);
+        // Controlled, same-host CI measurements only. Vite removes this branch
+        // from production, so reports cannot change runtime resource limits.
+        if (import.meta.env.MODE === 'benchmark' && event.data.benchmark_runtime) {
+          const {threads, ubatch} = event.data.benchmark_runtime;
+          if (![1, 2, 3, 4, 8].includes(threads) || ![128, 256, 512].includes(ubatch)) throw new Error('invalid_benchmark_runtime');
+          options.n_threads = threads;
+          options.n_ubatch = ubatch;
+        }
         await loadGgufModel(model, `https://huggingface.co/${config.model}/resolve/${config.revision}/${config.model_file}`, {
-          ...runtimeLoadOptions(config, inferenceThreads(), computeBackend),
+          ...options,
           log_level: LogLevel.WARN,
           progressCallback: ({loaded, total}) => self.postMessage({id, progress: {stage: initializing ? 'initializing' : 'loading', storage_mode: storageMode, compute_backend: computeBackend,
             percent: total ? Math.min(100, 100 * loaded / total) : undefined}}),
