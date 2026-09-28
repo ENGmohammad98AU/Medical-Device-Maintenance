@@ -1,10 +1,15 @@
 # Model preparation
 
-`browser-preparation-v2-prefix-cache` prepares the same pinned Qwen3-1.7B
+`browser-preparation-v3-bounded` prepares the same pinned Qwen3-1.7B
 Q4_K_M weights using wllama 3.6.1. All four prompt families are ready before
 report submission. Warmup evaluates their shared prefixes and discards one
 completion token; it no longer evaluates the unused empty-report suffixes.
 Report text and generated answers are never part of this preparation cache.
+
+The current branch bounds native initialization and warmup to a shared 120
+seconds after download. This is a stopping limit, not a promise that preparation
+will succeed on every CPU. Windows CPU results failed this gate; see the
+[follow-up measurements](evaluation/qwen17-bounded-preparation-20260928.md).
 
 On isolated desktop browsers reporting at least eight logical processors, the
 CPU runtime uses up to eight threads while reserving one logical processor for
@@ -16,7 +21,7 @@ downloads and preparation during navigation. A full browser reload still needs
 in-memory prompt preparation. The initial 1,107,409,472-byte model download is
 unchanged, so its duration still depends on the connection and local storage.
 
-The measured comparison is in
+The earlier Linux preparation comparison (before the bounded-phase follow-up) is in
 [`evaluation/qwen17-preparation-speed-20260927.json`](evaluation/qwen17-preparation-speed-20260927.json).
 It uses a SHA-verified local model file, a fresh browser profile per run and the
 actual production worker on one Linux desktop. Internet transfer is excluded.

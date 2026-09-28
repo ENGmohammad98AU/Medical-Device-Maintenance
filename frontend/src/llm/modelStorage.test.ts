@@ -43,3 +43,15 @@ it('does not retry native runtime failures as storage problems', async () => {
   await expect(run()).rejects.toThrow('native failure'); expect(fetch).not.toHaveBeenCalled();
   expect(model.loadModel).toHaveBeenCalledOnce();
 });
+it('starts native preparation only after the complete model file is available', async () => {
+  const {model, cached} = setup();
+  const stages: string[] = [];
+  model.modelManager.downloadModel.mockImplementation(async () => {
+    stages.push('download'); return cached;
+  });
+  cached.open.mockImplementation(async () => { stages.push('file ready'); return [new Blob(['abc'])]; });
+  model.loadModel.mockImplementation(async () => { stages.push('native load'); });
+  await loadGgufModel(model as unknown as Parameters<typeof loadGgufModel>[0], url, {}, 3,
+    undefined, () => stages.push('preparation deadline'));
+  expect(stages).toEqual(['download', 'file ready', 'preparation deadline', 'native load']);
+});

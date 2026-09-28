@@ -1,0 +1,158 @@
+{
+  "model": "unsloth/Qwen3-1.7B-GGUF",
+  "revision": "d7f544eead698dbd1f15126ef60b45a1e1933222",
+  "sha256": "b139949c5bd74937ad8ed8c8cf3d9ffb1e99c866c823204dc42c0d91fa181897",
+  "note": "Same Windows host; real production worker; same prompts and 120s preparation/45s inference deadlines. Download excluded from phase sums. No exact-answer reuse.",
+  "rows": [
+    {
+      "threads": 4,
+      "ubatch": 512,
+      "flash_attn": "auto",
+      "exit_code": 1,
+      "preparation_compute_ms": 120351,
+      "result": {
+        "kind": "prepared-generation",
+        "model": "unsloth/Qwen3-1.7B-GGUF",
+        "revision": "d7f544eead698dbd1f15126ef60b45a1e1933222",
+        "model_sha256": "b139949c5bd74937ad8ed8c8cf3d9ffb1e99c866c823204dc42c0d91fa181897",
+        "browser": "147.0.7727.15",
+        "measured_at": "2026-09-28T21:42:33.923Z",
+        "machine": {
+          "os": "win32",
+          "cpu": "INTEL(R) XEON(R) PLATINUM 8573C",
+          "logical_cpus": 4
+        },
+        "model_source": "SHA-verified local file; Internet download excluded",
+        "requested_runtime": {
+          "threads": 4,
+          "ubatch": 512
+        },
+        "preparation_ms": 133094,
+        "rows": [],
+        "browser_threads": 4,
+        "isolated": true,
+        "error": "Error: Model initialization and preparation exceeded 120 seconds on this device. The running model was stopped; cached model files were not deleted. You can continue with reference analysis.",
+        "preparation_diagnostics": [],
+        "preparation_stages": [
+          {
+            "stage": "loading",
+            "ms": 12655,
+            "completed": true
+          },
+          {
+            "stage": "initializing",
+            "ms": 5196,
+            "completed": true
+          },
+          {
+            "stage": "classification",
+            "ms": 115155,
+            "completed": false
+          }
+        ]
+      }
+    },
+    {
+      "threads": 4,
+      "ubatch": 512,
+      "flash_attn": false,
+      "exit_code": 1,
+      "preparation_compute_ms": 120394,
+      "result": {
+        "kind": "prepared-generation",
+        "model": "unsloth/Qwen3-1.7B-GGUF",
+        "revision": "d7f544eead698dbd1f15126ef60b45a1e1933222",
+        "model_sha256": "b139949c5bd74937ad8ed8c8cf3d9ffb1e99c866c823204dc42c0d91fa181897",
+        "browser": "147.0.7727.15",
+        "measured_at": "2026-09-28T21:44:49.887Z",
+        "machine": {
+          "os": "win32",
+          "cpu": "INTEL(R) XEON(R) PLATINUM 8573C",
+          "logical_cpus": 4
+        },
+        "model_source": "SHA-verified local file; Internet download excluded",
+        "requested_runtime": {
+          "threads": 4,
+          "ubatch": 512,
+          "flash_attn": false
+        },
+        "preparation_ms": 131354,
+        "rows": [],
+        "browser_threads": 4,
+        "isolated": true,
+        "error": "Error: Model initialization and preparation exceeded 120 seconds on this device. The running model was stopped; cached model files were not deleted. You can continue with reference analysis.",
+        "preparation_diagnostics": [],
+        "preparation_stages": [
+          {
+            "stage": "loading",
+            "ms": 10865,
+            "completed": true
+          },
+          {
+            "stage": "initializing",
+            "ms": 5470,
+            "completed": true
+          },
+          {
+            "stage": "classification",
+            "ms": 114924,
+            "completed": false
+          }
+        ]
+      }
+    },
+    {
+      "threads": 4,
+      "ubatch": 128,
+      "flash_attn": false,
+      "exit_code": 1,
+      "preparation_compute_ms": 120226,
+      "result": {
+        "kind": "prepared-generation",
+        "model": "unsloth/Qwen3-1.7B-GGUF",
+        "revision": "d7f544eead698dbd1f15126ef60b45a1e1933222",
+        "model_sha256": "b139949c5bd74937ad8ed8c8cf3d9ffb1e99c866c823204dc42c0d91fa181897",
+        "browser": "147.0.7727.15",
+        "measured_at": "2026-09-28T21:47:03.977Z",
+        "machine": {
+          "os": "win32",
+          "cpu": "INTEL(R) XEON(R) PLATINUM 8573C",
+          "logical_cpus": 4
+        },
+        "model_source": "SHA-verified local file; Internet download excluded",
+        "requested_runtime": {
+          "threads": 4,
+          "ubatch": 128,
+          "flash_attn": false
+        },
+        "preparation_ms": 131402,
+        "rows": [],
+        "browser_threads": 4,
+        "isolated": true,
+        "error": "Error: Model initialization and preparation exceeded 120 seconds on this device. The running model was stopped; cached model files were not deleted. You can continue with reference analysis.",
+        "preparation_diagnostics": [],
+        "preparation_stages": [
+          {
+            "stage": "loading",
+            "ms": 11082,
+            "completed": true
+          },
+          {
+            "stage": "initializing",
+            "ms": 6880,
+            "completed": true
+          },
+          {
+            "stage": "classification",
+            "ms": 113346,
+            "completed": false
+          }
+        ]
+      }
+    }
+  ],
+  "completed": true,
+  "source_workflow": "https://github.com/ENGmohammad98AU/Medical-Device-Maintenance/actions/runs/36487725217",
+  "source_commit": "e3aed4d67f6c62e14edf3d575abbee2f2993377e",
+  "interpretation": "All three attention variants timed out during classifier preparation. No successful speedup or generated answer was established. The unchanged production policy is retained."
+}

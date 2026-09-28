@@ -184,5 +184,5 @@
     "oxigen": "oxygen",
     "syring": "syringe"
   },
-  "preparation_version": "browser-preparation-v2-prefix-cache"
+  "preparation_version": "browser-preparation-v3-bounded"
 }

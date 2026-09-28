@@ -9,10 +9,17 @@ describe('local compute selection', () => {
     return requestAdapter;
   }
   it('uses WebGPU only when a hardware adapter and JSPI are available', async () => {
-    browser({info: {isFallbackAdapter: false}});
+    const probe = browser({info: {isFallbackAdapter: false}, features: new Set(['shader-f16'])});
     expect(await selectComputeBackend()).toBe('webgpu');
+    expect(probe).toHaveBeenCalledWith();
     vi.stubGlobal('WebAssembly', {});
     expect(await selectComputeBackend()).toBe('wasm');
+  });
+  it('rejects an available adapter that the pinned runtime cannot use', async () => {
+    browser({features: new Set(['subgroups'])});
+    const diagnostic = vi.fn();
+    expect(await selectComputeBackend(false, diagnostic)).toBe('wasm');
+    expect(diagnostic).toHaveBeenCalledWith('The GPU adapter lacks shader-f16, which this model runtime requires.');
   });
   it('uses CPU for unavailable, software or rejected adapters and forced retry', async () => {
     for (const adapter of [null, {isFallbackAdapter: true}, {info: {isFallbackAdapter: true}}]) {
@@ -25,9 +32,11 @@ describe('local compute selection', () => {
   });
   it('does not leave analysis waiting on an unresponsive GPU probe', async () => {
     vi.useFakeTimers(); browser({}).mockReturnValue(new Promise(() => {}));
-    const selected = selectComputeBackend();
+    const diagnostic = vi.fn();
+    const selected = selectComputeBackend(false, diagnostic);
     await vi.advanceTimersByTimeAsync(3000);
     expect(await selected).toBe('wasm');
+    expect(diagnostic).toHaveBeenCalledWith('GPU adapter lookup exceeded 3 seconds.');
   });
   it('keeps classification, reference and scope prefixes in three bounded contexts', () => {
     const options = runtimeLoadOptions({context_tokens: 4608, batch_tokens: 512, parallel_slots: 3}, 4, 'wasm');

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LocalModelClient } from './localModelClient';
-import { LOCAL_INFERENCE_TIMEOUT_MS, LOCAL_PREPARATION_TIMEOUT_MS, localModelConfig } from './localModelContract';
+import { LOCAL_INFERENCE_TIMEOUT_MS, LOCAL_PREPARATION_TIMEOUT_MS, LOCAL_DOWNLOAD_TIMEOUT_MS, localModelConfig } from './localModelContract';
 
 class FakeWorker {
   static instances: FakeWorker[] = [];
@@ -35,6 +35,17 @@ describe('local inference lifecycle', () => {
     expect(FakeWorker.instances[0].terminate).toHaveBeenCalledOnce();
     const second = client.run(input, vi.fn()); FakeWorker.instances[1].message({id: 2, result: success});
     expect((await second).status).toBe('success'); client.dispose();
+  });
+  it('keeps a prepared worker when cancellation has no active request', async () => {
+    const client = new LocalModelClient(); const preparing = client.prepare(vi.fn());
+    const worker = FakeWorker.instances[0];
+    worker.message({id: 1, ready: true, result: {status: 'success'}});
+    await preparing; client.cancel();
+    expect(client.isReady).toBe(true); expect(worker.terminate).not.toHaveBeenCalled();
+    const result = client.run(input, vi.fn());
+    worker.message({id: 2, result: success});
+    expect((await result).status).toBe('success'); expect(FakeWorker.instances).toHaveLength(1);
+    client.dispose(); expect(worker.terminate).toHaveBeenCalledOnce();
   });
   it('bounds inference time and terminates computation', async () => {
     const client = new LocalModelClient(); const result = client.run(input, vi.fn());
@@ -81,10 +92,49 @@ describe('local inference lifecycle', () => {
   });
   it('bounds preparation without renewing it at each warmup task', async () => {
     const client = new LocalModelClient(); const result = client.prepare(vi.fn());
+    FakeWorker.instances[0].message({id: 1, progress: {stage: 'initializing'}});
     vi.advanceTimersByTime(LOCAL_PREPARATION_TIMEOUT_MS - 1);
     FakeWorker.instances[0].message({id: 1, progress: {stage: 'warming'}});
     vi.advanceTimersByTime(1);
-    expect((await result).error_code).toBe('timeout'); expect(client.isReady).toBe(false);
+    expect(await result).toMatchObject({error_code: 'timeout', timeout_phase: 'preparation'}); expect(client.isReady).toBe(false);
+  });
+  it('allows the download to finish before starting the bounded model initialization', async () => {
+    const client = new LocalModelClient(); const result = client.prepare(vi.fn());
+    const worker = FakeWorker.instances[0];
+    vi.advanceTimersByTime(4 * 60_000);
+    worker.message({id: 1, progress: {stage: 'loading', percent: 100}});
+    expect(worker.terminate).not.toHaveBeenCalled();
+    worker.message({id: 1, progress: {stage: 'initializing'}});
+    vi.advanceTimersByTime(LOCAL_PREPARATION_TIMEOUT_MS);
+    expect(await result).toMatchObject({error_code: 'timeout', timeout_phase: 'preparation'});
+    expect(worker.terminate).toHaveBeenCalledOnce();
+  });
+  it('bounds a stalled download and identifies its timeout separately', async () => {
+    const client = new LocalModelClient(); const result = client.prepare(vi.fn());
+    vi.advanceTimersByTime(LOCAL_DOWNLOAD_TIMEOUT_MS);
+    expect(await result).toMatchObject({error_code: 'timeout', timeout_phase: 'download'});
+    expect(FakeWorker.instances[0].terminate).toHaveBeenCalledOnce();
+  });
+  it('keeps the preparation deadline and GPU diagnostic through the CPU retry', async () => {
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const client = new LocalModelClient(); const progress = vi.fn();
+      const result = client.prepare(progress); const gpu = FakeWorker.instances[0];
+      gpu.message({id: 1, progress: {stage: 'initializing', compute_backend: 'webgpu'}});
+      vi.advanceTimersByTime(80_000);
+      gpu.message({id: 1, retry_cpu: true, diagnostic: 'GPU preparation failed: device allocation failed'});
+      const cpu = FakeWorker.instances[1];
+      cpu.message({id: 1, progress: {stage: 'loading'}});
+      cpu.message({id: 1, progress: {stage: 'initializing', compute_backend: 'wasm'}});
+      cpu.message({id: 1, progress: {stage: 'warming', task: 'classification', compute_backend: 'wasm'}});
+      expect(progress).toHaveBeenLastCalledWith(expect.objectContaining({cpu_fallback: true,
+        deadline_at: LOCAL_PREPARATION_TIMEOUT_MS}));
+      vi.advanceTimersByTime(LOCAL_PREPARATION_TIMEOUT_MS - 80_000);
+      expect(await result).toMatchObject({error_code: 'timeout', timeout_phase: 'preparation',
+        compute_diagnostic: 'GPU preparation failed: device allocation failed'});
+      expect(cpu.terminate).toHaveBeenCalledOnce();
+      expect(warning).toHaveBeenCalledWith('Local model:', 'GPU preparation failed: device allocation failed');
+    } finally { warning.mockRestore(); }
   });
   it('honors a smaller workflow budget and refuses invalid or exhausted budgets', async () => {
     const client = new LocalModelClient();
@@ -114,6 +164,9 @@ describe('local inference lifecycle', () => {
     expect(await result).toMatchObject({status: 'success', output_token: 'A', runtime: 'wllama-3.6.1/wasm'});
     expect(progress).toHaveBeenCalledWith(expect.objectContaining({cpu_fallback: true}));
     client.dispose();
+    const nextSession = client.prepare(vi.fn());
+    expect(FakeWorker.instances[2].postMessage).toHaveBeenCalledWith(expect.objectContaining({force_cpu: false}));
+    client.cancel(); await nextSession;
   });
   it('does not loop CPU retries and cancellation also stops a fallback worker', async () => {
     const client = new LocalModelClient(); const first = client.run(input, vi.fn());

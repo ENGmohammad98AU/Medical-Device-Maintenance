@@ -6,4 +6,5 @@ export function loadGgufModel(
   options: NonNullable<Parameters<Wllama['loadModel']>[1]> & {progressCallback?: (progress: {loaded: number; total: number}) => void},
   expectedBytes: number,
   onMode?: (mode: StorageMode) => void,
+  onLoad?: () => void,
 ): Promise<StorageMode>;

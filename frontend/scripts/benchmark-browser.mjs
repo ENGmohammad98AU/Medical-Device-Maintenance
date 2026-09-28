@@ -108,7 +108,12 @@ try {
   // Exercise the production worker and UI too, not only the benchmark harness.
   await page.goto('http://127.0.0.1:4174/local-model',{waitUntil:'commit'});
   await page.getByRole('button',{name:'تشغيل النموذج مجانًا',exact:true}).click();
-  await page.getByText(/The model completed on this browser/).waitFor({timeout:35*60_000});
+  await Promise.race([
+    page.getByText(/The model completed on this browser/).waitFor({timeout:18*60_000}),
+    page.getByTestId('model-run-error').waitFor({timeout:18*60_000}).then(async()=>{
+      throw new Error(await page.getByTestId('model-run-error').innerText());
+    }),
+  ]);
   await page.getByText(/Model selection: Reference B/).waitFor({timeout:5000});
   assert.equal(await page.getByText(/Reference selection did not finish|The model selected a different result/).count(),0);
   // A repeated production request must preserve the decision and avoid WASM

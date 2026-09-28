@@ -34,7 +34,7 @@ async function temporaryBlob(url, expectedBytes, progress) {
   return new Response(stream).blob();
 }
 
-export async function loadGgufModel(model, url, options, expectedBytes, onMode = () => {}) {
+export async function loadGgufModel(model, url, options, expectedBytes, onMode = () => {}, onLoad = () => {}) {
   const manager = model.modelManager;
   let blobs;
   let mode = 'persistent';
@@ -70,6 +70,7 @@ export async function loadGgufModel(model, url, options, expectedBytes, onMode =
   if (!blobs) blobs = [await temporaryBlob(url, expectedBytes, options.progressCallback)];
   if (blobs.reduce((sum, blob) => sum + blob.size, 0) !== expectedBytes) throw new Error('model_size_mismatch');
   // Outside the storage catch: a runtime failure must not trigger a second load.
+  onLoad();
   await model.loadModel(blobs, options);
   return mode;
 }

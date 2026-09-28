@@ -5,7 +5,8 @@ import type { SupportContext, SupportResult } from './supportModelContract';
 export { config as localModelConfig };
 // One budget for all inference tasks. Preparation has its own visible phase.
 export const LOCAL_INFERENCE_TIMEOUT_MS = 45_000;
-export const LOCAL_PREPARATION_TIMEOUT_MS = 15 * 60_000;
+export const LOCAL_DOWNLOAD_TIMEOUT_MS = 15 * 60_000;
+export const LOCAL_PREPARATION_TIMEOUT_MS = 120_000;
 export type CategoryToken = keyof typeof config.categories;
 export interface LocalInput { report_text: string; device_type: string; patient_connected: boolean; support_context?: SupportContext }
 export type LocalError = 'cancelled' | 'timeout' | 'unsupported_browser' | 'insufficient_storage' | 'load_failed' | 'input_too_long' | 'invalid_output';
@@ -25,8 +26,10 @@ export interface LocalResult {
   guidance?: GuidanceResult;
   reused_result?: boolean;
   runtime?: 'wllama-3.6.1/wasm' | 'wllama-3.6.1/webgpu';
+  timeout_phase?: 'download' | 'preparation' | 'inference';
+  compute_diagnostic?: string;
 }
-export interface LocalProgress { stage: 'loading' | 'warming' | 'running'; percent?: number; task?: 'classification' | 'reference_selection' | 'scope' | 'generation'; storage_mode?: 'persistent' | 'temporary'; compute_backend?: 'wasm' | 'webgpu'; cpu_fallback?: boolean }
+export interface LocalProgress { stage: 'loading' | 'initializing' | 'warming' | 'running'; percent?: number; task?: 'classification' | 'reference_selection' | 'scope' | 'generation'; storage_mode?: 'persistent' | 'temporary'; compute_backend?: 'wasm' | 'webgpu'; cpu_fallback?: boolean; started_at?: number; deadline_at?: number; budget_phase?: 'download' | 'preparation' | 'inference' }
 
 // The server uses the same ordering. This detects stale input, not tampering.
 export function serializeInput(input: LocalInput): string {
@@ -42,6 +45,21 @@ export function categoryToken(value: string): CategoryToken {
 }
 export function localFailure(error_code: LocalError): LocalResult {
   return {status: 'error', revision: config.revision, latency_ms: 0, error_code};
+}
+// Keep device diagnostics in the browser. The API deliberately forbids fields
+// outside its result schema; preparation-only metadata is not a fault result.
+export function serverModelResult({compute_diagnostic: _diagnostic, timeout_phase: _phase,
+  preparation_version: _version, preparation_threads: _threads, ...result}: LocalResult) {
+  return result;
+}
+export function localResultError(result: LocalResult): string {
+  if (result.error_code === 'timeout' && result.timeout_phase === 'preparation') {
+    return 'Model initialization and preparation exceeded 120 seconds on this device. The running model was stopped; cached model files were not deleted. You can continue with reference analysis.';
+  }
+  if (result.error_code === 'timeout' && result.timeout_phase === 'download') {
+    return 'Model download or browser file access did not finish within 15 minutes. Check the connection and available browser storage.';
+  }
+  return localErrorText[result.error_code || 'load_failed'];
 }
 export const localErrorText: Record<LocalError, string> = {
   cancelled: 'Local model execution was cancelled.',
