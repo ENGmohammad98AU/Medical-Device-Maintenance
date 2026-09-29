@@ -1,6 +1,8 @@
 // Creates a reviewable draft by default. Change publish only after the user's
 // publication approval, and point validated_commit at the successful app tests.
-import {readFile, writeFile, readdir} from 'node:fs/promises';
+import {readFile, writeFile, readdir, stat} from 'node:fs/promises';
+import {createReadStream} from 'node:fs';
+import {createHash} from 'node:crypto';
 import {resolve} from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {preparePrefixAssets} from '../../frontend/scripts/prepare-prefix-assets.mjs';
@@ -58,7 +60,19 @@ if (process.argv.includes('--prepare-only')) {
     gh(['release', 'create', tag, '--repo', repository, '--draft', '--target', 'main',
       '--title', 'Qwen3-1.7B browser preparation v1', '--notes-file', notesFile]);
   }
-  gh(['release', 'upload', tag, ...names.map(name => resolve(directory, name)), '--repo', repository, '--clobber']);
+  // Other CI jobs may be downloading this draft. Keep identical assets in
+  // place instead of deleting/re-uploading them on every source-code change.
+  for (const name of names) {
+    const file = resolve(directory, name);
+    const existing = release?.assets.find(asset => asset.name === name);
+    if (existing) {
+      const hash = createHash('sha256');
+      for await (const chunk of createReadStream(file)) hash.update(chunk);
+      if (existing.size !== (await stat(file)).size || existing.digest !== `sha256:${hash.digest('hex')}`) {
+        throw new Error(`Existing draft asset differs: ${name}; review before replacing it`);
+      }
+    } else gh(['release', 'upload', tag, file, '--repo', repository]);
+  }
   if (control.publish === true) gh(['release', 'edit', tag, '--repo', repository, '--draft=false']);
   console.log(gh(['release', 'view', tag, '--repo', repository, '--json', 'url,isDraft,assets']));
 }
