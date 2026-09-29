@@ -41,7 +41,10 @@ class BrowserGuidanceResult(BaseModel):
 
 
 def prepare_guidance(request, device, references):
-    if not request.generate_guidance:
+    # Maintenance guidance is reference-grounded by construction. If the
+    # server cannot shortlist trusted evidence, do not even offer a generation
+    # context to the client/local model.
+    if not request.generate_guidance or not references:
         return None
     report = f"{request.fault} {request.description}".strip()
     device_type = device.type.value.upper().replace("-", "_").replace(" ", "_")
