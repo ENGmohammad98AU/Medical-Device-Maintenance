@@ -1,0 +1,168 @@
+{
+  "source_run": "https://github.com/ENGmohammad98AU/Medical-Device-Maintenance/actions/runs/36556746512",
+  "baseline_commit": "9d1aeb3a7c8eaddb052c92b38119d8d73aaee411",
+  "model_sha256": "b139949c5bd74937ad8ed8c8cf3d9ffb1e99c866c823204dc42c0d91fa181897",
+  "dataset_sha256": "9a12156d75ada164a0bd46a87ec56afeb24ad49c1ba1a11e9dbfba87cfab5d5d",
+  "classification": [
+    {
+      "name": "power_en_01",
+      "token": "A"
+    },
+    {
+      "name": "power_en_02",
+      "token": "A"
+    },
+    {
+      "name": "power_en_03",
+      "token": "A"
+    },
+    {
+      "name": "power_ar_01",
+      "token": "A"
+    },
+    {
+      "name": "power_ar_02",
+      "token": "A"
+    },
+    {
+      "name": "sensor_en_01",
+      "token": "D"
+    },
+    {
+      "name": "sensor_en_02",
+      "token": "B"
+    },
+    {
+      "name": "sensor_en_03",
+      "token": "B"
+    },
+    {
+      "name": "sensor_ar_01",
+      "token": "B"
+    },
+    {
+      "name": "sensor_ar_02",
+      "token": "B"
+    },
+    {
+      "name": "circuit_en_01",
+      "token": "C"
+    },
+    {
+      "name": "circuit_en_02",
+      "token": "C"
+    },
+    {
+      "name": "circuit_en_03",
+      "token": "C"
+    },
+    {
+      "name": "circuit_ar_01",
+      "token": "C"
+    },
+    {
+      "name": "circuit_ar_02",
+      "token": "C"
+    },
+    {
+      "name": "mechanical_en_01",
+      "token": "D"
+    },
+    {
+      "name": "mechanical_en_02",
+      "token": "D"
+    },
+    {
+      "name": "mechanical_en_03",
+      "token": "D"
+    },
+    {
+      "name": "mechanical_ar_01",
+      "token": "D"
+    },
+    {
+      "name": "mechanical_ar_02",
+      "token": "D"
+    },
+    {
+      "name": "software_en_01",
+      "token": "E"
+    },
+    {
+      "name": "software_en_02",
+      "token": "E"
+    },
+    {
+      "name": "software_en_03",
+      "token": "E"
+    },
+    {
+      "name": "software_ar_01",
+      "token": "E"
+    },
+    {
+      "name": "software_ar_02",
+      "token": "E"
+    },
+    {
+      "name": "alarm_en_01",
+      "token": "F"
+    },
+    {
+      "name": "alarm_en_02",
+      "token": "F"
+    },
+    {
+      "name": "alarm_en_03",
+      "token": "F"
+    },
+    {
+      "name": "alarm_ar_01",
+      "token": "F"
+    },
+    {
+      "name": "alarm_ar_02",
+      "token": "F"
+    },
+    {
+      "name": "other_en_01",
+      "token": "G"
+    },
+    {
+      "name": "other_en_02",
+      "token": "G"
+    },
+    {
+      "name": "other_en_03",
+      "token": "G"
+    },
+    {
+      "name": "other_ar_01",
+      "token": "D"
+    },
+    {
+      "name": "other_ar_02",
+      "token": "G"
+    },
+    {
+      "name": "unknown_en_01",
+      "token": "H"
+    },
+    {
+      "name": "unknown_en_02",
+      "token": "H"
+    },
+    {
+      "name": "unknown_en_03",
+      "token": "H"
+    },
+    {
+      "name": "unknown_ar_01",
+      "token": "H"
+    },
+    {
+      "name": "unknown_ar_02",
+      "token": "H"
+    }
+  ]
+}

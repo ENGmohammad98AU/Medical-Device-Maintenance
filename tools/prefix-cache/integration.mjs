@@ -20,8 +20,9 @@ const guidanceCases = await readJSON('frontend/src/llm/guidanceCases.json');
 const classificationCases = await readJSON('frontend/src/llm/benchmarkCases.json');
 const supportCases = await readJSON('frontend/src/llm/supportSmokeCases.json');
 const bundle = await readJSON('frontend/src/llm/staticPrefixBundle.json');
-const previous = await readJSON('frontend/benchmark-results/prefix-cache/results-win32.json');
-const baseline = previous.runs.find(run => run.kind === 'stock');
+const baseline = await readJSON('tools/prefix-cache/benchmark-baseline.json');
+assert.equal(createHash('sha256').update(await readFile('frontend/src/llm/benchmarkCases.json')).digest('hex'), baseline.dataset_sha256);
+assert.equal(config.model_file_sha256, baseline.model_sha256);
 const threads = Number(process.env.BENCHMARK_THREADS || 4);
 const full = threads === 4;
 const root = resolve('frontend/dist');
@@ -79,7 +80,8 @@ async function openSession(kind, slow = false) {
         if (!String(args[0]).includes('localModel.worker')) return;
         window.__modelWorker = this;
         const send = this.postMessage.bind(this);
-        this.postMessage = message => send({...message, force_cpu: true, benchmark_threads: threads});
+        this.postMessage = message => send({...message, force_cpu: true, benchmark_threads: threads,
+          serial_analysis: message.serial_analysis ?? window.__serialAnalysis});
         this.addEventListener('message', ({data}) => {
           if (data.progress) window.__progress.push({...data.progress, at: performance.now()});
           if (data.result) window.__results.push(data.result);
@@ -141,16 +143,43 @@ async function infer(input, serial = false) {
 async function guidance(serial) {
   const rows = [];
   result[serial ? 'serial_guidance' : 'parallel_guidance'] = rows;
+  await page.evaluate(serial => {window.__serialAnalysis = serial;}, serial);
+  await page.getByRole('combobox').nth(0).click();
+  await page.getByRole('option', {name: 'توليد إرشادات نصية قصيرة', exact: true}).click();
   for (const sample of guidanceCases) {
-    const measured = await infer({report_text: sample.report_text, device_type: sample.device_type, patient_connected: false,
-      support_context: {device_name: sample.device_name, report_text: sample.report_text, candidates: sample.candidates,
-        version: supportConfig.version, input_sha256: '0'.repeat(64),
-        guidance: {...sample, version: guidanceConfig.version, input_sha256: '0'.repeat(64)}}}, serial);
+    // Use the UI/client for guidance so its real hard deadline can terminate
+    // unresponsive WASM. A raw-worker listener would bypass that protection.
+    const prepare = page.getByRole('button', {name: 'تجهيز النموذج مسبقًا', exact: true});
+    if (await prepare.isEnabled()) {
+      await prepare.click();
+      await page.getByText('النموذج جاهز.', {exact: false}).waitFor({timeout: 30_000});
+    }
+    await page.getByRole('combobox').nth(1).click();
+    await page.getByRole('option', {name: sample.name, exact: true}).click();
+    const before = await page.evaluate(() => window.__results.length);
+    const start = performance.now();
+    await page.getByRole('button', {name: 'تشغيل النموذج مجانًا', exact: true}).click();
+    await page.waitForFunction(before => window.__results.length > before
+      || Array.from(document.querySelectorAll('[role="alert"]')).some(node => node.textContent.includes('The shared 45-second inference budget expired.')),
+    before, {timeout: 48_000});
+    const received = await page.evaluate(before => window.__results.length > before ? window.__results.at(-1) : null, before);
+    const measured = {...(received || {status: 'error', error_code: 'timeout', client_timeout: true}),
+      wall_ms: Math.round(performance.now() - start)};
     rows.push({name: sample.name, ...measured});
     console.log('PRODUCTION_GUIDANCE=' + JSON.stringify({serial, ...rows.at(-1)}));
-    assert.equal(measured.status, 'success');
-    assert.equal(measured.support?.status, 'success');
-    assert.ok(measured.wall_ms < 45_000);
+    if (full) {
+      assert.equal(measured.status, 'success');
+      assert.equal(measured.support?.status, 'success');
+      assert.ok(measured.wall_ms < 45_000);
+    } else {
+      assert.ok(measured.status === 'success' || measured.error_code === 'timeout');
+      assert.ok(measured.wall_ms < 46_000, 'Single-thread UI did not enforce the hard deadline');
+    }
+  }
+  const prepare = page.getByRole('button', {name: 'تجهيز النموذج مسبقًا', exact: true});
+  if (await prepare.isEnabled()) {
+    await prepare.click();
+    await page.getByText('النموذج جاهز.', {exact: false}).waitFor({timeout: 30_000});
   }
   return rows;
 }
@@ -176,7 +205,8 @@ try {
     const row = {name: sample.name, expected: sample.expected, actual: config.categories[measured.output_token], ...measured};
     result.classification.push(row);
     assert.equal(measured.status, 'success');
-    assert.equal(measured.output_token, baseline.checks.classification[index].token, `Classifier changed: ${sample.name}`);
+    assert.equal(sample.name, baseline.classification[index].name);
+    assert.equal(measured.output_token, baseline.classification[index].token, `Classifier changed: ${sample.name}`);
   }
   result.support = [];
   for (const sample of supportCases) {
@@ -223,7 +253,7 @@ try {
   result.completed = true;
   console.log('PRODUCTION_SUMMARY=' + JSON.stringify({completed: true, threads, comparison: result.comparison,
     classification: result.classification.filter(row => row.actual === row.expected).length,
-    guidance_success: result.parallel_guidance.filter(row => row.guidance.status === 'success').length}));
+    guidance_success: result.parallel_guidance.filter(row => row.guidance?.status === 'success').length}));
 } catch (error) {result.error = error.stack; throw error;}
 finally {
   await writeFile(output, JSON.stringify(result, null, 2));

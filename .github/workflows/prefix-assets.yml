@@ -1,0 +1,42 @@
+name: Prepare reviewed static assets
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/prefix-assets.yml'
+      - 'tools/prefix-cache/release-assets.mjs'
+      - 'tools/prefix-cache/release-control.json'
+      - 'frontend/src/llm/staticPrefixBundle.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare-draft:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+    env:
+      MDM_PREFIX_ASSET_DIR: ${{ github.workspace }}/frontend/benchmark-results/prefix-cache
+      MDM_REQUIRE_PREFIX_ASSETS: '1'
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 36556746512
+          name: static-prefix-prototype
+          path: frontend/benchmark-results/prefix-cache
+      - name: Verify every file and prepare the reviewable release
+        run: node tools/prefix-cache/release-assets.mjs
