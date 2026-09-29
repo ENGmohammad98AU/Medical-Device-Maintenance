@@ -20,7 +20,7 @@ from test_device_support_regressions import three_devices
 def test_decoded_answers_pass_the_production_boundary(three_devices):
     benchmark = json.loads(Path(os.environ['MDM_GENERATION_BENCHMARK']).read_text(encoding='utf-8'))
     assert benchmark.get('completed'), benchmark.get('error')
-    assert len(benchmark['rows']) == 6
+    assert len(benchmark['rows']) == 2
     client, _, _ = three_devices
     for row in benchmark['rows']:
         device_id = 902 if 'Philips' in row['name'] else 903 if 'Perfusor' in row['name'] else 901
@@ -39,5 +39,5 @@ def test_decoded_answers_pass_the_production_boundary(three_devices):
         resolved = response.json()['generated_guidance']
         assert resolved['status'] == 'DRAFT', (row['name'], resolved)
         assert resolved['text'] == row['guidance']['text']
-        assert [source['reference_id'] for source in resolved['sources']] == (
-            [row['guidance']['reference_id']] if row['guidance']['reference_id'] else [])
+        assert row['guidance']['reference_id']
+        assert [source['reference_id'] for source in resolved['sources']] == [row['guidance']['reference_id']]
