@@ -69,7 +69,7 @@ export default function MaintenancePage() {
   const selectedDevice = devices.find((device) => device.id === Number(deviceId));
 
   const runAnalysis = async () => {
-    if (busy || localModel.preparing || (useLocal && !localModel.ready)) return;
+    if (busy || localModel.preparing) return;
     if (!selectedDevice) {
       setError('يرجى اختيار الجهاز'); return;
     }
@@ -124,7 +124,10 @@ export default function MaintenancePage() {
         }
       }
       if (!mounted.current) return;
-      const browser_llm = useLocal ? await localModel.run({
+      // Reference-gated local inference: do not load or run the model when
+      // the server found no trusted candidate for this device/report.
+      const hasReferenceCandidates = Boolean(support_context?.candidates?.length);
+      const browser_llm = useLocal && hasReferenceCandidates ? await localModel.run({
         report_text: requestData.description, device_type: selectedDevice.type.toUpperCase().replace(/[- ]/g, '_'),
         patient_connected: requestData.patient_connected,
         support_context,
@@ -201,9 +204,9 @@ export default function MaintenancePage() {
       </Grid>
       <FormControlLabel control={<Switch checked={useLocal} disabled={busy} onChange={(event) => setUseLocal(event.target.checked)} />} label="معالجة الطلب واختيار المرجع بنموذج محلي مجاني" />
       {useLocal && <LocalModelPreparation model={localModel} disabled={busy} />}
-      <Alert severity="info" sx={{mt: 2}}>لا يحتاج النموذج إلى حساب خارجي أو مفتاح API. التنزيل الأول نحو 1.1 غيغابايت، ثم يعمل على جهازك. يصنّف الطلب ويختار المرجع ويولّد شرحًا حرًا بالإنكليزية يستند إلى الأدلة المتاحة؛ تحدد قواعد الخادم الخطورة وتبقى الإجراءات خاضعة لمراجعة المختص.</Alert>
+      <Alert severity="info" sx={{mt: 2}}>لا يحتاج النموذج إلى حساب خارجي أو مفتاح API. يفحص الخادم المراجع أولًا؛ إذا لم يوجد مرجع موثوق مطابق فلن يتم تحميل أو تشغيل النموذج وستظهر نتيجة عدم كفاية المرجع. عند وجود مرجع مطابق فقط، يعمل النموذج المحلي لاختيار الدليل المناسب وصياغة شرح مقيد به، مع بقاء إجراءات الصيانة خاضعة لمراجعة المختص.</Alert>
       {localModel.progress && <LocalModelProgress progress={localModel.progress} cancel={localModel.cancel} cancelLabel={localModel.preparing ? 'إلغاء التجهيز' : 'متابعة بالقواعد دون انتظار النموذج'} />}
-      <Button variant="contained" onClick={runAnalysis} disabled={busy || localModel.preparing || (useLocal && !localModel.ready)} startIcon={busy ? <CircularProgress size={18} /> : <PsychologyIcon />} sx={{ mt: 3 }}>التحقق والتحليل</Button>
+      <Button variant="contained" onClick={runAnalysis} disabled={busy || localModel.preparing} startIcon={busy ? <CircularProgress size={18} /> : <PsychologyIcon />} sx={{ mt: 3 }}>التحقق والتحليل</Button>
     </CardContent></Card>}
 
     {analysis && !analysis.reference_found && !analysis.customer_support && <Card><CardContent>
