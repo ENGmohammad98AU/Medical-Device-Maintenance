@@ -21,14 +21,21 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   generated-guidance:
     name: Free generation timing on Windows
     runs-on: windows-latest
     timeout-minutes: 25
+    env:
+      MDM_PREFIX_ASSET_DIR: ${{ github.workspace }}/frontend/benchmark-results/prefix-cache
+      MDM_REQUIRE_PREFIX_ASSETS: '1'
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/prefix-assets
+        with:
+          token: ${{ github.token }}
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -188,10 +195,17 @@ jobs:
     name: Frontend clean install on Windows
     runs-on: windows-latest
     timeout-minutes: 90
+    env:
+      MDM_PREFIX_ASSET_DIR: ${{ github.workspace }}/frontend/benchmark-results/prefix-cache
+      MDM_REQUIRE_PREFIX_ASSETS: '1'
 
     steps:
       - name: Checkout fresh repository
         uses: actions/checkout@v4
+
+      - uses: ./.github/actions/prefix-assets
+        with:
+          token: ${{ github.token }}
 
       - name: Set up Node.js 20
         uses: actions/setup-node@v4

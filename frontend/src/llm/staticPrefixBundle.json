@@ -1,0 +1,111 @@
+{
+  "id": "qwen3-prefix-v1-ad96fbe1963c",
+  "release_url": "https://github.com/ENGmohammad98AU/Medical-Device-Maintenance/releases/download/qwen3-prefix-v1",
+  "manifest_sha256": "7a6b05168175f2c074a053e30d3c0d71428f3cbf8ffaa4687171ad16ab6a9058",
+  "manifest": {
+    "model_sha256": "b139949c5bd74937ad8ed8c8cf3d9ffb1e99c866c823204dc42c0d91fa181897",
+    "options": {
+      "n_ctx": 6144,
+      "n_batch": 512,
+      "n_ubatch": 512,
+      "n_threads": 4,
+      "n_gpu_layers": 0,
+      "n_parallel": 4,
+      "kv_unified": false,
+      "ctx_shift": false,
+      "cache_idle_slots": true,
+      "seed": 0
+    },
+    "prefixes": [
+      {
+        "phase": "classification",
+        "sha256": "94d8a909f7659170f2bae7a5d9dc0da64523b3d33cad92ff5df6bca0a46549b9"
+      },
+      {
+        "phase": "reference_selection",
+        "sha256": "dea1cec7f9753f73078e3504ebfcbd76157c14afc03e1007a05e5619856d0d8b"
+      },
+      {
+        "phase": "scope",
+        "sha256": "8a8254f34572072550c9cfdb03bfea13a5362af9a0c7892f3cae2e928b7e154a"
+      },
+      {
+        "phase": "generation",
+        "sha256": "869447bbc39dd5621af67be2741c9677e72e8398103928617a7c4ab33eaf69f1"
+      }
+    ],
+    "slots": [
+      {
+        "slot": 0,
+        "file": "slot-0.bin",
+        "bytes": 30282584,
+        "sha256": "70b0f311e5a20550fc2dbeebbf8870488f27e1216f4d4415470facce2e4205bf",
+        "details": {
+          "id_slot": 0,
+          "filename": "prefix.bin",
+          "n_saved": 264,
+          "n_written": 30282584,
+          "timings": {
+            "save_ms": 97.275
+          }
+        },
+        "export_ms": 2770
+      },
+      {
+        "slot": 1,
+        "file": "slot-1.bin",
+        "bytes": 24662088,
+        "sha256": "31de85cf3a8709e329e32234c71074e5a4e4b40851792456b46c8c8f5ec125be",
+        "details": {
+          "id_slot": 1,
+          "filename": "prefix.bin",
+          "n_saved": 215,
+          "n_written": 24662088,
+          "timings": {
+            "save_ms": 84.32
+          }
+        },
+        "export_ms": 2258
+      },
+      {
+        "slot": 2,
+        "file": "slot-2.bin",
+        "bytes": 51617528,
+        "sha256": "ca2869d821364d796945d30f909143eedd3681ae85991d2211b5ccab7e8c9d72",
+        "details": {
+          "id_slot": 2,
+          "filename": "prefix.bin",
+          "n_saved": 450,
+          "n_written": 51617528,
+          "timings": {
+            "save_ms": 140.871
+          }
+        },
+        "export_ms": 4602
+      },
+      {
+        "slot": 3,
+        "file": "slot-3.bin",
+        "bytes": 92796264,
+        "sha256": "1edbac726a996891bec6beac6cb97061bd5de9fcc94a6e5446c7b429ec9ccb1e",
+        "details": {
+          "id_slot": 3,
+          "filename": "prefix.bin",
+          "n_saved": 809,
+          "n_written": 92796264,
+          "timings": {
+            "save_ms": 244.625
+          }
+        },
+        "export_ms": 8157
+      }
+    ],
+    "runtime": {
+      "format": "mdm-static-prefix-prototype-v1",
+      "wllama": "e3972797f9d508887440e9d3fa87dc296f2dec44",
+      "llama_cpp": "83d855c5a6d70487121edbf4020b25c96b7a04e7",
+      "js_sha256": "b7b988191b1d84fe0f8cf8e2ff3e26fb69a69e6eefc4a397bada1845e7461c3f",
+      "wasm_sha256": "ad96fbe1963c2e5a81592b9f0d2a0de39102b52d31bcd32ae7e1cc9f1b131ab0"
+    }
+  }
+}

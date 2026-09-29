@@ -19,6 +19,8 @@ export interface LocalResult {
   preparation_ms?: number;
   preparation_version?: string;
   preparation_threads?: number;
+  preparation_source?: 'stored' | 'bundled' | 'computed';
+  preparation_cached?: boolean;
   inference_ms?: number;
   error_code?: LocalError;
   support?: SupportResult;
@@ -26,7 +28,15 @@ export interface LocalResult {
   reused_result?: boolean;
   runtime?: 'wllama-3.6.1/wasm' | 'wllama-3.6.1/webgpu';
 }
-export interface LocalProgress { stage: 'loading' | 'warming' | 'running'; percent?: number; task?: 'classification' | 'reference_selection' | 'scope' | 'generation'; storage_mode?: 'persistent' | 'temporary'; compute_backend?: 'wasm' | 'webgpu'; cpu_fallback?: boolean }
+export interface LocalProgress {
+  stage: 'loading' | 'initializing' | 'restoring' | 'warming' | 'saving' | 'running'; percent?: number;
+  task?: 'classification' | 'reference_selection' | 'scope' | 'generation' | 'analysis';
+  storage_mode?: 'persistent' | 'temporary'; compute_backend?: 'wasm' | 'webgpu'; backend_ready?: boolean;
+  preparation_source?: 'stored' | 'bundled' | 'computed';
+  preparation_fallback?: 'unavailable' | 'slow_network' | 'incompatible';
+  cpu_fallback?: boolean; cpu_fallback_reason?: 'initialization_failed' | 'inference_failed';
+  stage_started_at?: number; operation_started_at?: number;
+}
 
 // The server uses the same ordering. This detects stale input, not tampering.
 export function serializeInput(input: LocalInput): string {

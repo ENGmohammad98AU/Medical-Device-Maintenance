@@ -52,7 +52,8 @@
       {
         "reference_id": "HAM-C6-001",
         "symptom": "Battery low",
-        "evidence": "meaning: Battery charge is low; alarm priority depends on remaining charge and whether the ventilator is on battery or primary power.\npossible_causes: Low total battery charge; ventilator operating on battery power or battery capacity below threshold.\nimmediate_safety_action: Connect to primary power and be prepared for alternative ventilation if needed.\nrecommended_solution: Restore a reliable approved power source and replace/recharge the battery as appropriate.\nverification_before_return_to_service: Confirm the battery alarm clears and stable primary power/battery status is shown before continued use."
+        "evidence": "meaning: Battery charge is low; alarm priority depends on remaining charge and whether the ventilator is on battery or primary power.\npossible_causes: Low total battery charge; ventilator operating on battery power or battery capacity below threshold.\nimmediate_safety_action: Connect to primary power and be prepared for alternative ventilation if needed.\nrecommended_solution: Restore a reliable approved power source and replace/recharge the battery as appropriate.\nverification_before_return_to_service: Confirm the battery alarm clears and stable primary power/battery status is shown before continued use.",
+        "meaning": "Battery charge is low; alarm priority depends on remaining charge and whether the ventilator is on battery or primary power."
       }
     ]
   },
@@ -73,7 +74,8 @@
       {
         "reference_id": "PH-MX800-013",
         "symptom": "Resp Leads Off",
-        "evidence": "meaning: The required respiration measurement electrodes are not fully connected.\nimmediate_safety_action: Specialist review is required, with assessment of the patient if connected to the device.\nrecommended_solution: A specialist checks the RA, LA, and LL electrode connections used for respiration measurement.\nverification_before_return_to_service: A specialist verifies that the alarm has cleared and the function is safe before returning the device to service."
+        "evidence": "meaning: The required respiration measurement electrodes are not fully connected.\nimmediate_safety_action: Specialist review is required, with assessment of the patient if connected to the device.\nrecommended_solution: A specialist checks the RA, LA, and LL electrode connections used for respiration measurement.\nverification_before_return_to_service: A specialist verifies that the alarm has cleared and the function is safe before returning the device to service.",
+        "meaning": "The required respiration measurement electrodes are not fully connected."
       }
     ]
   }

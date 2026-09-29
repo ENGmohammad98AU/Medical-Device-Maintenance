@@ -48,9 +48,11 @@ def prepare_guidance(request, device, references):
     baseline = FaultClassificationService().classify_fault(
         device_type=device_type, error_message=report, customer_expertise=request.customer_expertise,
         device_location=request.device_location, patient_connected=request.patient_connected)
-    # Only the later selected source enters the generation prompt. Keep its
-    # complete evidence (not an unsafe partial procedure) bound to this report.
+    # The short generated answer explains the complete meaning. Preserve all
+    # procedure fields in the context binding and the server-owned reference
+    # response; do not turn a shortened procedure into maintenance instructions.
     evidence = [{"reference_id": ref["reference_id"], "symptom": ref["matched_fault"],
+                 "meaning": ref.get("meaning", ""),
                  "evidence": "\n".join(f"{field}: {ref[field]}" for field in (
                      "meaning", "possible_causes", "immediate_safety_action", "recommended_solution",
                      "verification_before_return_to_service") if ref.get(field))}
@@ -89,6 +91,17 @@ UNSAFE = re.compile(
     r"(?:افصل|فصل).{0,22}(?:مريض|المريض|التنفس|المضخة)|"
     r"(?:أعد|إعادة).{0,15}(?:الخدمة|للاستخدام)", re.IGNORECASE)
 
+QUANTITY = re.compile(
+    r"(?<![\w.])[-+]?\d+(?:[.,]\d+)?\s*(?:%|percent\b|(?:milli)?volts?\b|m?v\b|"
+    r"(?:milli)?amps?\b|m?a\b|mmhg\b|kpa\b|psi\b|hz\b|seconds?\b|minutes?\b|hours?\b)", re.I)
+
+
+def supported_quantities(text, evidence):
+    def quantities(value):
+        return {re.sub(r"percent$", "%", re.sub(r"\s+", "", match.group().lower()))
+                for match in QUANTITY.finditer(value)}
+    return quantities(text).issubset(quantities(evidence))
+
 
 def resolve_guidance(context, result, llm_run, *, patient_connected, is_emergency,
                      selected_reference=None, out_of_scope=False):
@@ -123,7 +136,15 @@ def resolve_guidance(context, result, llm_run, *, patient_connected, is_emergenc
         metadata["error_code"] = "reference_mismatch"
         return metadata
     text = result.text.strip()
+    supplied = context["report_text"]
+    if selected_reference:
+        reference = next((ref for ref in context["references"] if ref["reference_id"] == expected_reference_id), None)
+        if reference is None:
+            metadata["error_code"] = "reference_mismatch"
+            return metadata
+        supplied = reference.get("meaning", "").strip() or reference["evidence"]
     if (len(text) < 20 or UNSAFE.search(text) or re.search(r"[^\x20-\x7e\n]|`", text)
+            or not supported_quantities(text, supplied)
             or not re.search(r"[A-Za-z]{3}", text) or not re.search(r"[.!?]$", text)
             or (not selected_reference and not re.search(
                 r"\b(?:unconfirmed|uncertain|unknown|cannot confirm|not confirmed|not established|insufficient|no matching|no reference)\b", text, re.I))
@@ -137,5 +158,8 @@ def resolve_guidance(context, result, llm_run, *, patient_connected, is_emergenc
         metadata.update(evidence_status="REFERENCE_PROVIDED", sources=[{
             "reference_id": selected_reference["reference_id"], "source": selected_reference["source"],
             "reference_url": selected_reference["reference_url"], "reference_page": selected_reference.get("reference_page", ""),
-        }], message="Generated explanation using the reference below. Source availability does not verify every generated claim; a biomedical engineer must review the answer.")
+        }], evidence_scope="ALARM_MEANING" if selected_reference.get("meaning", "").strip() else "FULL_REFERENCE",
+            message=("Generated explanation of the documented alarm meaning. Read the complete manufacturer reference for maintenance instructions; a biomedical engineer must review the answer."
+                     if selected_reference.get("meaning", "").strip() else
+                     "Generated explanation using the reference below. Source availability does not verify every generated claim; a biomedical engineer must review the answer."))
     return metadata

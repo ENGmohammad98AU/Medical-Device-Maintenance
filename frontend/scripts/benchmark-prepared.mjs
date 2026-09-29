@@ -112,13 +112,24 @@ try {
     // prepared worker. Every case still must independently pass the deadline.
     for (const sample of [...generationCases.slice(-1), ...generationCases.slice(0, -1)]) {
       console.log('GENERATION_CASE_START=' + sample.name);
+      const prepare = page.getByRole('button', {name: 'تجهيز النموذج مسبقًا', exact: true});
+      if (await prepare.isEnabled()) {
+        await prepare.click();
+        await page.getByText('النموذج جاهز.', {exact: false}).waitFor({timeout: 15 * 60_000});
+      }
       await page.getByRole('combobox').nth(1).click();
       await page.getByRole('option', {name: sample.name, exact: true}).click();
       const before = await page.evaluate(() => window.__modelResults.length);
       const start = performance.now();
       await page.getByRole('button', {name: 'تشغيل النموذج مجانًا', exact: true}).click();
-      await page.waitForFunction(n => window.__modelResults.length > n, before, {timeout: 50_000});
-      const measured = await page.evaluate(() => window.__modelResults.at(-1));
+      await page.waitForFunction(n => window.__modelResults.length > n
+        || Array.from(document.querySelectorAll('[role="alert"]')).some(node => node.textContent.includes('The shared 45-second inference budget expired.')),
+      before, {timeout: 50_000});
+      const received = await page.evaluate(n => window.__modelResults.length > n ? window.__modelResults.at(-1) : null, before);
+      // A terminated worker cannot post a result. Record the actual client
+      // failure and continue collecting evidence; the all-success gate below
+      // still fails. Never count an enforced timeout as a generated answer.
+      const measured = received || {status: 'error', error_code: 'timeout', client_timeout: true};
       const row = {name: sample.name, report_text: sample.report_text, wall_ms: Math.round(performance.now() - start), ...measured};
       result.rows.push(row); console.log('GENERATED_CASE=' + JSON.stringify(row));
       row.correct = measured.status === 'success' && measured.guidance?.status === 'success'

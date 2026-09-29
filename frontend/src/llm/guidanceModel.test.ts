@@ -1,6 +1,6 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import type { Wllama } from '@wllama/wllama';
-import {completeGuidance, generateGuidance, guidanceModelConfig as config} from './guidanceModel';
+import {completeGuidance, generateGuidance, supportedQuantities, guidanceModelConfig as config} from './guidanceModel';
 
 const context = {version: config.version, input_sha256: 'a'.repeat(64), device_name: 'Hamilton C6', report_text: 'The trolley wheel is jammed.'};
 const text = 'The cause is unconfirmed. Inspect the trolley wheel for visible obstructions and record any damage for the biomedical engineer.';
@@ -64,18 +64,40 @@ describe('bounded free generation', () => {
   it('provides only the selected evidence and binds its identifier to the answer', async () => {
     const m = model();
     const grounded = {...context, references: [
-      {reference_id: 'wheel', symptom: 'Jammed wheel', evidence: 'Inspect the caster for external obstructions.'},
+      {reference_id: 'wheel', symptom: 'Jammed "wheel"', evidence: 'meaning: Movement is restricted.\npossible_causes: External debris.\nimmediate_safety_action: Keep out of clinical use.\nrecommended_solution: Inspect the caster for external obstructions.\nverification_before_return_to_service: Specialist review required.'},
       {reference_id: 'other', symptom: 'Unrelated alarm', evidence: 'UNRELATED EVIDENCE'},
     ]};
     expect(await generateGuidance(m.instance, grounded, 40000, 'wheel')).toMatchObject({reference_id: 'wheel', status: 'success'});
     const options = m.createCompletion.mock.calls[0] as unknown as [{prompt: string}];
-    expect(options[0].prompt).toContain('Inspect the caster');
+    for (const sentence of ['Movement is restricted.', 'External debris.', 'Keep out of clinical use.',
+      'Inspect the caster for external obstructions.', 'Specialist review required.']) expect(options[0].prompt).toContain(sentence);
+    expect(options[0].prompt).toContain('Jammed \\"wheel\\"');
     expect(options[0].prompt).not.toContain('UNRELATED EVIDENCE');
     expect((await generateGuidance(m.instance, grounded, 40000, 'invented')).error_code).toBe('invalid_output');
   });
   it('requires uncertainty when no manufacturer evidence is available', async () => {
     const confident = model({...response, choices: [{text: 'The wheel bearing has failed and needs replacement.', finish_reason: 'stop'}]});
     expect((await generateGuidance(confident.instance, context, 40000)).error_code).toBe('invalid_output');
+  });
+  it('explains the complete source meaning while keeping full procedures intact outside the prompt', async () => {
+    const m = model();
+    const meaning = 'Charge is below 5%; the device changes operating state.';
+    const evidence = 'meaning: ' + meaning + '\nrecommended_solution: FULL PROCEDURE FOR SPECIALIST REVIEW';
+    const grounded = {...context, references: [{reference_id: 'alarm', symptom: 'Low charge', meaning, evidence}]};
+    expect((await generateGuidance(m.instance, grounded, 40000, 'alarm')).status).toBe('success');
+    const options = m.createCompletion.mock.calls[0] as unknown as [{prompt: string}];
+    expect(options[0].prompt).toContain(meaning);
+    expect(options[0].prompt).not.toContain('FULL PROCEDURE');
+    expect(options[0].prompt).toContain('Paraphrase the complete meaning, preserving conditions. No advice or inference.');
+    expect(grounded.references[0].evidence).toBe(evidence);
+  });
+  it('rejects invented numeric limits and retains supplied signs and units', async () => {
+    expect(supportedQuantities('Charge is below 5 percent.', 'Charge is below 5%.')).toBe(true);
+    expect(supportedQuantities('Charge is below 10%.', 'Charge is below 5%.')).toBe(false);
+    expect(supportedQuantities('Voltage is -5 V.', 'Voltage is 5 V.')).toBe(false);
+    expect(supportedQuantities('Wait 20 minutes.', 'Charge is below 20%.')).toBe(false);
+    const invented = model({...response, choices: [{text: 'The cause is unconfirmed. The battery is below 10%.', finish_reason: 'stop'}]});
+    expect((await generateGuidance(invented.instance, context, 40000)).error_code).toBe('invalid_output');
   });
   it('does not spend tokens on blocked, oversized or exhausted requests', async () => {
     const m = model();

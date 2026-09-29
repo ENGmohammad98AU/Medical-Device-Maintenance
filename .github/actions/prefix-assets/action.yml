@@ -1,0 +1,28 @@
+name: Fetch pinned static preparation assets
+description: Prefer durable release assets, bootstrapping from the validated producer artifact before release.
+inputs:
+  token:
+    description: Repository token with read access to contents and actions
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Prefer the versioned release, including the review draft
+      id: release
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+      run: |
+        if gh release view qwen3-prefix-v1 --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+          gh release download qwen3-prefix-v1 --repo "$GITHUB_REPOSITORY" --dir frontend/benchmark-results/prefix-cache --clobber --pattern runtime.js --pattern runtime.wasm --pattern prefix-manifest.json --pattern 'slot-*.bin'
+          echo "available=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "available=false" >> "$GITHUB_OUTPUT"
+        fi
+    - uses: actions/download-artifact@v4
+      if: steps.release.outputs.available != 'true'
+      with:
+        github-token: ${{ inputs.token }}
+        run-id: 36556746512
+        name: static-prefix-prototype
+        path: frontend/benchmark-results/prefix-cache
