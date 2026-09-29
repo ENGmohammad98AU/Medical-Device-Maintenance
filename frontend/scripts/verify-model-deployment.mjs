@@ -24,7 +24,10 @@ async function verify() {
   if (!worker) throw new Error('Production model worker is missing');
   const workerUrl = new URL(worker, new URL(entry, base)).href;
   const code = await (await resource(workerUrl)).text();
-  if (!code.includes(engine + '/') || !code.includes(engine + '.wasm')) throw new Error('Waiting for the expected production worker');
+  // The worker assembles the WASM filename at runtime; minification need not
+  // leave a literal engine + '.wasm' string. Check its runtime path here and
+  // verify the actual served WASM bytes below.
+  if (!code.includes(engine + '/')) throw new Error('Waiting for the expected production worker');
   if (expected.preparation_version && !code.includes(expected.preparation_version)) throw new Error('Waiting for the expected preparation worker');
   if (!app.includes(guidance.version) || !code.includes(guidance.version)) throw new Error('Waiting for the English generation frontend');
   const health = await (await resource('health', api)).json();
