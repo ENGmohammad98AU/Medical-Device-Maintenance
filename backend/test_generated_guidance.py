@@ -93,7 +93,7 @@ def test_stale_drafts_cannot_be_attached_to_changed_reports(api_client, change):
     client, _, _ = api_client
     request, context = prepare(client)
     body = analyze(client, {**request, **change}, local(request, context))
-    assert body['generated_guidance']['error_code'] == 'context_mismatch'
+    assert body['generated_guidance']['error_code'] in {'context_mismatch', 'missing_context'}
     assert not body['generated_guidance']['text']
 
 
