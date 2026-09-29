@@ -217,7 +217,7 @@ export default function FaultReportsPage() {
   };
 
   const handleAnalyze = async (useLlm = true) => {
-    if (analyzing || localModel.preparing || (useLlm && !localModel.ready)) return;
+    if (analyzing || localModel.preparing) return;
     if (!formData.device_id || formData.error_message.trim().length < 10) {
       setError('اختر الجهاز وأدخل وصفًا فنيًا لا يقل عن 10 محارف');
       return;
@@ -277,7 +277,13 @@ export default function FaultReportsPage() {
       }
       if (!mounted.current) return;
 
-      const browser_llm = useLlm ? await localModel.run({
+      const referenceCount = support_context?.candidates?.length ?? 0;
+      const needsLocalSelection = useLlm && referenceCount > 1;
+      if (useLlm && referenceCount === 0) setAnalysisStage('لا يوجد مرجع مطابق؛ إنهاء التحليل دون تشغيل النموذج…');
+      if (useLlm && referenceCount === 1) setAnalysisStage('تم العثور على مرجع واضح؛ استخدامه مباشرة دون تشغيل النموذج…');
+      if (needsLocalSelection) setAnalysisStage('عدة مراجع محتملة؛ تشغيل النموذج لاختيار الأنسب…');
+
+      const browser_llm = needsLocalSelection ? await localModel.run({
         report_text: supportRequest.description,
         device_type: selectedDevice.type.toUpperCase().replace(/[- ]/g, '_'),
         patient_connected: patientConnected,
@@ -620,7 +626,7 @@ export default function FaultReportsPage() {
                 variant="outlined"
                 startIcon={<PsychologyIcon />}
                 onClick={() => handleAnalyze(true)}
-                disabled={analyzing || localModel.preparing || !localModel.ready}
+                disabled={analyzing || localModel.preparing}
                 sx={{ mt: 2 }}
                 fullWidth
               >
@@ -630,7 +636,7 @@ export default function FaultReportsPage() {
                 تحليل سريع بالمراجع
               </Button>
               <Typography variant="caption" component="p" sx={{mt: 1}}>
-                جهّز النموذج أولًا للتصنيف واختيار المرجع أو توليد إرشادات قصيرة للحالات الأخرى. مهلة معالجة البلاغ بعد التجهيز 55 ثانية؛ التحليل السريع بالمراجع متاح دون تجهيز النموذج.
+                يبدأ التحليل بالبحث في المراجع أولًا: مرجع واحد واضح يُستخدم مباشرة، وعدم وجود مرجع يعيد نتيجة فورية، ولا يُشغَّل Qwen إلا عند وجود عدة مراجع محتملة تحتاج للاختيار بينها. التجهيز المسبق اختياري لتسريع هذه الحالات فقط.
               </Typography>
               <LocalModelPreparation model={localModel} disabled={analyzing} />
               {localModel.progress ? <LocalModelProgress progress={localModel.progress} cancel={localModel.cancel} cancelLabel={localModel.preparing ? 'إلغاء التجهيز' : 'متابعة بالمراجع دون انتظار النموذج'} />
