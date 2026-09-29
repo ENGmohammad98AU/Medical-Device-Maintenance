@@ -41,7 +41,9 @@ class BrowserGuidanceResult(BaseModel):
 
 
 def prepare_guidance(request, device, references):
-    if not request.generate_guidance:
+    # Free generation is allowed only when the server has already shortlisted
+    # trusted, device-bound manufacturer evidence. No reference means no draft.
+    if not request.generate_guidance or not references:
         return None
     report = f"{request.fault} {request.description}".strip()
     device_type = device.type.value.upper().replace("-", "_").replace(" ", "_")
@@ -119,6 +121,13 @@ def resolve_guidance(context, result, llm_run, *, patient_connected, is_emergenc
     if (llm_run.status != "success" or result.version != MANIFEST["version"]
             or result.input_sha256 != context["input_sha256"]):
         metadata["error_code"] = "context_mismatch"
+        return metadata
+    if selected_reference is None:
+        metadata.update(
+            status="BLOCKED",
+            error_code="not_allowed",
+            message="No accepted technical reference was selected, so the local model cannot generate maintenance guidance.",
+        )
         return metadata
     if patient_connected or is_emergency or context.get("blocked_reason") or llm_run.browser_category == "UNKNOWN" or out_of_scope:
         metadata.update(status="BLOCKED", error_code="not_allowed",
