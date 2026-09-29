@@ -1,6 +1,7 @@
 import { mkdir, copyFile, readFile, writeFile } from 'node:fs/promises';
 import {formatQwenMessages as format} from '../src/llm/ggufChoice.js';
 import {normalizeReportText} from '../src/llm/reportText.js';
+import {preparePrefixAssets} from './prepare-prefix-assets.mjs';
 const out = new URL('../public/llm/', import.meta.url);
 await mkdir(out, {recursive: true});
 await copyFile(new URL('../node_modules/@wllama/wllama/esm/index.js', import.meta.url), new URL('wllama.js', out));
@@ -31,3 +32,4 @@ const supportCases = (await read('../src/llm/supportSmokeCases.json')).map(c => 
     : [{role:'system',content:support.scope_prompt}, ...support.scope_examples, {role:'user',content:normalize(c.report_text)}], support.answer_prefix),
 }));
 await writeFile(new URL('candidate.json', out), JSON.stringify({config,cases,supportCases}));
+await preparePrefixAssets();

@@ -3,7 +3,12 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'tools/prefix-cache/**'
+      - 'tools/prefix-cache/apply-runtime-patch.mjs'
+      - 'tools/prefix-cache/prefix-state.inc'
+      - 'tools/prefix-cache/build-runtime.sh'
+      - 'tools/prefix-cache/bundle.mjs'
+      - 'tools/prefix-cache/browser.ts'
+      - 'tools/prefix-cache/benchmark.mjs'
       - '.github/workflows/static-prefix-benchmark.yml'
   workflow_dispatch:
 

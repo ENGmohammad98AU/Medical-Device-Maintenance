@@ -19,6 +19,32 @@ export async function selectSupportLocally(model: ChoiceModel, context: SupportC
     labels, supportModelConfig.max_input_tokens, true), context.candidates);
 }
 
+// These tasks use independent prompt slots and neither consumes the other's
+// answer. Wait for both to settle so a rejected task cannot leave work running
+// after the client has received a result or started the next report.
+export async function analyzeLocally(model: ChoiceModel, input: LocalInput, parallel = true,
+  progress: (task: 'classification' | 'reference_selection' | 'analysis') => void = () => {}) {
+  progress(parallel && input.support_context ? 'analysis' : 'classification');
+  let classificationDone = false, supportDone = !input.support_context;
+  const classification = classifyLocally(model, input).finally(() => {
+    classificationDone = true;
+    if (!supportDone) progress('reference_selection');
+  });
+  if (!parallel) await classification;
+  const supportStarted = performance.now();
+  let support_ms = 0;
+  const support = input.support_context
+    ? selectSupportLocally(model, input.support_context).finally(() => {
+      support_ms = Math.round(performance.now() - supportStarted);
+      supportDone = true;
+      if (!classificationDone) progress('classification');
+    })
+    : Promise.resolve(undefined);
+  const [category, selection] = await Promise.allSettled([classification, support]);
+  if (category.status === 'rejected') throw category.reason;
+  return {output_token: category.value, selection, support_ms};
+}
+
 // Populate all four stable prefixes before accepting reports. Preparation uses
 // no report data, and never evaluates the disposable empty-report suffixes.
 export async function warmLocalPrompts(model: ChoiceModel,

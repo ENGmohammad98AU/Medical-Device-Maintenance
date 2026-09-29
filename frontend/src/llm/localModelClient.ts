@@ -6,8 +6,10 @@ export class LocalModelClient {
   private sequence = 0;
   private forceCpu = false;
   private ready = false;
+  private fallbackReason?: LocalProgress['cpu_fallback_reason'];
   get isReady() { return this.ready; }
   private pending?: {id: number; key?: string; input?: LocalInput; started: number; inferenceStarted?: number;
+    stageKey?: string; stageStarted?: number; wallStarted: number;
     deadline: number; inferenceBudget: number; resolve: (result: LocalResult) => void; progress: (progress: LocalProgress) => void};
   private timer?: ReturnType<typeof setTimeout>;
   // Session-only, bounded cache. The key includes the complete reference context
@@ -45,7 +47,7 @@ export class LocalModelClient {
       const id = ++this.sequence;
       const started = performance.now();
       const inferenceStarted = this.ready && input ? started : undefined;
-      this.pending = {id, key, input, started, inferenceStarted,
+      this.pending = {id, key, input, started, inferenceStarted, wallStarted: Date.now(),
         deadline: started + (inferenceStarted === undefined ? LOCAL_PREPARATION_TIMEOUT_MS : inferenceBudget), inferenceBudget,
         resolve, progress: onProgress};
       this.armTimeout();
@@ -57,20 +59,22 @@ export class LocalModelClient {
     const {id, input} = this.pending;
     try {
         const worker = this.worker ??= new Worker(new URL('./localModel.worker.ts', import.meta.url), {type: 'module'});
-        worker.onmessage = ({data}: MessageEvent<{id: number; result?: LocalResult; ready?: boolean; progress?: LocalProgress; diagnostic?: string; retry_cpu?: boolean}>) => {
+        worker.onmessage = ({data}: MessageEvent<{id: number; result?: LocalResult; ready?: boolean; progress?: LocalProgress;
+          diagnostic?: string; retry_cpu?: boolean; cpu_fallback_reason?: LocalProgress['cpu_fallback_reason']}>) => {
           if (worker !== this.worker || data.id !== this.pending?.id) return;
           // A delayed event must not turn an expired request into a success.
           if (performance.now() >= this.pending.deadline) { this.finish(localFailure('timeout')); return; }
+          if (data.diagnostic) console.warn('Local model:', data.diagnostic);
           if (data.retry_cpu) {
             if (this.forceCpu) { this.finish(localFailure('load_failed')); return; }
             this.forceCpu = true;
+            this.fallbackReason = data.cpu_fallback_reason;
             this.ready = false;
             worker.terminate(); this.worker = undefined;
-            this.pending.progress({stage: 'loading', compute_backend: 'wasm', cpu_fallback: true});
+            this.emitProgress({stage: 'loading', compute_backend: 'wasm', cpu_fallback: true});
             // GPU failure never replenishes an already-running deadline.
             this.startWorker(); return;
           }
-          if (data.diagnostic) console.warn('Local model:', data.diagnostic);
           if (data.ready) this.ready = true;
           if (data.progress) {
             if (data.progress.stage === 'running' && this.pending.inferenceStarted === undefined) {
@@ -78,7 +82,7 @@ export class LocalModelClient {
               this.pending.deadline = this.pending.inferenceStarted + this.pending.inferenceBudget;
               this.armTimeout();
             }
-            this.pending.progress(data.progress);
+            this.emitProgress(data.progress);
           }
           if (data.result) this.finish(data.result);
         };
@@ -87,6 +91,18 @@ export class LocalModelClient {
           inference_budget_ms: this.pending.inferenceStarted === undefined ? this.pending.inferenceBudget
             : Math.max(0, this.pending.deadline - performance.now())});
       } catch { this.finish(localFailure('load_failed')); }
+  }
+  private emitProgress(progress: LocalProgress) {
+    if (!this.pending) return;
+    const key = `${progress.stage}/${progress.task ?? ''}/${progress.preparation_source ?? ''}`;
+    if (key !== this.pending.stageKey) {
+      this.pending.stageKey = key;
+      this.pending.stageStarted = Date.now();
+    }
+    this.pending.progress({...progress, stage_started_at: this.pending.stageStarted,
+      operation_started_at: this.pending.wallStarted,
+      ...(this.forceCpu ? {cpu_fallback: true, cpu_fallback_reason: this.fallbackReason} : {}),
+    });
   }
   private armTimeout() {
     clearTimeout(this.timer);
