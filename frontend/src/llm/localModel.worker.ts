@@ -66,7 +66,7 @@ self.addEventListener('message', async (event: MessageEvent<{id: number; input?:
     loading = false;
     const inferenceStarted = performance.now();
     const {output_token, selection, support_ms} = await analyzeLocally(loaded, input,
-      !(import.meta.env.MODE === 'benchmark' && event.data.serial_analysis),
+      import.meta.env.MODE === 'benchmark' && event.data.serial_analysis === false,
       task => self.postMessage({id, progress: {stage: 'running', task, storage_mode: storageMode,
         compute_backend: computeBackend, backend_ready: true}}));
     let support: SupportResult | undefined;

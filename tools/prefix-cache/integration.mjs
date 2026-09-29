@@ -15,13 +15,14 @@ const {chromium} = await import(pathToFileURL(resolve('frontend/node_modules/pla
 const readJSON = async path => JSON.parse(await readFile(path, 'utf8'));
 const config = await readJSON('frontend/src/llm/localModelConfig.json');
 const supportConfig = await readJSON('frontend/src/llm/supportModelConfig.json');
-const guidanceConfig = await readJSON('frontend/src/llm/guidanceModelConfig.json');
 const guidanceCases = await readJSON('frontend/src/llm/guidanceCases.json');
 const classificationCases = await readJSON('frontend/src/llm/benchmarkCases.json');
 const supportCases = await readJSON('frontend/src/llm/supportSmokeCases.json');
 const bundle = await readJSON('frontend/src/llm/staticPrefixBundle.json');
 const baseline = await readJSON('tools/prefix-cache/benchmark-baseline.json');
-assert.equal(createHash('sha256').update(await readFile('frontend/src/llm/benchmarkCases.json')).digest('hex'), baseline.dataset_sha256);
+// Git may check out CRLF on Windows; compare the original LF source bytes.
+const dataset = (await readFile('frontend/src/llm/benchmarkCases.json', 'utf8')).replace(/\r\n/g, '\n');
+assert.equal(createHash('sha256').update(dataset).digest('hex'), baseline.dataset_sha256);
 assert.equal(config.model_file_sha256, baseline.model_sha256);
 const threads = Number(process.env.BENCHMARK_THREADS || 4);
 const full = threads === 4;

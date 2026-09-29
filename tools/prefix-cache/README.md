@@ -2,7 +2,7 @@
 
 The released Windows tests spend about 5-6 minutes preparing Qwen3-1.7B. Most of that time evaluates the four fixed prefixes. Keeping a worker alive avoids some repetitions but cannot accelerate a new session.
 
-This experiment adds a bounded bridge to the existing llama.cpp slot save/restore operations. A slot file includes its KV state and prompt token bookkeeping. It does not contain a generated answer catalogue. The production model, quantization, prompts, inference parameters, evidence checks, and 45-second inference budget are unchanged.
+This experiment adds a bounded bridge to the existing llama.cpp slot save/restore operations. A slot file includes its KV state and prompt token bookkeeping. It does not contain a generated answer catalogue. The production model, quantization, fixed instructions, inference parameters, evidence checks, and 45-second inference budget are unchanged. A separately versioned candidate compacts dynamic reference JSON without removing evidence; its response effects require the generation checks.
 
 The draft application now loads the verified paired runtime and calls `prepareStaticPrefixState()` before accepting reports. The currently published site is unchanged. The native benchmark workflow:
 
@@ -20,7 +20,7 @@ The worker prefers Cache Storage, then compatible bundled CPU state. Transfers h
 
 ## Production integration test
 
-`prefix-integration.yml` builds the actual application with verified assets and tests Windows with one and four CPU threads. It opens a fresh browser process against the same profile to prove persistence, compares serial/concurrent report analysis, checks the original forty classifier outputs and six support cases, and exercises corrupted state plus stalled transfer recovery. `benchmark-baseline.json` records the earlier classifier outputs and the exact dataset hash; test inputs and expected categories are unchanged. Latency and correctness are evaluated separately. The one-thread guidance test records hardware timeouts and checks the actual UI/client deadline; it does not promise successful generation on that slower profile.
+`prefix-integration.yml` builds the actual application with verified assets and tests Windows with one and four CPU threads. It opens a fresh browser process against the same profile to prove persistence, compares serial/concurrent report analysis (production remains serial after the measured gain was below 1%), checks the original forty classifier outputs and six support cases, and exercises corrupted state plus stalled transfer recovery. `benchmark-baseline.json` records the earlier classifier outputs and the LF-normalized source dataset hash; test inputs and expected categories are unchanged. Latency and correctness are evaluated separately. The one-thread guidance test records hardware timeouts and checks the actual UI/client deadline; it does not promise successful generation on that slower profile.
 
 ## Assets and publication
 

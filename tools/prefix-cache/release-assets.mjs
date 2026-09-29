@@ -21,6 +21,8 @@ const notes = [
   `Runtime JavaScript SHA-256: ${lock.manifest.runtime.js_sha256}`,
   `Runtime WASM SHA-256: ${lock.manifest.runtime.wasm_sha256}`,
   `Prefix manifest SHA-256: ${lock.manifest_sha256}`,
+  'Asset producer commit: https://github.com/ENGmohammad98AU/Medical-Device-Maintenance/tree/209f5d15f391cbe45e3f6788921d4cf0290f9bdf',
+  'This is a binary asset release anchored to the published application branch, not an application source-code release.',
   '',
   'Generated from four fixed instruction prefixes with no user report. These files contain native slot state, not an answer catalogue or model weights.',
   'CPU state only; incompatible/GPU/compatibility profiles use normal warmup. Runtime and state files must remain paired.',
@@ -50,7 +52,10 @@ if (process.argv.includes('--prepare-only')) {
   let release = releases.find(item => item.tag_name === tag);
   if (release && !release.draft) throw new Error('Published assets are immutable; create a new version instead of overwriting');
   if (!release) {
-    gh(['release', 'create', tag, '--repo', repository, '--draft', '--target', '209f5d15f391cbe45e3f6788921d4cf0290f9bdf',
+    // Only anchor the asset release to the existing published branch. A token
+    // with Contents permission cannot tag new workflow definitions; their
+    // producer commit is recorded in the release notes instead.
+    gh(['release', 'create', tag, '--repo', repository, '--draft', '--target', 'main',
       '--title', 'Qwen3-1.7B browser preparation v1', '--notes-file', notesFile]);
   }
   gh(['release', 'upload', tag, ...names.map(name => resolve(directory, name)), '--repo', repository, '--clobber']);

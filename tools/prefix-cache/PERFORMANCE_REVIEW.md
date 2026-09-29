@@ -1,90 +1,65 @@
 # Model preparation and response review
 
-Reviewed on 2026-09-29. Published baseline: `9d1aeb3a7c8eaddb052c92b38119d8d73aaee411`.
-Measured prototype: `209f5d15f391cbe45e3f6788921d4cf0290f9bdf`.
+Reviewed on 2026-09-29. Published baseline: `9d1aeb3a7c8eaddb052c92b38119d8d73aaee411`. Integration evidence: `6db5841dbe743ef532a4dfb46614ee09e4dd0bd4` in [draft PR 25](https://github.com/ENGmohammad98AU/Medical-Device-Maintenance/pull/25). The published site has not changed.
 
-The dominant measured delay is browser-side evaluation of static prompts. It is not a server-side Qwen initialization in the published architecture. `render.yaml` selects `AI_MODE=browser`, and `localModel.worker.ts` loads the GGUF model and performs inference inside the browser. API startup and Internet downloads can add separate delays; this experiment does not measure either.
+## Measured bottleneck and implemented fix
 
-## Evidence
+Qwen executes in the browser (`AI_MODE=browser`). The dominant measured preparation cost is evaluation of four fixed instruction prefixes, not server-side Qwen startup. Cached weights do not preserve that evaluated state.
 
-[Completed Linux and Windows comparison](https://github.com/ENGmohammad98AU/Medical-Device-Maintenance/actions/runs/36556746512), in [draft PR 25](https://github.com/ENGmohammad98AU/Medical-Device-Maintenance/pull/25).
+The [original Windows comparison](https://github.com/ENGmohammad98AU/Medical-Device-Maintenance/actions/runs/36556746512) measured 304.307 seconds to readiness: 5.166 seconds initialization and 299.141 seconds static prompt evaluation. Restoring the same static native state took 6.765 seconds. These measurements exclude Internet model transfer.
 
-The `static-prefix-windows-evidence` artifact contains `results-win32.json`; `static-prefix-prototype` contains the paired runtime and static state manifests. Windows used four CPU threads, Qwen3-1.7B Q4_K_M, the existing prompts, and the existing inference settings. A new browser process was used for restoration. No live worker survived between runs.
+The application now loads a paired, hash-verified runtime, restores compatible static state before accepting reports, and persists it in browser Cache Storage. The model weights, quantization, classification/reference/scope prompts, generation instructions and sampling settings remain unchanged. Persistent state contains only fixed prefixes prepared before user reports, not generated answers.
 
-| Windows preparation stage | Published runtime |
-| --- | ---: |
-| Initialize model after reading local weights | 5.166 s |
-| Evaluate classification prefix, 809 tokens | 146.534 s |
-| Evaluate reference-selection prefix, 450 tokens | 74.020 s |
-| Evaluate scope prefix, 215 tokens | 35.305 s |
-| Evaluate guidance prefix, 264 tokens | 43.282 s |
-| Total readiness, excluding model transfer | 304.307 s |
+## Actual application results
 
-Restored readiness was **6.765 s**: 4.581 s initialization and 2.184 s restoration, approximately 45 times faster in this test. The static files total **199,358,464 bytes**. Reading and hashing them from localhost is included; Internet transfer time is not. This is not a promise of seven-second first visits. The approximately 1.1 GB model download is also excluded.
+[Windows production-worker integration](https://github.com/ENGmohammad98AU/Medical-Device-Maintenance/actions/runs/36581312478), four CPU threads, exercised the built application and a persistent browser profile across separate browser processes:
 
-## Findings in the published code
+| Scenario | Model initialization plus preparation | Outcome |
+| --- | ---: | --- |
+| First visit with bundled state | 9.728 s | Four static files restored and saved |
+| New browser process | 8.702 s | Saved state; zero model or static-file requests |
+| Corrupted saved state and stalled transfer | About 345 s overall | Five-second transfer stall detected; genuine warmup completed and repaired storage |
+| New browser after repair | 7.426 s | Saved state restored; zero model or static-file requests |
 
-### 1. Static preparation is recalculated for each new worker
+First-visit overall time was 25.491 seconds, including model transfer from localhost. The approximately 1.1 GB weights and 199,358,464 bytes of static state still need Internet transfer on a real first visit. These results do not promise ten-second first visits or comparable performance on every device.
 
-`frontend/src/llm/localModel.worker.ts`, initialization: `loadGgufModel()` is always followed by `warmLocalPrompts()`.
+A one-thread process also restored the same state: 7.907 seconds first initialization/restoration and 7.716 seconds in a new browser. Its original raw-worker test later timed out during guidance; startup portability does not establish successful one-thread generation.
 
-`frontend/src/llm/localModelEngine.ts`, `warmLocalPrompts()`: four independent fixed prefixes are evaluated serially. This consumed 299.141 seconds, about 98% of measured readiness. `frontend/src/llm/modelStorage.js` retains model weights, but not the evaluated prompt state. Cached model weights therefore do not remove this computation.
+## Response latency and concurrency decision
 
-If browser storage is unavailable or has insufficient quota, `modelStorage.js` uses a temporary downloaded Blob. A new worker can then require another approximately 1.1 GB transfer. This is a separate code path to check on the affected device; it was not the cause of the local-file preparation times above.
+The six four-thread serial report cases took 25.225, 28.320, 22.842, 29.588, 37.155 and 43.595 seconds. Five answers completed; the Philips MX800 Resp case exhausted the shared budget during generation.
 
-PR 24 keeps a worker alive across route navigation. It cannot preserve that worker across a page reload, browser closure, logout, or the ten-minute idle disposal in `localModelSession.ts`. The existing 15-minute preparation deadline can leave the user waiting for this genuine CPU work; reducing the deadline would only stop it earlier.
+Concurrent classification/reference selection totaled 185.822 seconds versus 186.725 seconds sequentially, an improvement of only 0.48%. Outputs and completion count were unchanged. This fails the predeclared five-percent useful-gain threshold. **Production stays sequential**; concurrency is available only in benchmark builds for reproducibility.
 
-**Measured improvement:** save and restore the native slot state, including KV data and prompt token bookkeeping, for the four static prefixes. No report, generated answer, model weight, reference-selection rule, or generation instruction needs to change.
+Static restoration accelerates preparation, not the remaining report/evidence prefill and decoding. The battery case in the earlier native trace spent 21.632 seconds evaluating 129 additional tokens, compared with roughly 3.698 seconds decoding. Reducing answer length alone cannot remove that prefill work.
 
-### 2. Response work uses a shared budget sequentially
+A separate candidate reduces dynamic reference JSON overhead by combining the selected symptom and complete evidence in one escaped value. It removes no evidence sentences, report text or manufacturer/model identity. Its manifest is versioned independently from the unchanged static prefix. **Its latency and output effects are under test; no speedup is claimed.**
 
-`frontend/src/llm/localModel.worker.ts`, report handling: classification completes before reference selection starts; guidance starts after both. All three consume the same 45-second inference budget. `generateGuidance()` reserves 1.5 seconds for returning a structured result before the hard client timeout.
+## Reliability and diagnostics
 
-The six restored Windows report cases took 24.869, 28.126, 22.417, 29.566, 37.265 and 43.707 seconds. The final case timed out. Startup restoration did not materially accelerate report inference.
+- State identity binds the model, paired runtime, context/backend options and exact static prompt hashes. Scheduling thread count is excluded from the CPU state layout identity. GPU/compatibility workers use ordinary warmup.
+- Size and SHA-256 checks precede native import; restored token counts are checked. A manifest is written only after all static slots are saved. Storage failure leaves a successfully prepared model usable.
+- Bundle transfer has a five-second no-progress watchdog and sixty-second total cap. After a three-second sample, a projected over-budget transfer is abandoned. Data-saver and 2G/3G connections skip it.
+- The UI distinguishes download, model initialization, state restoration, each of four preparation phases, saving, classification, reference selection and generation. It displays elapsed stage/operation time and sanitized CPU-fallback reasons.
+- Adapter availability is not represented as proof of completed GPU initialization. Reports are not logged by the production diagnostics.
+- Existing hard client deadlines remain. Tests now record client-enforced termination when a stopped worker cannot post a result, without counting that failure as a completed answer.
 
-For the Philips MX800 Resp case, classification consumed about 3.51 seconds and reference selection about 10 seconds before generation. The failure is recorded inside **guidance generation**, after its remaining budget expired. These traces do not include partial generation output, so they do not establish whether the final delay was in evidence prefill, decoding, or both. There is no evidence here of an unresolved JavaScript Promise or an infinite loop.
+## Regression results and remaining gates
 
-**Candidate improvement, not yet measured:** submit classification and support selection concurrently to the existing four-slot runtime. They do not consume each other's results. The local `analyzeLocally()` helper waits for both tasks to settle, including failures, so a rejected task does not leave an inference request running after completion. Its two unit tests pass, but the worker does not use it. Concurrency can contend for the same CPU and must be measured before claiming a speedup or changing production behavior.
+For the completed four-thread integration at `6db5841`:
 
-### 3. Reference evidence contributes substantial response prefill
+- Classification: **38/40**, all category tokens identical to the published baseline. Existing misses remain `sensor_en_01` and `other_ar_01` (both MECHANICAL).
+- Reference selection: **6/6**, unchanged outputs.
+- Guidance: **5/6**; all five completed texts identical between sequential and concurrent runs. Resp timed out in both.
+- Corruption, stalled transfer, repaired persistence and new-browser reuse passed.
+- Local candidate validation: **110 frontend unit tests**, TypeScript checking and application build passed.
 
-`frontend/src/llm/guidanceModel.ts`, `prompt()`: the variable report precedes the selected reference evidence. That evidence must be evaluated after the report; the static startup prefix does not include it.
+The next integration harness uses the actual UI/client to measure one-thread deadlines. Dataset hashing normalizes Git's Windows CRLF checkout to LF while preserving all forty cases and expected outputs. The earlier hash mismatch was a test representation error, not an inference result.
 
-In the sourced battery case, the guidance request evaluated 129 additional tokens in 21.632 seconds and decoded its answer in approximately 3.698 seconds. Thus shortening only the generated answer would not remove the main cost in that case.
+Clean-install/generation tests now receive the same verified runtime/state package as the proposed production build. The all-six-generated-answers check remains strict; previous failures are not reclassified as success. Real-browser candidate results and publication readiness must be read from the latest PR checks. Synthetic regression tests are not a general guarantee of answer correctness or clinical validation.
 
-**Possible later improvement:** arrange reusable reference context before variable report text and assess per-reference caching. This changes prompt ordering and would require new output and evidence regression tests. It is not included in the validated startup experiment. Evidence must not be silently truncated to improve a timing number.
+## Review and publication
 
-### 4. Status reporting obscures the expensive phase
+The application changes are on a test branch only. Versioned runtime/state assets are prepared as a draft release with checksums and third-party notices. Production builds require the bundle and fail explicitly if it is unavailable; developer builds may use upstream warmup with a warning.
 
-`frontend/src/components/LocalModelProgress.tsx`: the warming message does not distinguish classification, reference, scope, and guidance preparation even though the worker supplies `task`. It also displays GPU acceleration as active during loading once `selectComputeBackend()` has chosen an adapter.
-
-`frontend/src/llm/computeBackend.js`: an available, non-fallback adapter is sufficient to select WebGPU. Adapter availability is not an observation that model loading or GPU execution has completed successfully. `localModel.worker.ts` suppresses native runtime logs and requests a CPU retry before emitting a diagnostic for a GPU failure, which removes useful failure context.
-
-**Diagnostic improvement:** show the actual stage and elapsed time; distinguish the requested backend from a successfully initialized backend; retain a sanitized preparation-failure reason. Do not log report text. The old `powerPreference` warning and a fulfilled Promise alone do not identify the measured bottleneck.
-
-### 5. Preparation storage and compute compatibility need deployment work
-
-The new `staticPrefixState.ts` helper binds reusable state to model, runtime, load options and prompt hashes, verifies byte sizes and SHA-256 before native import, and falls back to normal warmup on corrupt or incompatible data. It writes the manifest only after all static files have been saved, before accepting reports.
-
-The validated package is CPU/four-thread only. The current exact-profile check rejects other thread counts and GPU load options. The application can select one to eight threads, so the package is not yet a universal first-start solution. Cross-backend state compatibility has not been validated. The bundled download attempt currently has a 180-second limit; on a slow or failed connection this can add delay before normal warmup. Transfer and fallback policy need validation before deployment.
-
-Native slot IDs are not warmup phase IDs: the saved slots are guidance, scope, reference, and classification in that order. The local helper was corrected to report generic restoration byte progress instead of assigning incorrect phase names from slot numbers.
-
-## Regression results and limits
-
-- Classification: **38/40 before and after**, with identical category tokens. Existing misses: `sensor_en_01` and `other_ar_01`, both returned `MECHANICAL`.
-- Support selection: **6/6 before and after**, with identical outputs.
-- Guidance: **5/6 before and after**. All five completed texts matched exactly. The Philips MX800 Resp case timed out in both runs.
-- Local frontend validation: 108 unit tests passed and TypeScript checking passed, including eight static-cache tests and two concurrency-helper tests. This does not establish a concurrency speedup or replace production-browser integration testing.
-
-These are synthetic regression cases, not a general guarantee of answer correctness or a clinical validation.
-
-## Publication status and adoption order
-
-The production worker still imports the stock runtime and calls normal warmup. It does not call `prepareStaticPrefixState()` or `analyzeLocally()`. Draft PR 25 is a validated startup experiment; it has not been merged or deployed. The local helper and review additions are not in the published site.
-
-1. Wire the paired, verified runtime and static-state helper into the production worker, with stable asset distribution and compatible-profile fallback.
-2. Test that production worker on a first visit, a repeat visit, unavailable storage, slow transfer, and the intended device/backend profile. Report transfer time separately from computation.
-3. Measure concurrent classification/reference selection while keeping the model, prompts, evidence, seed and shared budget unchanged. Retain the change only if latency improves without output regressions.
-4. Add stage-specific timing and GPU-fallback diagnostics to make any remaining slowdown directly identifiable.
-5. Publish only the concrete, tested integration after the required publication approval. Raising a timeout, changing a progress message, or keeping a worker alive cannot by itself remove first-session computation.
+Public assets must be released before the application is merged so Render can retrieve them. Publication requires user approval and matching successful validation; no merge or deployment has been performed. The generation timeout remains a separate limitation until a tested candidate resolves it.

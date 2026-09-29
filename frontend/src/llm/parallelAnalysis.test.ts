@@ -12,7 +12,7 @@ describe('independent classification and support', () => {
   it('starts both requests before waiting for either result', async () => {
     const resolve: ((value: unknown) => void)[] = [];
     const createCompletion = vi.fn(() => new Promise(done => resolve.push(done)));
-    const work = analyzeLocally({createCompletion} as unknown as Pick<Wllama, 'createCompletion'>, input);
+    const work = analyzeLocally({createCompletion} as unknown as Pick<Wllama, 'createCompletion'>, input, true);
     expect(createCompletion).toHaveBeenCalledTimes(2);
     resolve[1](completion('D'));
     resolve[0](completion('A'));
@@ -23,7 +23,7 @@ describe('independent classification and support', () => {
     const createCompletion = vi.fn().mockRejectedValueOnce(new Error('Classification failed'))
       .mockImplementationOnce(() => new Promise(done => {finishSupport = done;}));
     let finished = false;
-    const work = analyzeLocally({createCompletion} as unknown as Pick<Wllama, 'createCompletion'>, input)
+    const work = analyzeLocally({createCompletion} as unknown as Pick<Wllama, 'createCompletion'>, input, true)
       .catch(error => {finished = true; return error.message;});
     await Promise.resolve(); await Promise.resolve();
     expect(finished).toBe(false);

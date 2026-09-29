@@ -64,12 +64,14 @@ describe('bounded free generation', () => {
   it('provides only the selected evidence and binds its identifier to the answer', async () => {
     const m = model();
     const grounded = {...context, references: [
-      {reference_id: 'wheel', symptom: 'Jammed wheel', evidence: 'Inspect the caster for external obstructions.'},
+      {reference_id: 'wheel', symptom: 'Jammed "wheel"', evidence: 'meaning: Movement is restricted.\npossible_causes: External debris.\nimmediate_safety_action: Keep out of clinical use.\nrecommended_solution: Inspect the caster for external obstructions.\nverification_before_return_to_service: Specialist review required.'},
       {reference_id: 'other', symptom: 'Unrelated alarm', evidence: 'UNRELATED EVIDENCE'},
     ]};
     expect(await generateGuidance(m.instance, grounded, 40000, 'wheel')).toMatchObject({reference_id: 'wheel', status: 'success'});
     const options = m.createCompletion.mock.calls[0] as unknown as [{prompt: string}];
-    expect(options[0].prompt).toContain('Inspect the caster');
+    for (const sentence of ['Movement is restricted.', 'External debris.', 'Keep out of clinical use.',
+      'Inspect the caster for external obstructions.', 'Specialist review required.']) expect(options[0].prompt).toContain(sentence);
+    expect(options[0].prompt).toContain('Jammed \\"wheel\\"');
     expect(options[0].prompt).not.toContain('UNRELATED EVIDENCE');
     expect((await generateGuidance(m.instance, grounded, 40000, 'invented')).error_code).toBe('invalid_output');
   });

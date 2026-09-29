@@ -22,7 +22,8 @@ export async function selectSupportLocally(model: ChoiceModel, context: SupportC
 // These tasks use independent prompt slots and neither consumes the other's
 // answer. Wait for both to settle so a rejected task cannot leave work running
 // after the client has received a result or started the next report.
-export async function analyzeLocally(model: ChoiceModel, input: LocalInput, parallel = true,
+// The measured concurrency gain was below 1%; production stays sequential.
+export async function analyzeLocally(model: ChoiceModel, input: LocalInput, parallel = false,
   progress: (task: 'classification' | 'reference_selection' | 'analysis') => void = () => {}) {
   progress(parallel && input.support_context ? 'analysis' : 'classification');
   let classificationDone = false, supportDone = !input.support_context;

@@ -1,5 +1,5 @@
 {
-  "version": "browser-guidance-v13-english-evidence",
+  "version": "browser-guidance-v14-compact-evidence",
   "output_language": "en",
   "max_input_tokens": 2048,
   "max_new_tokens": 128,
