@@ -5,7 +5,7 @@ import { formatQwenUserPrefix } from './ggufChoice.js';
 
 export { config as guidanceModelConfig };
 export interface GuidanceReference {
-  reference_id: string; symptom: string; evidence: string;
+  reference_id: string; symptom: string; evidence: string; meaning?: string;
 }
 export interface GuidanceContext {
   version: string; input_sha256: string; device_name: string; report_text: string;
@@ -34,24 +34,38 @@ function prompt(context: GuidanceContext, referenceId?: string | null) {
   const device = context.device_name.match(/\(([^()]+)\)$/)?.[1] || context.device_name;
   const reference = context.references?.find(item => item.reference_id === referenceId);
   if (referenceId && !reference) throw new Error('invalid_output');
-  if (reference && reference.evidence.length > 6000) throw new Error('input_too_long');
-  // Shorten field labels only; retain every sentence of manufacturer evidence.
+  if (reference && (reference.evidence.length > 6000 || (reference.meaning?.length ?? 0) > 6000)) throw new Error('input_too_long');
   // Put the shared language instruction before report data so preparation can
   // cache it instead of evaluating it again on each slower CPU request.
-  const evidence = reference?.evidence.replace(/^(possible_causes|immediate_safety_action|recommended_solution|verification_before_return_to_service):/gm,
+  // A sourced short answer explains the complete manufacturer meaning. Full
+  // maintenance procedures remain in the server-owned reference panel and in
+  // the context binding; they are not silently shortened into partial steps.
+  // Older contexts without a meaning retain every sentence of their evidence.
+  const evidence = reference?.meaning?.trim() || reference?.evidence.replace(/^(possible_causes|immediate_safety_action|recommended_solution|verification_before_return_to_service):/gm,
     field => ({'possible_causes:': 'Causes:', 'immediate_safety_action:': 'Safety:',
       'recommended_solution:': 'Solution:', 'verification_before_return_to_service:': 'Verification:'}[field]!));
   return formatQwenMessages([{role: 'system', content: config.system_prompt},
     {role: 'user', content: ENGLISH_INSTRUCTION
       + JSON.stringify({device, report: context.report_text,
       reference: reference ? {symptom: reference.symptom, evidence} : null})
-      + (reference ? '\nNo replacement advice.' : '')
+      + (reference?.meaning?.trim() ? '\nExplain only this alarm meaning. No procedures or extra technical claims.'
+        : reference ? '\nNo replacement advice.' : '')
       }]);
 }
 
 // Restrict the output script only. Sentence structure, wording and number of
 // paragraphs are generated, with no answer catalogue or fixed inspection verbs.
 const ENGLISH_TEXT_GRAMMAR = 'root ::= [A-Za-z] [\\u0020-\\u007E\\n]*\n';
+
+// Reject unsupported numeric limits rather than turning a plausible number
+// into a manufacturer specification. This is a rejection check, not a general
+// semantic correctness score.
+export function supportedQuantities(text: string, evidence: string): boolean {
+  const quantities = (value: string) => [...value.matchAll(/(?<![\w.])[-+]?\d+(?:[.,]\d+)?\s*(?:%|percent\b|(?:milli)?volts?\b|m?v\b|(?:milli)?amps?\b|m?a\b|mmhg\b|kpa\b|psi\b|hz\b|seconds?\b|minutes?\b|hours?\b)/gi)]
+    .map(match => match[0].toLowerCase().replace(/\s+/g, '').replace(/percent$/, '%'));
+  const supplied = new Set(quantities(evidence));
+  return quantities(text).every(value => supplied.has(value));
+}
 
 export function completeGuidance(text: string): string {
   const value = text.trim().split('\n').map(line => line.trim()).join('\n');
@@ -92,6 +106,9 @@ export async function generateGuidance(model: Model, context: GuidanceContext, b
     if (response.usage.prompt_tokens > config.max_input_tokens) throw new Error('input_too_long');
     if (response.choices[0]?.finish_reason !== 'stop') throw new Error('invalid_output');
     const text = completeGuidance(response.choices[0].text);
+    const reference = context.references?.find(item => item.reference_id === referenceId);
+    const supplied = reference ? reference.meaning?.trim() || reference.evidence : context.report_text;
+    if (!supportedQuantities(text, supplied)) throw new Error('invalid_output');
     if (!referenceId && !/\b(?:unconfirmed|uncertain|unknown|cannot confirm|not confirmed|not established|insufficient|no matching|no reference)\b/i.test(text)) {
       throw new Error('invalid_output');
     }

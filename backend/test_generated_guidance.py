@@ -73,6 +73,9 @@ def test_catalogue_provides_evidence_for_free_generation(api_client):
     _, context = prepare(client, text='Battery low warning')
     assert context['guidance']['references'] and context['candidates']
     assert context['guidance']['references'][0]['reference_id'] == context['candidates'][0]['reference_id']
+    reference = context['guidance']['references'][0]
+    assert reference['meaning'] and reference['meaning'] in reference['evidence']
+    assert 'recommended_solution:' in reference['evidence']
 
 
 @pytest.mark.parametrize('text', ['Low oxygen', 'Resp Leads Off', 'Standby time expired'])
@@ -174,6 +177,7 @@ def test_generated_explanation_preserves_server_owned_evidence(three_devices, sa
     body = analyze(client, request, result)
     assert body['generated_guidance']['status'] == 'DRAFT'
     assert body['generated_guidance']['evidence_status'] == 'REFERENCE_PROVIDED'
+    assert body['generated_guidance']['evidence_scope'] == 'ALARM_MEANING'
     assert body['generated_guidance']['sources'][0]['reference_id'] == candidate['reference_id']
     assert body['generated_guidance']['sources'][0]['reference_url'] == body['reference_url']
     assert body['reference_found'] and body['recommended_solution'] != TEXT
@@ -233,3 +237,26 @@ def test_changed_source_invalidates_previously_generated_text(api_client):
     body = analyze(client, request, result)
     assert body['generated_guidance']['error_code'] == 'context_mismatch'
     assert not body['generated_guidance']['text']
+
+
+@pytest.mark.parametrize('text', [
+    'The cause is unconfirmed. The battery is below 10%.',
+    'The cause is unconfirmed. The required voltage is 24 V.',
+    'The cause is unconfirmed. Wait 20 minutes before checking.',
+])
+def test_invented_numeric_specifications_are_not_displayed(api_client, text):
+    client, _, _ = api_client
+    request, context = prepare(client)
+    result = local(request, context)
+    result['guidance']['text'] = text
+    body = analyze(client, request, result)
+    assert body['generated_guidance']['status'] == 'BLOCKED'
+    assert not body['generated_guidance']['text']
+
+
+def test_numeric_grounding_preserves_values_signs_and_units():
+    from app.services.generated_guidance_service import supported_quantities
+    assert supported_quantities('Charge is below 5 percent.', 'Charge is below 5%.')
+    assert not supported_quantities('Charge is below 10%.', 'Charge is below 5%.')
+    assert not supported_quantities('Voltage is -5 V.', 'Voltage is 5 V.')
+    assert not supported_quantities('Wait 20 minutes.', 'Charge is below 20%.')
