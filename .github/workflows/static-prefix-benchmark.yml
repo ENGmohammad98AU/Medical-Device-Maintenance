@@ -1,0 +1,70 @@
+name: Static prefix state benchmark
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'tools/prefix-cache/**'
+      - '.github/workflows/static-prefix-benchmark.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-generate:
+    name: Build pinned runtime and generate static state
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: bash tools/prefix-cache/build-runtime.sh
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Export static prefixes and verify a fresh process can use them
+        run: node tools/prefix-cache/benchmark.mjs --generate --quick
+      - name: Save paired runtime and static states
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-prefix-prototype
+          path: frontend/benchmark-results/prefix-cache/
+          compression-level: 1
+          if-no-files-found: error
+
+  verify-windows:
+    name: Compare published engine and restored state on Windows
+    needs: build-and-generate
+    runs-on: windows-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - uses: actions/download-artifact@v4
+        with:
+          name: static-prefix-prototype
+          path: frontend/benchmark-results/prefix-cache/
+      - run: node tools/prefix-cache/bundle.mjs
+      - run: npx playwright install chromium
+        working-directory: frontend
+      - name: Measure cold preparation, restored preparation, and unchanged answers
+        run: node tools/prefix-cache/benchmark.mjs
+      - name: Save timing and regression evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-prefix-windows-evidence
+          path: frontend/benchmark-results/prefix-cache/results-win32.json
+          if-no-files-found: error
