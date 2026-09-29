@@ -18,6 +18,17 @@ MANIFEST = json.loads((Path(__file__).parent / "support_llm_manifest.json").read
 PROMPT_HASH = hashlib.sha256(json.dumps(MANIFEST, sort_keys=True).encode()).hexdigest()
 
 
+def _direct_reference(references):
+    """Return a clearly dominant catalogue reference, otherwise None."""
+    if not references or references[0].get("reference_origin") != "CATALOGUE":
+        return None
+    top = float(references[0].get("match_confidence") or 0.0)
+    second = float(references[1].get("match_confidence") or 0.0) if len(references) > 1 else 0.0
+    if top >= 0.90 and (len(references) == 1 or top - second >= 0.15):
+        return references[0]
+    return None
+
+
 class BrowserSupportResult(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     status: Literal["success", "error"]
@@ -44,17 +55,13 @@ def prepare_support(request, device, db):
         device_type=device_type, description=request.description, fault_query=request.fault,
         llm_context_records=load_llm_context(),
     )
-    single_direct = (
-        len(references) == 1
-        and references[0].get("reference_origin") == "CATALOGUE"
-        and float(references[0].get("match_confidence") or 0.0) >= 0.85
-    )
+    single_direct = _direct_reference(references)
     context = {
         "version": MANIFEST["version"], "report_text": redact_report(report_text),
         "device_name": f"{device.name} ({device.manufacturer} {device.model})",
         "candidates": [{"label": "ABC"[i], "reference_id": r["reference_id"], "symptom": r["symptom"]}
                        for i, r in enumerate(references)],
-        "selection_required": bool(references) and not single_direct,
+        "selection_required": bool(references) and single_direct is None,
     }
     # Includes complete reference content, device and patient/expertise context.
     # Detects stale data; an untrusted browser can still forge its own proposal.
@@ -97,28 +104,28 @@ def resolve_support(context, references, result, llm_run, fallback):
         "model": llm_run.model, "model_revision": llm_run.model_revision,
         "runtime": llm_run.runtime, "result": result.model_dump() if result else None,
     }
-    if not references and llm_run.provider == "reference-gate":
-        metadata.update(
-            status="NO_REFERENCE",
-            scope="UNCONFIRMED",
-            method="REFERENCE_GATE",
-            message="No technical reference matches this report and device in the current knowledge base. No local-model maintenance inference was run.",
-            questions=clarification_questions(context),
-        )
-        metadata["guards"].append("NO_REFERENCE_NO_LLM")
-        return dict(NO_MATCH), metadata, True
     if not references:
+        if llm_run.provider == "reference-gate":
+            metadata.update(
+                status="NO_REFERENCE",
+                scope="UNCONFIRMED",
+                method="REFERENCE_GATE",
+                message="No technical reference matches this report and device in the current knowledge base. No local-model maintenance inference was run.",
+                questions=clarification_questions(context),
+            )
+            metadata["guards"].append("NO_REFERENCE_NO_LLM")
+            return dict(NO_MATCH), metadata, True
         metadata["message"] = "No technical reference matches this report and device in the current knowledge base. Provide more details or consult a biomedical engineer."
         metadata["questions"] = clarification_questions(context)
+        return fallback, metadata, False
+
     direct_single = (
-        len(references) == 1
-        and references[0].get("reference_origin") == "CATALOGUE"
-        and float(references[0].get("match_confidence") or 0.0) >= 0.85
-        and llm_run.provider in {"browser-local", "reference-gate"}
-        and (result is None or result.status != "success")
+        _direct_reference(references)
+        if llm_run.provider == "browser-local" and result is None
+        else None
     )
     if direct_single:
-        selected = references[0]
+        selected = direct_single
         metadata.update(
             status="SELECTED",
             scope="IN_SCOPE",
