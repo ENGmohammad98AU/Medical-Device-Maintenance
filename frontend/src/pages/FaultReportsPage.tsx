@@ -278,10 +278,10 @@ export default function FaultReportsPage() {
       if (!mounted.current) return;
 
       const referenceCount = support_context?.candidates?.length ?? 0;
-      const needsLocalSelection = useLlm && referenceCount > 1;
+      const needsLocalSelection = useLlm && Boolean(support_context?.selection_required);
       if (useLlm && referenceCount === 0) setAnalysisStage('لا يوجد مرجع مطابق؛ إنهاء التحليل دون تشغيل النموذج…');
-      if (useLlm && referenceCount === 1) setAnalysisStage('تم العثور على مرجع واضح؛ استخدامه مباشرة دون تشغيل النموذج…');
-      if (needsLocalSelection) setAnalysisStage('عدة مراجع محتملة؛ تشغيل النموذج لاختيار الأنسب…');
+      if (useLlm && referenceCount === 1 && !needsLocalSelection) setAnalysisStage('تم العثور على مرجع واحد عالي الثقة؛ استخدامه مباشرة دون تشغيل النموذج…');
+      if (needsLocalSelection) setAnalysisStage('المراجع المتاحة تحتاج اختيارًا دلاليًا؛ تشغيل النموذج لاختيار الأنسب…');
 
       const browser_llm = needsLocalSelection ? await localModel.run({
         report_text: supportRequest.description,
