@@ -33,7 +33,7 @@ Concurrent classification/reference selection totaled 185.822 seconds versus 186
 
 Static restoration accelerates preparation, not the remaining report/evidence prefill and decoding. The battery case in the earlier native trace spent 21.632 seconds evaluating 129 additional tokens, compared with roughly 3.698 seconds decoding. Reducing answer length alone cannot remove that prefill work.
 
-A separate candidate reduces dynamic reference JSON overhead by combining the selected symptom and complete evidence in one escaped value. It removes no evidence sentences, report text or manufacturer/model identity. Its manifest is versioned independently from the unchanged static prefix. **Its latency and output effects are under test; no speedup is claimed.**
+A separate compact dynamic-reference formatting experiment was tested at `b702640`. In the [six-case Windows generation run](https://github.com/ENGmohammad98AU/Medical-Device-Maintenance/actions/runs/36585954710), four answers completed; Resp still hit the hard client deadline and the trolley-wheel case timed out during generation. The battery prompt saved only six tokens (400 to 394), while its answer grew by four tokens (13 to 17). The wheel prompt itself was unchanged, so this run does not isolate a formatting-caused regression; observed compute rates also varied. **No reliable improvement was established, and the formatting change was removed. Production retains the original v13 guidance prompt and version.**
 
 ## Reliability and diagnostics
 
@@ -54,9 +54,9 @@ For the completed four-thread integration at `6db5841`:
 - Corruption, stalled transfer, repaired persistence and new-browser reuse passed.
 - Local candidate validation: **110 frontend unit tests**, TypeScript checking and application build passed.
 
-The next integration harness uses the actual UI/client to measure one-thread deadlines. Dataset hashing normalizes Git's Windows CRLF checkout to LF while preserving all forty cases and expected outputs. The earlier hash mismatch was a test representation error, not an inference result.
+The integration harness now uses the actual UI/client to measure one-thread deadlines. Dataset hashing normalizes Git's Windows CRLF checkout to LF while preserving all forty cases and expected outputs. The earlier hash mismatch was a test representation error, not an inference result.
 
-Clean-install/generation tests now receive the same verified runtime/state package as the proposed production build. The all-six-generated-answers check remains strict; previous failures are not reclassified as success. Real-browser candidate results and publication readiness must be read from the latest PR checks. Synthetic regression tests are not a general guarantee of answer correctness or clinical validation.
+Clean-install/generation tests now receive the same verified runtime/state package as the proposed production build. The all-six-generated-answers check remains strict and is not green; timeouts are not reclassified as success. Real-browser candidate results and publication readiness must be read from the latest PR checks. Synthetic regression tests are not a general guarantee of answer correctness or clinical validation.
 
 ## Review and publication
 

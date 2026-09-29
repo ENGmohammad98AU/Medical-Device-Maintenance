@@ -2,7 +2,7 @@
 
 The released Windows tests spend about 5-6 minutes preparing Qwen3-1.7B. Most of that time evaluates the four fixed prefixes. Keeping a worker alive avoids some repetitions but cannot accelerate a new session.
 
-This experiment adds a bounded bridge to the existing llama.cpp slot save/restore operations. A slot file includes its KV state and prompt token bookkeeping. It does not contain a generated answer catalogue. The production model, quantization, fixed instructions, inference parameters, evidence checks, and 45-second inference budget are unchanged. A separately versioned candidate compacts dynamic reference JSON without removing evidence; its response effects require the generation checks.
+This experiment adds a bounded bridge to the existing llama.cpp slot save/restore operations. A slot file includes its KV state and prompt token bookkeeping. It does not contain a generated answer catalogue. The production model, quantization, prompts, inference parameters, evidence checks, and 45-second inference budget are unchanged. A compact dynamic-reference formatting experiment did not establish a reliable improvement and was removed.
 
 The draft application now loads the verified paired runtime and calls `prepareStaticPrefixState()` before accepting reports. The currently published site is unchanged. The native benchmark workflow:
 

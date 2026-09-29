@@ -44,9 +44,7 @@ function prompt(context: GuidanceContext, referenceId?: string | null) {
   return formatQwenMessages([{role: 'system', content: config.system_prompt},
     {role: 'user', content: ENGLISH_INSTRUCTION
       + JSON.stringify({device, report: context.report_text,
-      // Retain the symptom and every evidence sentence in one escaped JSON
-      // value, removing only the nested field-name/brace token overhead.
-      reference: reference ? reference.symptom + '\n' + evidence : null})
+      reference: reference ? {symptom: reference.symptom, evidence} : null})
       + (reference ? '\nNo replacement advice.' : '')
       }]);
 }
