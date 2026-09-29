@@ -1,4 +1,13 @@
 {
-  "publish": false,
-  "validated_commit": "6db5841dbe743ef532a4dfb46614ee09e4dd0bd4"
+  "publish": true,
+  "validated_commit": "8b0b50f10dca9ed15799401d222735362ea7cff4",
+  "accepted_performance_limitation": {
+    "commit": "8b0b50f10dca9ed15799401d222735362ea7cff4",
+    "run_id": 36597188654,
+    "job_id": 109505016331,
+    "decision": "publish_with_disclosed_timeout",
+    "requested_at": "2026-09-29T19:40:26+03:00",
+    "user_request": "انشر التعديلات",
+    "context": "Publication requested after disclosure that 11/12 repeated answers completed and one exceeded 45 seconds; the live site had not yet been updated."
+  }
 }

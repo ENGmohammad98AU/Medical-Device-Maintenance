@@ -6,6 +6,7 @@ import {createHash} from 'node:crypto';
 import {resolve} from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {preparePrefixAssets} from '../../frontend/scripts/prepare-prefix-assets.mjs';
+import {validateAcceptedTimeout} from './accepted-timeout.mjs';
 
 const repository = 'ENGmohammad98AU/Medical-Device-Maintenance';
 const control = JSON.parse(await readFile('tools/prefix-cache/release-control.json', 'utf8'));
@@ -32,6 +33,11 @@ const notes = [
   '',
   'Reproducible build and patch: tools/prefix-cache/ in this repository. Upstream revisions and per-file hashes are recorded in prefix-manifest.json.',
   'Third-party notices accompany the runtime. The existing Qwen model remains downloaded from its pinned model repository.',
+  ...(control.accepted_performance_limitation ? ['',
+    'Known application limitation accepted for this release: the repeated-session test completed 11/12 answers; one reopened Resp request timed out at 45.450 seconds. Standalone generation completed 6/6. This does not guarantee response time on every device.',
+    'Evidence: https://github.com/ENGmohammad98AU/Medical-Device-Maintenance/actions/runs/36597188654/job/109505016331',
+    'The owner requested publication on 2026-09-29 after this limitation was disclosed. The failed test has not been marked successful.',
+  ] : []),
 ].join('\n');
 const notesFile = resolve('frontend/benchmark-results/prefix-release-notes.md');
 await writeFile(notesFile, notes + '\n');
@@ -47,7 +53,14 @@ if (process.argv.includes('--prepare-only')) {
     const runs = JSON.parse(gh(['api', `repos/${repository}/actions/runs?event=pull_request&head_sha=${control.validated_commit}&per_page=100`])).workflow_runs;
     for (const name of ['Production prefix cache and repeat analysis', 'Clean Install Test']) {
       const latest = runs.filter(run => run.name === name).sort((a, b) => b.id - a.id)[0];
-      if (latest?.conclusion !== 'success') throw new Error(`Validated application check is not green: ${name}`);
+      if (latest?.conclusion !== 'success') {
+        if (name !== 'Production prefix cache and repeat analysis' || !control.accepted_performance_limitation) {
+          throw new Error(`Validated application check is not green: ${name}`);
+        }
+        const jobs = JSON.parse(gh(['api', `repos/${repository}/actions/runs/${latest.id}/jobs?per_page=100`])).jobs;
+        const log = gh(['api', `repos/${repository}/actions/jobs/${control.accepted_performance_limitation.job_id}/logs`]);
+        console.warn(validateAcceptedTimeout(control, latest, jobs, log));
+      }
     }
   }
   const releases = JSON.parse(gh(['api', `repos/${repository}/releases?per_page=100`]));
@@ -73,6 +86,6 @@ if (process.argv.includes('--prepare-only')) {
       }
     } else gh(['release', 'upload', tag, file, '--repo', repository]);
   }
-  if (control.publish === true) gh(['release', 'edit', tag, '--repo', repository, '--draft=false']);
+  if (control.publish === true) gh(['release', 'edit', tag, '--repo', repository, '--notes-file', notesFile, '--draft=false']);
   console.log(gh(['release', 'view', tag, '--repo', repository, '--json', 'url,isDraft,assets']));
 }

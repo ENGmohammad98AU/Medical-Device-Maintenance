@@ -28,6 +28,8 @@ The worker prefers Cache Storage, then compatible bundled CPU state. Transfers h
 
 `prefix-assets.yml` prepares a **draft** release with the verified runtime, static files and third-party notices. `release-control.json` defaults to `publish: false`. Publication requires explicit user approval before changing that flag. The publication script also verifies that frontend/backend/runtime code matches the validated commit and that its production-integration and clean-install workflows passed. Released assets are immutable. Publish the assets before merging the application change so Render can download them during its build.
 
+For the 2026-09-29 publication request only, `accepted_performance_limitation` records the owner's request to publish after the 11/12 repeated-answer result was disclosed. The exception is bound to application commit `8b0b50f`, run `36597188654`, job `109505016331` and its exact one-timeout evidence. Clean-install validation and the other production job must pass; any changed application code, other failure or missing evidence is rejected. The failed CI result stays visible. Standalone generation completed 6/6, but intermittent timeouts remain unresolved; the failed job did not reach its later corruption/fallback checks. This is an accepted release limitation, not a claim that latency is fixed.
+
 Production builds use stable release URLs. CI prefers the versioned release (including the authenticated review draft); the original artifact is only a bootstrap source before that release exists. Model weights are never uploaded into this release.
 
 Run from the repository root on a normal machine with Docker and browser support:
