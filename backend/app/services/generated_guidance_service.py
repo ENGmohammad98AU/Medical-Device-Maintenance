@@ -80,7 +80,7 @@ UNSAFE = re.compile(
     r"https?://|[<>]|(?:open|remove|unscrew).{0,25}(?:cover|housing|case)|"
     r"\b(?:calibrat\w*|reboot|reset|bypass|dosage|dose|sedat\w*|solder\w*)\b|"
     r"(?:disable|silence|change|adjust).{0,25}(?:alarm|limit|flow|rate|pressure|voltage)|"
-    r"(?:replace|repair).{0,25}(?:board|fuse|battery|valve|motor)|"
+    r"\b(?:replace|replacement|repair)\b|"
     # Reject approval/directives, while allowing a sourced prerequisite such as
     # "Verify alarm clearance before returning to service".
     r"(?:^|[.!?]\s+|\n)\s*(?:\d+[.)]\s*)?(?:return|restore)\b.{0,30}(?:service|clinical use)|"
