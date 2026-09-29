@@ -313,7 +313,7 @@ def analyze_fault(
 
         # The model receives a minimal, redacted technical report only after the
         # reference gate opens. This prevents unsupported diagnosis/maintenance.
-        if not reference_gate_open:
+        if request.browser_llm is not None and not reference_gate_open:
             llm_run = LLMRun(
                 status="disabled",
                 provider="reference-gate",
