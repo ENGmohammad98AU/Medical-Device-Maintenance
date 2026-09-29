@@ -1,4 +1,4 @@
-name: Production prefix cache and parallel analysis
+name: Production prefix cache and repeat analysis
 on:
   pull_request:
     branches: [main]

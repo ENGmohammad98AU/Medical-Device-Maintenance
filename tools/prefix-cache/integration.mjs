@@ -81,8 +81,7 @@ async function openSession(kind, slow = false) {
         if (!String(args[0]).includes('localModel.worker')) return;
         window.__modelWorker = this;
         const send = this.postMessage.bind(this);
-        this.postMessage = message => send({...message, force_cpu: true, benchmark_threads: threads,
-          serial_analysis: message.serial_analysis ?? window.__serialAnalysis});
+        this.postMessage = message => send({...message, force_cpu: true, benchmark_threads: threads});
         this.addEventListener('message', ({data}) => {
           if (data.progress) window.__progress.push({...data.progress, at: performance.now()});
           if (data.result) window.__results.push(data.result);
@@ -126,10 +125,10 @@ async function openSession(kind, slow = false) {
   return row;
 }
 async function closeSession() {await context.close(); context = null;}
-async function infer(input, serial = false) {
+async function infer(input) {
   const id = ++sequence;
   const start = performance.now();
-  const measured = await page.evaluate(({input, id, serial}) => new Promise((resolve, reject) => {
+  const measured = await page.evaluate(({input, id}) => new Promise((resolve, reject) => {
     const worker = window.__modelWorker;
     const timer = setTimeout(() => {worker.removeEventListener('message', listener); reject(new Error('Production inference timed out'));}, 46_000);
     const listener = ({data}) => {
@@ -137,14 +136,13 @@ async function infer(input, serial = false) {
       clearTimeout(timer); worker.removeEventListener('message', listener); resolve(data.result);
     };
     worker.addEventListener('message', listener);
-    worker.postMessage({id, input, serial_analysis: serial, inference_budget_ms: 45_000});
-  }), {input, id, serial});
+    worker.postMessage({id, input, inference_budget_ms: 45_000});
+  }), {input, id});
   return {...measured, wall_ms: Math.round(performance.now() - start)};
 }
-async function guidance(serial) {
+async function guidance(phase) {
   const rows = [];
-  result[serial ? 'serial_guidance' : 'parallel_guidance'] = rows;
-  await page.evaluate(serial => {window.__serialAnalysis = serial;}, serial);
+  result[phase] = rows;
   await page.getByRole('combobox').nth(0).click();
   await page.getByRole('option', {name: 'توليد إرشادات نصية قصيرة', exact: true}).click();
   for (const sample of guidanceCases) {
@@ -167,10 +165,13 @@ async function guidance(serial) {
     const measured = {...(received || {status: 'error', error_code: 'timeout', client_timeout: true}),
       wall_ms: Math.round(performance.now() - start)};
     rows.push({name: sample.name, ...measured});
-    console.log('PRODUCTION_GUIDANCE=' + JSON.stringify({serial, ...rows.at(-1)}));
+    console.log('PRODUCTION_GUIDANCE=' + JSON.stringify({phase, ...rows.at(-1)}));
     if (full) {
       assert.equal(measured.status, 'success');
       assert.equal(measured.support?.status, 'success');
+      assert.equal(measured.guidance?.status, 'success', `Generation did not finish: ${sample.name}`);
+      assert.equal(measured.guidance.reference_id, sample.references[0]?.reference_id || null);
+      assert.match(measured.guidance.text, new RegExp(sample.relevance, 'i'));
       assert.ok(measured.wall_ms < 45_000);
     } else {
       assert.ok(measured.status === 'success' || measured.error_code === 'timeout');
@@ -190,7 +191,7 @@ try {
   assert.equal(first.preparation.preparation_cached, true);
   assert.equal(first.transfers.states, 4);
   assert.ok(!first.progress.some(event => event.stage === 'warming'));
-  if (full) result.serial_guidance = await guidance(true);
+  if (full) result.first_guidance = await guidance('first_guidance');
   await closeSession();
 
   const repeat = await openSession('fresh-browser-saved-state');
@@ -199,7 +200,7 @@ try {
   assert.equal(repeat.transfers.model, 0);
   assert.ok(repeat.init_and_preparation_ms < 30_000, 'Saved preparation took too long');
   assert.ok(!repeat.progress.some(event => event.stage === 'warming'));
-  result.parallel_guidance = await guidance(false);
+  result.reopened_guidance = await guidance('reopened_guidance');
   result.classification = [];
   for (const [index, sample] of classificationCases.entries()) {
     const measured = await infer({report_text: sample.report_text, device_type: sample.device_type, patient_connected: sample.patient_connected});
@@ -218,19 +219,15 @@ try {
   }
   if (full) {
     for (let index = 0; index < guidanceCases.length; index++) {
-      const before = result.serial_guidance[index], after = result.parallel_guidance[index];
+      const before = result.first_guidance[index], after = result.reopened_guidance[index];
       assert.equal(after.output_token, before.output_token);
       assert.equal(after.support.output_token, before.support.output_token);
-      if (before.guidance.status === 'success') {
-        assert.equal(after.guidance.status, 'success', `Generation regressed: ${after.name}`);
-        assert.equal(after.guidance.text, before.guidance.text, `Generated text changed: ${after.name}`);
-      }
+      assert.equal(after.guidance.text, before.guidance.text, `Generated text changed: ${after.name}`);
     }
     const sum = rows => rows.reduce((total, row) => total + row.wall_ms, 0);
-    result.comparison = {serial_ms: sum(result.serial_guidance), parallel_ms: sum(result.parallel_guidance),
-      serial_success: result.serial_guidance.filter(row => row.guidance.status === 'success').length,
-      parallel_success: result.parallel_guidance.filter(row => row.guidance.status === 'success').length};
-    result.comparison.faster = result.comparison.parallel_ms < result.comparison.serial_ms * 0.95;
+    result.comparison = {first_ms: sum(result.first_guidance), reopened_ms: sum(result.reopened_guidance),
+      first_success: result.first_guidance.filter(row => row.guidance.status === 'success').length,
+      reopened_success: result.reopened_guidance.filter(row => row.guidance.status === 'success').length};
     // Corrupt only our first static slot. Keep cached weights intact.
     await page.evaluate(async () => {
       for (const key of await caches.keys()) if (key.startsWith('mdm-static-prefix-v1-')) {
@@ -254,7 +251,7 @@ try {
   result.completed = true;
   console.log('PRODUCTION_SUMMARY=' + JSON.stringify({completed: true, threads, comparison: result.comparison,
     classification: result.classification.filter(row => row.actual === row.expected).length,
-    guidance_success: result.parallel_guidance.filter(row => row.guidance?.status === 'success').length}));
+    guidance_success: result.reopened_guidance.filter(row => row.guidance?.status === 'success').length}));
 } catch (error) {result.error = error.stack; throw error;}
 finally {
   await writeFile(output, JSON.stringify(result, null, 2));

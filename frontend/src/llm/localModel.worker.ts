@@ -18,7 +18,7 @@ let storageMode: StorageMode | undefined;
 let computeBackend: ComputeBackend = 'wasm';
 let preparation: {source: 'stored' | 'bundled' | 'computed'; persisted: boolean} | undefined;
 self.addEventListener('message', async (event: MessageEvent<{id: number; input?: LocalInput; force_cpu?: boolean;
-  inference_budget_ms?: number; serial_analysis?: boolean; benchmark_threads?: number}>) => {
+  inference_budget_ms?: number; benchmark_threads?: number}>) => {
   const {id, input} = event.data;
   const started = performance.now();
   let loading = true;
@@ -66,7 +66,7 @@ self.addEventListener('message', async (event: MessageEvent<{id: number; input?:
     loading = false;
     const inferenceStarted = performance.now();
     const {output_token, selection, support_ms} = await analyzeLocally(loaded, input,
-      import.meta.env.MODE === 'benchmark' && event.data.serial_analysis === false,
+      false,
       task => self.postMessage({id, progress: {stage: 'running', task, storage_mode: storageMode,
         compute_backend: computeBackend, backend_ready: true}}));
     let support: SupportResult | undefined;

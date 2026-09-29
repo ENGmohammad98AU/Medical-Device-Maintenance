@@ -45,7 +45,7 @@ if (process.argv.includes('--prepare-only')) {
     execFileSync('git', ['diff', '--exit-code', control.validated_commit, 'HEAD', '--', 'frontend', 'backend', 'render.yaml',
       'tools/prefix-cache/apply-runtime-patch.mjs', 'tools/prefix-cache/prefix-state.inc', 'tools/prefix-cache/build-runtime.sh', 'tools/prefix-cache/bundle.mjs'], {stdio: 'inherit'});
     const runs = JSON.parse(gh(['api', `repos/${repository}/actions/runs?event=pull_request&head_sha=${control.validated_commit}&per_page=100`])).workflow_runs;
-    for (const name of ['Production prefix cache and parallel analysis', 'Clean Install Test']) {
+    for (const name of ['Production prefix cache and repeat analysis', 'Clean Install Test']) {
       const latest = runs.filter(run => run.name === name).sort((a, b) => b.id - a.id)[0];
       if (latest?.conclusion !== 'success') throw new Error(`Validated application check is not green: ${name}`);
     }

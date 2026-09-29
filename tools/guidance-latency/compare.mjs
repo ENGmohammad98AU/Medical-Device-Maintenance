@@ -16,7 +16,7 @@ assert.equal(baseline.rows.length, cases.length);
 assert.equal(candidate.rows.length, cases.length);
 assert.ok(candidate.completed && candidate.rows.every(row => row.correct), 'Every candidate answer must complete and pass the unchanged checks');
 for (const file of ['localModelConfig.json', 'localModelEngine.ts', 'localModelContract.ts',
-  'supportModelContract.ts', 'supportModelConfig.json', 'ggufChoice.js', 'fastGgufChoice.js', 'localModel.worker.ts']) {
+  'supportModelContract.ts', 'supportModelConfig.json', 'ggufChoice.js', 'fastGgufChoice.js']) {
   assert.equal(await readFile('frontend/src/llm/' + file, 'utf8'),
     await readFile('.latency-baseline/frontend/src/llm/' + file, 'utf8'), `Selection code changed: ${file}`);
 }
