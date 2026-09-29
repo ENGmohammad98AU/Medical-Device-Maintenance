@@ -76,7 +76,7 @@ describe('bounded free generation', () => {
       'Inspect the caster for external obstructions.', 'Specialist review required.']) expect(options[0].prompt).toContain(sentence);
     expect(options[0].prompt).toContain('Jammed \\"wheel\\"');
     expect(options[0].prompt).not.toContain('UNRELATED EVIDENCE');
-    expect((await generateGuidance(m.instance, grounded, 40000, 'invented')).error_code).toBe('invalid_output');
+    expect((await generateGuidance(m.instance, grounded, 40000, 'invented')).error_code).toBe('not_allowed');
   });
   it('does not run generation when no manufacturer reference is selected', async () => {
     const m = model();
