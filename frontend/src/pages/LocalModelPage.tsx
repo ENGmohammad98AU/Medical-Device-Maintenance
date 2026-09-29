@@ -17,16 +17,17 @@ export default function LocalModelPage() {
   const [result, setResult] = useState<LocalResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState('support');
-  const examples = mode === 'generation' ? guidanceCases : mode === 'support' ? supportCases : cases;
+  const groundedGuidanceCases = guidanceCases.filter((sample) => sample.references?.length && sample.candidates?.length);
+  const examples = mode === 'generation' ? groundedGuidanceCases : mode === 'support' ? supportCases : cases;
   const run = async () => {
     setBusy(true); setResult(null);
     try {
       const support = supportCases[selected];
       setResult(await local.run(mode === 'generation' ? {
-        ...guidanceCases[selected], patient_connected: false,
+        ...groundedGuidanceCases[selected], patient_connected: false,
         support_context: {version: supportModelConfig.version, input_sha256: '0'.repeat(64),
-          report_text: guidanceCases[selected].report_text, device_name: guidanceCases[selected].device_name, candidates: guidanceCases[selected].candidates as SupportCandidate[],
-          guidance: {...guidanceCases[selected], version: guidanceModelConfig.version, input_sha256: '0'.repeat(64)}},
+          report_text: groundedGuidanceCases[selected].report_text, device_name: groundedGuidanceCases[selected].device_name, candidates: groundedGuidanceCases[selected].candidates as SupportCandidate[],
+          guidance: {...groundedGuidanceCases[selected], version: guidanceModelConfig.version, input_sha256: '0'.repeat(64)}},
       } : mode === 'support' ? {
         report_text: support.report_text, device_type: 'VENTILATOR', patient_connected: false,
         support_context: {version: supportModelConfig.version, input_sha256: '0'.repeat(64),
@@ -36,7 +37,7 @@ export default function LocalModelPage() {
   };
   const category = result?.output_token ? config.categories[result.output_token] : undefined;
   const selectedReference = result?.support?.output_token
-    ? (mode === 'generation' ? guidanceCases[selected]?.candidates : supportCases[selected]?.candidates)
+    ? (mode === 'generation' ? groundedGuidanceCases[selected]?.candidates : supportCases[selected]?.candidates)
       ?.find((c) => c.label === result.support?.output_token) : undefined;
   return <Container maxWidth="sm" dir="rtl"><Box sx={{py: 5}}>
     <Typography component="h1" variant="h4" gutterBottom>تجربة النموذج المجاني</Typography>

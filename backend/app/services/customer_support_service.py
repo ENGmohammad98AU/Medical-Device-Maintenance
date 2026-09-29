@@ -91,6 +91,16 @@ def resolve_support(context, references, result, llm_run, fallback):
         "model": llm_run.model, "model_revision": llm_run.model_revision,
         "runtime": llm_run.runtime, "result": result.model_dump() if result else None,
     }
+    if not references and llm_run.provider == "reference-gate":
+        metadata.update(
+            status="NO_REFERENCE",
+            scope="UNCONFIRMED",
+            method="REFERENCE_GATE",
+            message="No technical reference matches this report and device in the current knowledge base. No local-model maintenance inference was run.",
+            questions=clarification_questions(context),
+        )
+        metadata["guards"].append("NO_REFERENCE_NO_LLM")
+        return dict(NO_MATCH), metadata, True
     if not references:
         metadata["message"] = "No technical reference matches this report and device in the current knowledge base. Provide more details or consult a biomedical engineer."
         metadata["questions"] = clarification_questions(context)

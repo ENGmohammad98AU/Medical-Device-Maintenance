@@ -305,9 +305,25 @@ def analyze_fault(
             patient_connected=request.patient_connected
         )
 
-        # The external model receives a minimal, redacted technical report, never
-        # user identity, device serial number, location, or database credentials.
-        if request.browser_llm is not None:
+        # Build the authoritative device-bound shortlist before any model call.
+        # This is the reference gate: without trusted evidence, inference is skipped
+        # and the request can only return the explicit no-reference path.
+        support_context, support_references = prepare_support(request, device, db)
+        reference_gate_open = bool(support_references)
+
+        # The model receives a minimal, redacted technical report only after the
+        # reference gate opens. This prevents unsupported diagnosis/maintenance.
+        if request.browser_llm is not None and not reference_gate_open:
+            llm_run = LLMRun(
+                status="disabled",
+                provider="reference-gate",
+                error_code="no_matching_reference",
+            )
+            logger.info(
+                "maintenance_reference_gate device_id=%s model=%s gate=closed",
+                device.id, model,
+            )
+        elif request.browser_llm is not None:
             # Local success, failure and disablement never fall back to a cloud API.
             llm_run = browser_run(
                 request.browser_llm, report_text=f"{fault} {description}".strip(),
@@ -319,10 +335,8 @@ def analyze_fault(
                 manufacturer=manufacturer, model=model,
                 patient_connected=request.patient_connected, reference=reference_lookup,
             )
-        # Recompute candidates from authoritative device/source records. Model
-        # abstention suppresses all repair retrieval, including the legacy path.
+        # Candidates were computed from authoritative device/source records.
         baseline_reference_severity = reference_lookup.get("severity") if reference_lookup.get("matched") else None
-        support_context, support_references = prepare_support(request, device, db)
         # Moving a source outside the catalogue must not lower its safety floor,
         # including when the model abstains or cannot finish its selection.
         if support_references and support_references[0].get("reference_origin") == "LLM_CONTEXT":

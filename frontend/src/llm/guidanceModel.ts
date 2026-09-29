@@ -87,6 +87,12 @@ export async function generateGuidance(model: Model, context: GuidanceContext, b
   referenceId?: string | null): Promise<GuidanceResult> {
   const started = performance.now();
   const base = {version: context.version, input_sha256: context.input_sha256};
+  // Hard reference gate at the generator boundary: free-form maintenance text
+  // is never decoded unless the server supplied and the selector accepted a
+  // concrete reference identifier.
+  if (!referenceId || !context.references?.some(item => item.reference_id === referenceId)) {
+    return {...base, status: 'error', error_code: 'not_allowed', latency_ms: 0};
+  }
   const controller = new AbortController();
   // Leave time for the worker to return a failure before the hard client limit.
   const timer = setTimeout(() => controller.abort(), Math.max(0, budgetMs - 1500));

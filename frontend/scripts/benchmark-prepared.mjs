@@ -18,6 +18,7 @@ const cases = JSON.parse(await readFile('src/llm/supportSmokeCases.json', 'utf8'
 const deviceCases = JSON.parse(await readFile('src/llm/deviceRegressionCases.json', 'utf8'));
 const supportConfig = JSON.parse(await readFile('src/llm/supportModelConfig.json', 'utf8'));
 const generationCases = JSON.parse(await readFile('src/llm/guidanceCases.json', 'utf8'));
+const groundedGenerationCases = generationCases.filter(sample => sample.references?.length);
 const classificationCases = JSON.parse(await readFile('src/llm/benchmarkCases.json', 'utf8'));
 const localModel = process.env.LLM_MODEL_FILE;
 if (localModel) {
@@ -110,7 +111,7 @@ try {
     await page.getByRole('option', {name: 'توليد إرشادات نصية قصيرة', exact: true}).click();
     // Exercise sourced answers and both input languages and devices on the same
     // prepared worker. Every case still must independently pass the deadline.
-    for (const sample of [...generationCases.slice(-1), ...generationCases.slice(0, -1)]) {
+    for (const sample of groundedGenerationCases) {
       console.log('GENERATION_CASE_START=' + sample.name);
       const prepare = page.getByRole('button', {name: 'تجهيز النموذج مسبقًا', exact: true});
       if (await prepare.isEnabled()) {

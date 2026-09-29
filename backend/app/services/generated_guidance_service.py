@@ -41,7 +41,10 @@ class BrowserGuidanceResult(BaseModel):
 
 
 def prepare_guidance(request, device, references):
-    if not request.generate_guidance:
+    # Maintenance guidance is reference-grounded by construction. If the
+    # server cannot shortlist trusted evidence, do not even offer a generation
+    # context to the client/local model.
+    if not request.generate_guidance or not references:
         return None
     report = f"{request.fault} {request.description}".strip()
     device_type = device.type.value.upper().replace("-", "_").replace(" ", "_")
@@ -77,7 +80,7 @@ UNSAFE = re.compile(
     r"https?://|[<>]|(?:open|remove|unscrew).{0,25}(?:cover|housing|case)|"
     r"\b(?:calibrat\w*|reboot|reset|bypass|dosage|dose|sedat\w*|solder\w*)\b|"
     r"(?:disable|silence|change|adjust).{0,25}(?:alarm|limit|flow|rate|pressure|voltage)|"
-    r"(?:replace|repair).{0,25}(?:board|fuse|battery|valve|motor)|"
+    r"\b(?:replace|replacement|repair)\b|"
     # Reject approval/directives, while allowing a sourced prerequisite such as
     # "Verify alarm clearance before returning to service".
     r"(?:^|[.!?]\s+|\n)\s*(?:\d+[.)]\s*)?(?:return|restore)\b.{0,30}(?:service|clinical use)|"
@@ -119,6 +122,13 @@ def resolve_guidance(context, result, llm_run, *, patient_connected, is_emergenc
     if (llm_run.status != "success" or result.version != MANIFEST["version"]
             or result.input_sha256 != context["input_sha256"]):
         metadata["error_code"] = "context_mismatch"
+        return metadata
+    if selected_reference is None:
+        metadata.update(
+            status="BLOCKED",
+            error_code="not_allowed",
+            message="No accepted technical reference was selected, so the local model cannot generate maintenance guidance.",
+        )
         return metadata
     if patient_connected or is_emergency or context.get("blocked_reason") or llm_run.browser_category == "UNKNOWN" or out_of_scope:
         metadata.update(status="BLOCKED", error_code="not_allowed",

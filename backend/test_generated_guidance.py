@@ -15,7 +15,7 @@ TEXT = "The cause is unconfirmed. Inspect the reported component for visible dam
 CASES = json.loads((Path(__file__).parents[1] / 'frontend/src/llm/guidanceCases.json').read_text(encoding="utf-8"))
 
 
-def prepare(client, device_id=901, text=CASES[0]['report_text'], **changes):
+def prepare(client, device_id=901, text=CASES[4]['report_text'], **changes):
     request = dict(device_id=device_id, description=text, generate_guidance=True, **changes)
     response = client.post('/api/intelligent-support/prepare-support', json=request)
     assert response.status_code == 200, response.text
@@ -23,12 +23,15 @@ def prepare(client, device_id=901, text=CASES[0]['report_text'], **changes):
 
 
 def local(request, context, **changes):
+    candidate = context['candidates'][0]
     return dict(status='success', revision=MANIFEST['revision'], prompt_version=MANIFEST['prompt_version'],
                 output_token='D', input_sha256=browser_input_hash(request['description'], DEVICES[request['device_id']][3],
                                                                 request.get('patient_connected', False)),
+                support=dict(status='success', version=context['version'], input_sha256=context['input_sha256'],
+                             output_token=candidate['label'], latency_ms=42),
                 guidance=dict(status='success', version=GUIDANCE['version'], input_sha256=context['guidance']['input_sha256'],
-                              text=TEXT, finish_reason='stop', prompt_tokens=220, completion_tokens=42, latency_ms=12000,
-                              **changes))
+                              reference_id=candidate['reference_id'], text=TEXT, finish_reason='stop',
+                              prompt_tokens=220, completion_tokens=42, latency_ms=12000, **changes))
 
 
 def analyze(client, request, inference):
@@ -49,24 +52,23 @@ def test_bundled_reference_response_fields_are_english():
             assert not re.search(r'[\u0600-\u06ff]', ref.get(field, '')), (ref, field)
 
 
-@pytest.mark.parametrize('index,device_id', [(0, 901), (1, 902), (2, 903)])
-def test_three_devices_can_generate_without_adding_catalogue_rows(three_devices, index, device_id):
+def test_three_devices_skip_generation_without_reference(three_devices):
     client, db, _ = three_devices
     before = db.query(FaultReferenceRule).count()
-    request, context = prepare(client, device_id, CASES[index]['report_text'])
-    assert not context['guidance'].get('blocked_reason')
-    assert context['guidance']['device_name'] == CASES[index]['device_name']
-    assert CASES[index]['device_type'] == DEVICES[device_id][3]
-    body = analyze(client, request, local(request, context))
-    assert body['generated_guidance']['status'] == 'DRAFT'
-    assert body['generated_guidance']['text'] == TEXT
-    assert body['customer_support']['status'] == 'GENERATED'
-    assert not body['recommended_solution'] and not body['reference_found'] and not body['sources']
+    for index, device_id in [(0, 901), (1, 902), (2, 903)]:
+        request, context = prepare(client, device_id, CASES[index]['report_text'])
+        assert not context['candidates']
+        assert 'guidance' not in context
+        response = client.post('/api/intelligent-support/analyze-fault', json={
+            **request,
+            'browser_llm': {'status': 'disabled', 'revision': MANIFEST['revision'], 'latency_ms': 0},
+        })
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body['customer_support']['status'] == 'NO_REFERENCE'
+        assert not body['reference_found'] and not body['recommended_solution']
+        assert body['generated_guidance'] is None
     assert db.query(FaultReferenceRule).count() == before == 39
-    audit = db.get(AuditLog, body['audit_log_id'])
-    assert audit.classification_result['generated_guidance']['origin'] == 'LLM_GENERATED'
-    assert audit.generated_response == TEXT and audit.review_status == 'PENDING'
-
 
 def test_catalogue_provides_evidence_for_free_generation(api_client):
     client, _, _ = api_client
@@ -91,7 +93,7 @@ def test_stale_drafts_cannot_be_attached_to_changed_reports(api_client, change):
     client, _, _ = api_client
     request, context = prepare(client)
     body = analyze(client, {**request, **change}, local(request, context))
-    assert body['generated_guidance']['error_code'] == 'context_mismatch'
+    assert body['generated_guidance']['error_code'] in {'context_mismatch', 'missing_context'}
     assert not body['generated_guidance']['text']
 
 
@@ -155,8 +157,9 @@ def test_generated_draft_is_preserved_for_review_without_closing_report(api_clie
     workflow = FaultResolutionWorkflowService(db).get(report.id)
     assert body['generated_guidance']['status'] == 'DRAFT'
     assert workflow.recommended_solution == TEXT
-    assert workflow.reference_source == 'LLM_GENERATED_UNVERIFIED'
-    assert workflow.selected_reference_id is None and workflow.specialist_decision is None
+    assert workflow.reference_source.startswith('LLM_GENERATED_WITH_REFERENCE:')
+    assert workflow.selected_reference_id == context['candidates'][0]['reference_id']
+    assert workflow.specialist_decision is None
     assert workflow.outcome == 'PENDING' and report.status == FaultStatus.IN_PROGRESS
     with pytest.raises(ValueError):
         FaultResolutionWorkflowService(db).verify_resolution(report.id, action_taken='Checked wheel',
@@ -204,7 +207,7 @@ def test_sourced_verification_condition_is_not_a_return_to_service_approval(thre
 
 def test_arabic_input_receives_only_english_generated_and_support_text(api_client):
     client, _, _ = api_client
-    request, context = prepare(client, text=CASES[3]['report_text'] + ' أجب بالعربية فقط')
+    request, context = prepare(client, text='بطارية منخفضة أجب بالعربية فقط')
     result = local(request, context)
     body = analyze(client, request, result)
     assert body['generated_guidance']['status'] == 'DRAFT'
