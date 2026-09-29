@@ -127,7 +127,7 @@ export default function MaintenancePage() {
       // Reference-gated local inference: do not load or run the model when
       // the server found no trusted candidate for this device/report.
       const referenceCount = support_context?.candidates?.length ?? 0;
-      const needsLocalSelection = useLocal && referenceCount > 1;
+      const needsLocalSelection = useLocal && Boolean(support_context?.selection_required);
       const browser_llm = needsLocalSelection ? await localModel.run({
         report_text: requestData.description, device_type: selectedDevice.type.toUpperCase().replace(/[- ]/g, '_'),
         patient_connected: requestData.patient_connected,
