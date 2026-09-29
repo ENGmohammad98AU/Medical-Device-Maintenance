@@ -92,8 +92,15 @@ def resolve_support(context, references, result, llm_run, fallback):
         "runtime": llm_run.runtime, "result": result.model_dump() if result else None,
     }
     if not references:
-        metadata["message"] = "No technical reference matches this report and device in the current knowledge base. Provide more details or consult a biomedical engineer."
-        metadata["questions"] = clarification_questions(context)
+        metadata.update(
+            status="NO_REFERENCE",
+            scope="UNCONFIRMED",
+            method="REFERENCE_GATE",
+            message="No technical reference matches this report and device in the current knowledge base. No local-model maintenance inference was run.",
+            questions=clarification_questions(context),
+        )
+        metadata["guards"].append("NO_REFERENCE_NO_LLM")
+        return dict(NO_MATCH), metadata, True
     elif references[0].get("reference_origin") == "LLM_CONTEXT":
         metadata.update(status="LLM_REQUIRED", method="LOCAL_LLM_REQUIRED",
                         message="This alarm is outside the 39-fault catalogue. Run the local model to select from the available technical evidence, or consult a biomedical engineer.",
