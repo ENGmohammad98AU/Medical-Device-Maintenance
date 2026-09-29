@@ -31,12 +31,13 @@ describe('preparation prefixes', () => {
     createCompletion.mockResolvedValueOnce(completion('D'));
     await selectSupportLocally(model, {...context, candidates: []});
     expect(lastPrompt().startsWith(prefixes[2])).toBe(true);
-    createCompletion.mockResolvedValueOnce(completion('The cause is unconfirmed. Check the wheel for visible debris.'));
+    createCompletion.mockResolvedValueOnce(completion('Battery charge is low.'));
     const guidance = await generateGuidance(model, {version: guidanceModelConfig.version,
-      input_sha256: 'a'.repeat(64), device_name: 'Hamilton C6', report_text: 'The wheel is jammed.'}, 40_000);
+      input_sha256: 'a'.repeat(64), device_name: 'Hamilton C6', report_text: 'Battery low',
+      references: [{reference_id: 'battery', symptom: 'Battery low',
+        evidence: 'Battery charge is low.', meaning: 'Battery charge is low.'}]}, 40_000, 'battery');
     expect(guidance.status).toBe('success');
     expect(lastPrompt().startsWith(prefixes[3])).toBe(true);
-    expect(prefixes[3]).toContain('If reference is null, state that the cause is unconfirmed.');
     createCompletion.mockResolvedValueOnce(completion('Inspect the external electrode connections.'));
     await generateGuidance(model, {version: guidanceModelConfig.version,
       input_sha256: 'a'.repeat(64), device_name: 'Philips MX800', report_text: 'Resp Leads Off',
