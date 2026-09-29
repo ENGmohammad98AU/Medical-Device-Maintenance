@@ -88,7 +88,7 @@ describe('bounded free generation', () => {
     const options = m.createCompletion.mock.calls[0] as unknown as [{prompt: string}];
     expect(options[0].prompt).toContain(meaning);
     expect(options[0].prompt).not.toContain('FULL PROCEDURE');
-    expect(options[0].prompt).toContain('No procedures or extra technical claims.');
+    expect(options[0].prompt).toContain('Paraphrase the complete meaning, preserving conditions. No advice or inference.');
     expect(grounded.references[0].evidence).toBe(evidence);
   });
   it('rejects invented numeric limits and retains supplied signs and units', async () => {

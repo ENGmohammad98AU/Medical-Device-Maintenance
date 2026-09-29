@@ -15,7 +15,10 @@ using the same verified model file and cached static prefixes. The six report
 texts, original complete evidence, expected classification and reference checks
 are fixed. The baseline may record its existing failures; the candidate must
 complete all six, preserve selections, pass actual API validation and improve
-total sourced-case time by at least 15%. Artifacts contain both timings and
+total sourced-case time by at least 15%. If the baseline worker is killed at its
+deadline before posting selection tokens, that comparison is explicitly marked
+unavailable, never counted as a matching selection. Selection code and prompts
+must also remain byte-identical. Artifacts contain both timings and
 generated answers for review. Completion is reported separately from accuracy.
 
 This comparison neither publishes the application nor relaxes its release gates.

@@ -48,7 +48,7 @@ function prompt(context: GuidanceContext, referenceId?: string | null) {
     {role: 'user', content: ENGLISH_INSTRUCTION
       + JSON.stringify({device, report: context.report_text,
       reference: reference ? {symptom: reference.symptom, evidence} : null})
-      + (reference?.meaning?.trim() ? '\nExplain only this alarm meaning. No procedures or extra technical claims.'
+      + (reference?.meaning?.trim() ? '\nOne sentence. Paraphrase the complete meaning, preserving conditions. No advice or inference.'
         : reference ? '\nNo replacement advice.' : '')
       }]);
 }

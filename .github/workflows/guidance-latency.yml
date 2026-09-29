@@ -50,16 +50,19 @@ jobs:
         working-directory: .latency-baseline/frontend
         run: npm run benchmark:prepared -- --generation
       - name: Require all six candidate answers to complete
+        id: candidate
         working-directory: frontend
         run: npm run benchmark:prepared -- --generation
       - name: Compare identical reports on the same runner
         run: node tools/guidance-latency/compare.mjs
       - uses: actions/setup-python@v5
+        if: ${{ !cancelled() && steps.candidate.outcome == 'success' }}
         with:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: backend/requirements.txt
       - name: Validate generated answers and guards through the real API
+        if: ${{ !cancelled() && steps.candidate.outcome == 'success' }}
         working-directory: backend
         env:
           DATABASE_URL: sqlite:///./database/medical_ai.db

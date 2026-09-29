@@ -15,13 +15,24 @@ assert.equal(candidate.revision, baseline.revision);
 assert.equal(baseline.rows.length, cases.length);
 assert.equal(candidate.rows.length, cases.length);
 assert.ok(candidate.completed && candidate.rows.every(row => row.correct), 'Every candidate answer must complete and pass the unchanged checks');
+for (const file of ['localModelConfig.json', 'localModelEngine.ts', 'localModelContract.ts',
+  'supportModelContract.ts', 'supportModelConfig.json', 'ggufChoice.js', 'fastGgufChoice.js', 'localModel.worker.ts']) {
+  assert.equal(await readFile('frontend/src/llm/' + file, 'utf8'),
+    await readFile('.latency-baseline/frontend/src/llm/' + file, 'utf8'), `Selection code changed: ${file}`);
+}
 const rows = candidate.rows.map(row => {
   const before = baseline.rows.find(item => item.name === row.name);
   const sample = cases.find(item => item.name === row.name);
   assert.equal(row.report_text, before.report_text);
-  assert.equal(row.output_token, before.output_token, `Classification changed: ${row.name}`);
-  assert.equal(row.support.output_token, before.support.output_token, `Reference selection changed: ${row.name}`);
+  // The client kills a timed-out worker, which can leave no selection tokens.
+  // Absence is not a changed classification, nor evidence of a matching one.
+  const selectionCompared = !before.client_timeout;
+  if (selectionCompared) {
+    assert.equal(row.output_token, before.output_token, `Classification changed: ${row.name}`);
+    assert.equal(row.support.output_token, before.support.output_token, `Reference selection changed: ${row.name}`);
+  } else assert.equal(before.error_code, 'timeout');
   return {name: row.name, sourced: !!sample.references.length, before_ms: before.wall_ms, after_ms: row.wall_ms,
+    selection_comparison: selectionCompared ? 'MATCH' : 'BASELINE_TIMEOUT_NO_TOKENS',
     before_completed: before.guidance?.status === 'success', after_completed: row.guidance.status === 'success',
     before_prompt_tokens: before.guidance?.prompt_tokens, after_prompt_tokens: row.guidance.prompt_tokens,
     text: row.guidance.text, reference_id: row.guidance.reference_id};
