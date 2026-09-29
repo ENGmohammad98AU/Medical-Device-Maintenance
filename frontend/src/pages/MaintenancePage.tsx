@@ -204,7 +204,7 @@ export default function MaintenancePage() {
       </Grid>
       <FormControlLabel control={<Switch checked={useLocal} disabled={busy} onChange={(event) => setUseLocal(event.target.checked)} />} label="معالجة الطلب واختيار المرجع بنموذج محلي مجاني" />
       {useLocal && <LocalModelPreparation model={localModel} disabled={busy} />}
-      <Alert severity="info" sx={{mt: 2}}>لا يحتاج النموذج إلى حساب خارجي أو مفتاح API. يفحص الخادم المراجع أولًا؛ إذا لم يوجد مرجع موثوق مطابق فلن يتم تحميل أو تشغيل النموذج وستظهر نتيجة عدم كفاية المرجع. عند وجود مرجع مطابق فقط، يعمل النموذج المحلي لاختيار الدليل المناسب وصياغة شرح مقيد به، مع بقاء إجراءات الصيانة خاضعة لمراجعة المختص.</Alert>
+      <Alert severity="info" sx={{mt: 2}}>لا يحتاج النموذج إلى حساب خارجي أو مفتاح API. يفحص الخادم المراجع أولًا؛ إذا لم يوجد مرجع موثوق مطابق فلن يُشغَّل النموذج لتحليل هذا البلاغ وستظهر نتيجة عدم كفاية المرجع. عند وجود مرجع مطابق فقط، يعمل النموذج المحلي لاختيار الدليل المناسب وصياغة شرح مقيد به، مع بقاء إجراءات الصيانة خاضعة لمراجعة المختص.</Alert>
       {localModel.progress && <LocalModelProgress progress={localModel.progress} cancel={localModel.cancel} cancelLabel={localModel.preparing ? 'إلغاء التجهيز' : 'متابعة بالقواعد دون انتظار النموذج'} />}
       <Button variant="contained" onClick={runAnalysis} disabled={busy || localModel.preparing} startIcon={busy ? <CircularProgress size={18} /> : <PsychologyIcon />} sx={{ mt: 3 }}>التحقق والتحليل</Button>
     </CardContent></Card>}
