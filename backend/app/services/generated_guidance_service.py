@@ -41,9 +41,7 @@ class BrowserGuidanceResult(BaseModel):
 
 
 def prepare_guidance(request, device, references):
-    # Free generation is allowed only when the server has already shortlisted
-    # trusted, device-bound manufacturer evidence. No reference means no draft.
-    if not request.generate_guidance or not references:
+    if not request.generate_guidance:
         return None
     report = f"{request.fault} {request.description}".strip()
     device_type = device.type.value.upper().replace("-", "_").replace(" ", "_")
