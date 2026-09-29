@@ -19,7 +19,7 @@
       if (req.data.arr.size() != 1 || req.data.arr[0].size() < 32 || req.data.arr[0].size() > max_bytes)
         throw app_exception("Invalid prefix state size");
       std::ofstream output(path, std::ios::binary | std::ios::trunc);
-      output.write(req.data.arr[0].data(), req.data.arr[0].size());
+      output.write(reinterpret_cast<const char *>(req.data.arr[0].data()), req.data.arr[0].size());
       output.close();
       if (!output) throw app_exception("Unable to write prefix state");
     }
@@ -46,8 +46,8 @@
       if (!input || size < 32 || size > static_cast<std::streamoff>(max_bytes))
         throw app_exception("Invalid exported prefix state size");
       input.seekg(0);
-      std::vector<char> bytes(static_cast<size_t>(size));
-      input.read(bytes.data(), bytes.size());
+      std::vector<uint8_t> bytes(static_cast<size_t>(size));
+      input.read(reinterpret_cast<char *>(bytes.data()), bytes.size());
       if (!input) throw app_exception("Unable to read prefix state");
       res.data.arr.push_back(std::move(bytes));
     }

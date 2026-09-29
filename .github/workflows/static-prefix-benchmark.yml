@@ -24,7 +24,34 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
         working-directory: frontend
+      - uses: actions/cache/restore@v4
+        id: runtime-cache
+        with:
+          path: |
+            frontend/benchmark-results/prefix-cache/runtime.js
+            frontend/benchmark-results/prefix-cache/runtime.wasm
+            frontend/benchmark-results/prefix-cache/runtime-manifest.json
+          key: prefix-runtime-v1-${{ hashFiles('tools/prefix-cache/apply-runtime-patch.mjs', 'tools/prefix-cache/prefix-state.inc', 'tools/prefix-cache/build-runtime.sh', 'tools/prefix-cache/bundle.mjs') }}
       - run: bash tools/prefix-cache/build-runtime.sh
+        if: steps.runtime-cache.outputs.cache-hit != 'true'
+      - uses: actions/cache/save@v4
+        if: steps.runtime-cache.outputs.cache-hit != 'true'
+        with:
+          path: |
+            frontend/benchmark-results/prefix-cache/runtime.js
+            frontend/benchmark-results/prefix-cache/runtime.wasm
+            frontend/benchmark-results/prefix-cache/runtime-manifest.json
+          key: ${{ steps.runtime-cache.outputs.cache-primary-key }}
+      - run: node tools/prefix-cache/bundle.mjs
+        if: steps.runtime-cache.outputs.cache-hit == 'true'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: static-prefix-runtime
+          path: |
+            frontend/benchmark-results/prefix-cache/runtime.js
+            frontend/benchmark-results/prefix-cache/runtime.wasm
+            frontend/benchmark-results/prefix-cache/runtime-manifest.json
+          if-no-files-found: error
       - run: npx playwright install --with-deps chromium
         working-directory: frontend
       - name: Export static prefixes and verify a fresh process can use them
@@ -37,6 +64,15 @@ jobs:
           path: frontend/benchmark-results/prefix-cache/
           compression-level: 1
           if-no-files-found: error
+      - name: Save startup measurements separately
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-prefix-linux-evidence
+          path: |
+            frontend/benchmark-results/prefix-cache/results-linux.json
+            frontend/benchmark-results/prefix-cache/prefix-manifest.json
+          if-no-files-found: warn
 
   verify-windows:
     name: Compare published engine and restored state on Windows
