@@ -10,6 +10,7 @@ export interface SupportCandidate { label: 'A' | 'B' | 'C'; reference_id: string
 export interface SupportContext {
   version: string; input_sha256: string; report_text: string; device_name: string;
   candidates: SupportCandidate[];
+  selection_required?: boolean;
   guidance?: GuidanceContext;
 }
 export interface SupportResult {
