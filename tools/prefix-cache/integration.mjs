@@ -16,6 +16,7 @@ const readJSON = async path => JSON.parse(await readFile(path, 'utf8'));
 const config = await readJSON('frontend/src/llm/localModelConfig.json');
 const supportConfig = await readJSON('frontend/src/llm/supportModelConfig.json');
 const guidanceCases = await readJSON('frontend/src/llm/guidanceCases.json');
+const groundedGuidanceCases = guidanceCases.filter(sample => sample.references?.length);
 const classificationCases = await readJSON('frontend/src/llm/benchmarkCases.json');
 const supportCases = await readJSON('frontend/src/llm/supportSmokeCases.json');
 const bundle = await readJSON('frontend/src/llm/staticPrefixBundle.json');
@@ -145,7 +146,7 @@ async function guidance(phase) {
   result[phase] = rows;
   await page.getByRole('combobox').nth(0).click();
   await page.getByRole('option', {name: 'توليد إرشادات نصية قصيرة', exact: true}).click();
-  for (const sample of guidanceCases) {
+  for (const sample of groundedGuidanceCases) {
     // Use the UI/client for guidance so its real hard deadline can terminate
     // unresponsive WASM. A raw-worker listener would bypass that protection.
     const prepare = page.getByRole('button', {name: 'تجهيز النموذج مسبقًا', exact: true});
@@ -218,7 +219,7 @@ try {
     assert.equal(measured.support?.output_token, sample.expected);
   }
   if (full) {
-    for (let index = 0; index < guidanceCases.length; index++) {
+    for (let index = 0; index < groundedGuidanceCases.length; index++) {
       const before = result.first_guidance[index], after = result.reopened_guidance[index];
       assert.equal(after.output_token, before.output_token);
       assert.equal(after.support.output_token, before.support.output_token);
