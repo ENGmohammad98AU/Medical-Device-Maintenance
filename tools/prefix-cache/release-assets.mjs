@@ -58,7 +58,10 @@ if (process.argv.includes('--prepare-only')) {
           throw new Error(`Validated application check is not green: ${name}`);
         }
         const jobs = JSON.parse(gh(['api', `repos/${repository}/actions/runs/${latest.id}/jobs?per_page=100`])).jobs;
-        const log = gh(['api', `repos/${repository}/actions/jobs/${control.accepted_performance_limitation.job_id}/logs`]);
+        // Capture and strip log styling before parsing; never send raw terminal
+        // control sequences to stdout. Recent gh versions protect log output.
+        const log = gh(['api', `repos/${repository}/actions/jobs/${control.accepted_performance_limitation.job_id}/logs`, '--allow-escape-sequences'])
+          .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '');
         console.warn(validateAcceptedTimeout(control, latest, jobs, log));
       }
     }
