@@ -1,19 +1,19 @@
 """Regression tests for reference-gated local LLM maintenance inference."""
 
 from app.services.llm_triage_service import LLMRun
-from app.services.generated_guidance_service import resolve_guidance
+from app.services.generated_guidance_service import MANIFEST, resolve_guidance
 
 
 def test_no_selected_reference_blocks_generated_maintenance_guidance():
     context = {
-        "version": "test",
+        "version": MANIFEST["version"],
         "input_sha256": "a" * 64,
         "report_text": "Unknown device fault",
         "references": [],
     }
 
     class Result:
-        version = "test"
+        version = MANIFEST["version"]
         input_sha256 = "a" * 64
         status = "success"
         text = "A fabricated maintenance answer must never be accepted."
