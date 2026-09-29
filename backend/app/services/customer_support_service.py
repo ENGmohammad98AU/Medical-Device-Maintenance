@@ -44,11 +44,17 @@ def prepare_support(request, device, db):
         device_type=device_type, description=request.description, fault_query=request.fault,
         llm_context_records=load_llm_context(),
     )
+    single_direct = (
+        len(references) == 1
+        and references[0].get("reference_origin") == "CATALOGUE"
+        and float(references[0].get("match_confidence") or 0.0) >= 0.85
+    )
     context = {
         "version": MANIFEST["version"], "report_text": redact_report(report_text),
         "device_name": f"{device.name} ({device.manufacturer} {device.model})",
         "candidates": [{"label": "ABC"[i], "reference_id": r["reference_id"], "symptom": r["symptom"]}
                        for i, r in enumerate(references)],
+        "selection_required": bool(references) and not single_direct,
     }
     # Includes complete reference content, device and patient/expertise context.
     # Detects stale data; an untrusted browser can still forge its own proposal.
@@ -104,6 +110,25 @@ def resolve_support(context, references, result, llm_run, fallback):
     if not references:
         metadata["message"] = "No technical reference matches this report and device in the current knowledge base. Provide more details or consult a biomedical engineer."
         metadata["questions"] = clarification_questions(context)
+    direct_single = (
+        len(references) == 1
+        and references[0].get("reference_origin") == "CATALOGUE"
+        and float(references[0].get("match_confidence") or 0.0) >= 0.85
+        and llm_run.provider in {"browser-local", "reference-gate"}
+        and (result is None or result.status != "success")
+    )
+    if direct_single:
+        selected = references[0]
+        metadata.update(
+            status="SELECTED",
+            scope="IN_SCOPE",
+            method="REFERENCE_SINGLE_MATCH",
+            selected_reference_id=selected["reference_id"],
+            reference_origin="CATALOGUE",
+            questions=[],
+            message="A single high-confidence manufacturer reference matched this report; it was selected without running the local model.",
+        )
+        return selected, metadata, True
     elif references[0].get("reference_origin") == "LLM_CONTEXT":
         metadata.update(status="LLM_REQUIRED", method="LOCAL_LLM_REQUIRED",
                         message="This alarm is outside the 39-fault catalogue. Run the local model to select from the available technical evidence, or consult a biomedical engineer.",
