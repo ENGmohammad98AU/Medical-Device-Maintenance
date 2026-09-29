@@ -100,7 +100,8 @@ def test_unlisted_reference_cannot_be_selected(api_client):
     request, context = prepare(client, "The enclosure hinge is broken")
     assert not context["candidates"]
     body = analyze(client, request, context)
-    assert body["customer_support"]["status"] == "INVALID_RESULT"
+    assert body["customer_support"]["status"] == "NO_REFERENCE"
+    assert body["customer_support"]["method"] == "REFERENCE_GATE"
     assert not body["recommended_solution"]
 
 
