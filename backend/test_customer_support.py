@@ -169,3 +169,27 @@ def test_client_cannot_supply_repair_text(api_client):
                         "output_token": "A", "repair_text": "Untrusted repair"}
     response = client.post("/api/intelligent-support/analyze-fault", json={**request, "browser_llm": local})
     assert response.status_code == 422
+
+
+def test_single_high_confidence_reference_skips_local_model(api_client):
+    from app.services.browser_llm_service import MANIFEST as LOCAL_MANIFEST
+    client, _, _ = api_client
+    response = client.post("/api/intelligent-support/analyze-fault", json={
+        "device_id": 901,
+        "description": "Battery low",
+        "generate_guidance": True,
+        "browser_llm": {
+            "status": "disabled",
+            "revision": LOCAL_MANIFEST["revision"],
+            "latency_ms": 0,
+        },
+    })
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["reference_found"] is True
+    assert body["customer_support"]["status"] == "SELECTED"
+    assert body["customer_support"]["method"] == "REFERENCE_SINGLE_MATCH"
+    assert body["customer_support"]["selected_reference_id"] == "HAM-C6-001"
+    assert body["recommended_solution"]
+    assert body["llm"]["status"] == "disabled"
+    assert body["generated_guidance"]["status"] == "UNAVAILABLE"

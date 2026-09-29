@@ -126,8 +126,8 @@ export default function MaintenancePage() {
       if (!mounted.current) return;
       // Reference-gated local inference: do not load or run the model when
       // the server found no trusted candidate for this device/report.
-      const hasReferenceCandidates = Boolean(support_context?.candidates?.length);
-      const browser_llm = useLocal && hasReferenceCandidates ? await localModel.run({
+      const needsLocalSelection = useLocal && Boolean(support_context?.selection_required);
+      const browser_llm = needsLocalSelection ? await localModel.run({
         report_text: requestData.description, device_type: selectedDevice.type.toUpperCase().replace(/[- ]/g, '_'),
         patient_connected: requestData.patient_connected,
         support_context,
@@ -204,7 +204,7 @@ export default function MaintenancePage() {
       </Grid>
       <FormControlLabel control={<Switch checked={useLocal} disabled={busy} onChange={(event) => setUseLocal(event.target.checked)} />} label="معالجة الطلب واختيار المرجع بنموذج محلي مجاني" />
       {useLocal && <LocalModelPreparation model={localModel} disabled={busy} />}
-      <Alert severity="info" sx={{mt: 2}}>لا يحتاج النموذج إلى حساب خارجي أو مفتاح API. يفحص الخادم المراجع أولًا؛ إذا لم يوجد مرجع موثوق مطابق فلن يُشغَّل النموذج لتحليل هذا البلاغ وستظهر نتيجة عدم كفاية المرجع. عند وجود مرجع مطابق فقط، يعمل النموذج المحلي لاختيار الدليل المناسب وصياغة شرح مقيد به، مع بقاء إجراءات الصيانة خاضعة لمراجعة المختص.</Alert>
+      <Alert severity="info" sx={{mt: 2}}>يبحث الخادم في المراجع أولًا. عند عدم وجود مرجع يعيد النتيجة دون تشغيل Qwen، وعند وجود مرجع واحد واضح يستخدمه مباشرة، ولا يُشغَّل النموذج المحلي إلا إذا وُجدت عدة مراجع محتملة تحتاج إلى اختيار. التجهيز المسبق اختياري لتسريع هذه الحالات فقط.</Alert>
       {localModel.progress && <LocalModelProgress progress={localModel.progress} cancel={localModel.cancel} cancelLabel={localModel.preparing ? 'إلغاء التجهيز' : 'متابعة بالقواعد دون انتظار النموذج'} />}
       <Button variant="contained" onClick={runAnalysis} disabled={busy || localModel.preparing} startIcon={busy ? <CircularProgress size={18} /> : <PsychologyIcon />} sx={{ mt: 3 }}>التحقق والتحليل</Button>
     </CardContent></Card>}
