@@ -12,6 +12,11 @@ export async function classifyLocally(model: ChoiceModel, input: LocalInput) {
     Object.keys(config.categories), config.max_input_tokens, false, undefined,
     import.meta.env.MODE === 'benchmark' ? metrics => console.warn('CLASSIFICATION_TRACE=' + JSON.stringify(metrics)) : undefined));
 }
+export async function warmReferenceSelection(model: ChoiceModel) {
+  await warmGgufPrefix(model, formatQwenUserPrefix([{role: 'system', content: supportModelConfig.system_prompt},
+    ...supportModelConfig.examples], 'Device: '));
+}
+
 export async function selectSupportLocally(model: ChoiceModel, context: SupportContext) {
   const labels = context.candidates.length ? [...context.candidates.map(c => c.label), 'D'] : ['D', 'E'];
   return supportToken(await chooseGgufToken(model,
@@ -53,8 +58,7 @@ export async function warmLocalPrompts(model: ChoiceModel,
   progress('classification');
   await warmGgufPrefix(model, formatQwenUserPrefix([{role: 'system', content: config.system_prompt}, ...config.examples]));
   progress('reference_selection');
-  await warmGgufPrefix(model, formatQwenUserPrefix([{role: 'system', content: supportModelConfig.system_prompt},
-    ...supportModelConfig.examples], 'Device: '));
+  await warmReferenceSelection(model);
   progress('scope');
   await warmGgufPrefix(model, formatQwenUserPrefix([{role: 'system', content: supportModelConfig.scope_prompt},
     ...supportModelConfig.scope_examples]));
