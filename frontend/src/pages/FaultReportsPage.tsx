@@ -39,7 +39,6 @@ import { useAuth } from '../hooks/useAuth';
 import api, { authService, isAuthenticationError } from '../services/auth';
 import { filterFaultReports, normalizeEnumValue } from '../utils/faultReportFilters';
 import { useLocalModel } from '../hooks/useLocalModel';
-import LocalModelPreparation from '../components/LocalModelPreparation';
 import {createAnalysisBudget, ANALYSIS_TIMEOUT_TEXT} from '../llm/analysisBudget';
 import { localModelConfig } from '../llm/localModelContract';
 import type { SupportContext } from '../llm/supportModelContract';
@@ -262,7 +261,7 @@ export default function FaultReportsPage() {
         fault: '',
         description: formData.error_message.trim(),
         customer_expertise: 'INTERMEDIATE',
-        generate_guidance: useLlm,
+        generate_guidance: false,
         patient_connected: patientConnected,
       };
       let support_context: SupportContext | undefined;
@@ -288,6 +287,7 @@ export default function FaultReportsPage() {
         device_type: selectedDevice.type.toUpperCase().replace(/[- ]/g, '_'),
         patient_connected: patientConnected,
         support_context,
+        selection_only: true,
       }, budget.inferenceMs()) : { status: 'disabled' as const, revision: localModelConfig.revision, latency_ms: 0 };
       if (!mounted.current) return;
       setAnalysisStage('التحقق من المراجع وحفظ التحليل…');
@@ -298,7 +298,7 @@ export default function FaultReportsPage() {
         alarm_code: '',
         error_message: formData.error_message.trim(),
         patient_connected: patientConnected,
-        generate_guidance: useLlm,
+        generate_guidance: false,
         browser_llm: browser_llm || { status: 'disabled', revision: localModelConfig.revision, latency_ms: 0 },
       }, budget.requestOptions());
       setAiAnalysis(response.data);
@@ -636,9 +636,8 @@ export default function FaultReportsPage() {
                 تحليل سريع بالمراجع
               </Button>
               <Typography variant="caption" component="p" sx={{mt: 1}}>
-                يبدأ التحليل بالبحث في المراجع أولًا: مرجع واحد واضح يُستخدم مباشرة، وعدم وجود مرجع يعيد نتيجة فورية، ولا يُشغَّل Qwen إلا عند وجود عدة مراجع محتملة تحتاج للاختيار بينها. التجهيز المسبق اختياري لتسريع هذه الحالات فقط.
+                يبدأ التحليل من قاعدة المراجع. إذا كان هناك مرجع واحد قوي يُستخدم مباشرة، وإذا لم يوجد مرجع تُعاد النتيجة فورًا. لا يبدأ Qwen إلا عندما توجد عدة مراجع متقاربة، وعندها يعمل في وضع اختيار المرجع فقط دون توليد نص صيانة، لتقليل زمن التجهيز والاستدلال إلى الحد الأدنى.
               </Typography>
-              <LocalModelPreparation model={localModel} disabled={analyzing} />
               {localModel.progress ? <LocalModelProgress progress={localModel.progress} cancel={localModel.cancel} cancelLabel={localModel.preparing ? 'إلغاء التجهيز' : 'متابعة بالمراجع دون انتظار النموذج'} />
                 : analysisStage && <Typography role="status" sx={{mt: 2}}>{analysisStage}</Typography>}
               {error && <Alert severity="error" sx={{mt: 2}}>{error}</Alert>}
