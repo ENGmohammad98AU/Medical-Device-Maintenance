@@ -55,6 +55,24 @@ describe('static prefix state preparation', () => {
     expect(second.exportPrefixState).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
   });
+  it('restores only the reference-selection slot for lazy maintenance startup', async () => {
+    await prepare(model());
+    const prepared = await manifest();
+    const states = new Map([...bucket()].filter(([url]) => url.endsWith('.bin')).map(([url, response]) => [url.split('/').pop(), response]));
+    buckets.clear();
+    vi.stubGlobal('fetch', vi.fn(async (url: URL) => states.get(url.pathname.split('/').pop())!.clone()));
+    const next = model();
+    const result = await prepareStaticPrefixState(next, runtime, options, () => {}, {
+      manifest: prepared, baseUrl: 'https://example.test/llm/prefix-state/',
+    }, ['reference_selection']);
+    expect(result).toEqual({source: 'bundled', persisted: false});
+    expect(next.importPrefixState).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledWith(expect.objectContaining({pathname: expect.stringContaining('slot-1.bin')}),
+      expect.any(Object));
+    expect(next.createCompletion).not.toHaveBeenCalled();
+  });
+
   it('never sends corrupted bytes to the native engine and rebuilds safely', async () => {
     await prepare(model());
     const file = [...bucket().keys()].find(url => url.endsWith('slot-0.bin'))!;
