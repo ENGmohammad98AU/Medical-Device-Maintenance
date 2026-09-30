@@ -131,7 +131,7 @@ export default function MaintenancePage() {
         patient_connected: requestData.patient_connected,
         support_context,
         selection_only: true,
-      }, budget.inferenceMs()) : {status: 'disabled', revision: localModelConfig.revision, latency_ms: 0};
+      }, Math.min(15_000, budget.inferenceMs())) : {status: 'disabled', revision: localModelConfig.revision, latency_ms: 0};
       if (!mounted.current) return;
       const response = await api.post('/api/intelligent-support/analyze-fault', {...requestData, browser_llm}, budget.requestOptions());
       setAnalysis(response.data);
