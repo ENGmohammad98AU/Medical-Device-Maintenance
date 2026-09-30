@@ -7,8 +7,8 @@ import { analyzeLocally, selectSupportLocally, warmLocalPrompts, warmReferenceSe
 import {modelRuntime} from './modelRuntime';
 import {prepareStaticPrefixState} from './staticPrefixState';
 import { generateGuidance, type GuidanceResult } from './guidanceModel';
-import type { SupportResult } from './supportModelContract';
-import { inputHash, localFailure, localModelConfig as config, type LocalInput, type LocalError } from './localModelContract';
+import type { SupportResult, SupportToken } from './supportModelContract';
+import { inputHash, localFailure, localModelConfig as config, type CategoryToken, type LocalInput, type LocalError } from './localModelContract';
 
 // wllama resolves assets against document.baseURI. In this outer worker,
 // provide only that URL base. The runtime itself starts a dedicated worker.
@@ -72,8 +72,8 @@ self.addEventListener('message', async (event: MessageEvent<{id: number; input?:
     }
     loading = false;
     const inferenceStarted = performance.now();
-    let output_token: ReturnType<typeof import('./localModelContract').categoryToken> | undefined;
-    let selection: PromiseSettledResult<ReturnType<typeof import('./supportModelContract').supportToken>> = {status: 'fulfilled', value: undefined as never};
+    let output_token: CategoryToken | undefined;
+    let selection: PromiseSettledResult<SupportToken | undefined> = {status: 'fulfilled', value: undefined};
     let support_ms = 0;
     if (input.selection_only && input.support_context) {
       self.postMessage({id, progress: {stage: 'running', task: 'reference_selection',
