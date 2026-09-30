@@ -19,16 +19,19 @@ PROMPT_HASH = hashlib.sha256(json.dumps(MANIFEST, sort_keys=True).encode()).hexd
 
 
 def _direct_reference(references):
-    """Return a clearly dominant catalogue reference, otherwise None."""
-    if not references or references[0].get("reference_origin") != "CATALOGUE":
+    """Return a decisive verified reference, otherwise None."""
+    if not references:
         return None
     top = float(references[0].get("match_confidence") or 0.0)
     second = float(references[1].get("match_confidence") or 0.0) if len(references) > 1 else 0.0
-    # A normalized exact manufacturer match is decisive even when another
-    # reference shares generic words such as "low". This lets spelling-corrected
-    # alarms like LOW OXSEGEN -> LOW OXYGEN bypass local-model selection.
+    # A normalized exact manufacturer match is decisive regardless of whether
+    # it lives in the 39-row catalogue or the separately versioned reference
+    # context. support_candidates already enforces manufacturer verification,
+    # source URL and device/model identity before a reference reaches here.
     if top >= 0.99:
         return references[0]
+    if references[0].get("reference_origin") != "CATALOGUE":
+        return None
     if top >= 0.90 and (len(references) == 1 or top - second >= 0.15):
         return references[0]
     return None
@@ -136,7 +139,7 @@ def resolve_support(context, references, result, llm_run, fallback):
             scope="IN_SCOPE",
             method="REFERENCE_SINGLE_MATCH",
             selected_reference_id=selected["reference_id"],
-            reference_origin="CATALOGUE",
+            reference_origin=selected.get("reference_origin", "CATALOGUE"),
             questions=[],
             message="A single high-confidence manufacturer reference matched this report; it was selected without running the local model.",
         )
