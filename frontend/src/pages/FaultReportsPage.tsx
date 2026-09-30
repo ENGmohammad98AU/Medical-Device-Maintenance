@@ -288,7 +288,7 @@ export default function FaultReportsPage() {
         patient_connected: patientConnected,
         support_context,
         selection_only: true,
-      }, budget.inferenceMs()) : { status: 'disabled' as const, revision: localModelConfig.revision, latency_ms: 0 };
+      }, Math.min(15_000, budget.inferenceMs())) : { status: 'disabled' as const, revision: localModelConfig.revision, latency_ms: 0 };
       if (!mounted.current) return;
       setAnalysisStage('التحقق من المراجع وحفظ التحليل…');
 
@@ -635,9 +635,6 @@ export default function FaultReportsPage() {
               <Button type="button" variant="contained" onClick={() => handleAnalyze(false)} disabled={analyzing || localModel.preparing} sx={{mt: 1}} fullWidth>
                 تحليل سريع بالمراجع
               </Button>
-              <Typography variant="caption" component="p" sx={{mt: 1}}>
-                يبدأ التحليل من قاعدة المراجع. إذا كان هناك مرجع واحد قوي يُستخدم مباشرة، وإذا لم يوجد مرجع تُعاد النتيجة فورًا. لا يبدأ Qwen إلا عندما توجد عدة مراجع متقاربة، وعندها يعمل في وضع اختيار المرجع فقط دون توليد نص صيانة، لتقليل زمن التجهيز والاستدلال إلى الحد الأدنى.
-              </Typography>
               {localModel.progress ? <LocalModelProgress progress={localModel.progress} cancel={localModel.cancel} cancelLabel={localModel.preparing ? 'إلغاء التجهيز' : 'متابعة بالمراجع دون انتظار النموذج'} />
                 : analysisStage && <Typography role="status" sx={{mt: 2}}>{analysisStage}</Typography>}
               {error && <Alert severity="error" sx={{mt: 2}}>{error}</Alert>}
