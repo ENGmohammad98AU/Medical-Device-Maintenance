@@ -98,6 +98,20 @@ def test_mx800_battery_requests_accessory_identity_without_cross_model_repair(th
 
 def test_normalization_does_not_modify_codes_or_negation():
     assert normalize_report_text('BATTARY LOW; no oxigen alarm; E42_BATERY') == 'battery LOW; no oxygen alarm; E42_BATERY'
+    assert normalize_report_text('LOW OXSEGEN') == 'LOW oxygen'
+
+
+def test_low_oxsegen_typo_resolves_to_hamilton_oxygen_reference_without_llm(three_devices):
+    client, _, _ = three_devices
+    prepared = client.post('/api/intelligent-support/prepare-support', json={
+        'device_id': 901, 'description': 'LOW OXSEGEN',
+    })
+    assert prepared.status_code == 200, prepared.text
+    context = prepared.json()
+    assert context['candidates']
+    assert context['candidates'][0]['reference_id'] == 'HAM-C6-013'
+    assert context['selection_required'] is False
+
 
 
 def test_browser_regressions_use_actual_device_bound_candidates(three_devices):
