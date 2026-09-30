@@ -182,6 +182,9 @@
     "battary": "battery",
     "batery": "battery",
     "oxigen": "oxygen",
+    "oxsegen": "oxygen",
+    "oxegen": "oxygen",
+    "oxsigen": "oxygen",
     "syring": "syringe"
   },
   "preparation_version": "browser-preparation-v3-persistent-state"
