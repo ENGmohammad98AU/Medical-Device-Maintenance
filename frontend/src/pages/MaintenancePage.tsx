@@ -12,7 +12,6 @@ import LLMTriageSummary, { TriageMetadata } from '../components/LLMTriageSummary
 import GeneratedGuidanceSummary, {type GeneratedGuidance} from '../components/GeneratedGuidanceSummary';
 import CustomerSupportSummary, {type CustomerSupportMetadata} from '../components/CustomerSupportSummary';
 import { useLocalModel } from '../hooks/useLocalModel';
-import LocalModelPreparation from '../components/LocalModelPreparation';
 import {createAnalysisBudget, ANALYSIS_TIMEOUT_TEXT} from '../llm/analysisBudget';
 import { localModelConfig } from '../llm/localModelContract';
 import LocalModelProgress from '../components/LocalModelProgress';
@@ -111,7 +110,7 @@ export default function MaintenancePage() {
         customer_expertise: expertise,
         device_location: selectedDevice.location || selectedDevice.department,
         patient_connected: patientConnected,
-        generate_guidance: useLocal,
+        generate_guidance: false,
       };
       let support_context: SupportContext | undefined;
       if (useLocal) {
@@ -131,6 +130,7 @@ export default function MaintenancePage() {
         report_text: requestData.description, device_type: selectedDevice.type.toUpperCase().replace(/[- ]/g, '_'),
         patient_connected: requestData.patient_connected,
         support_context,
+        selection_only: true,
       }, budget.inferenceMs()) : {status: 'disabled', revision: localModelConfig.revision, latency_ms: 0};
       if (!mounted.current) return;
       const response = await api.post('/api/intelligent-support/analyze-fault', {...requestData, browser_llm}, budget.requestOptions());
@@ -203,8 +203,7 @@ export default function MaintenancePage() {
         <Grid item xs={12}><FormControlLabel control={<Switch disabled={busy} checked={patientConnected} onChange={(event) => setPatientConnected(event.target.checked)} />} label="المريض متصل بالجهاز حاليًا" /></Grid>
       </Grid>
       <FormControlLabel control={<Switch checked={useLocal} disabled={busy} onChange={(event) => setUseLocal(event.target.checked)} />} label="معالجة الطلب واختيار المرجع بنموذج محلي مجاني" />
-      {useLocal && <LocalModelPreparation model={localModel} disabled={busy} />}
-      <Alert severity="info" sx={{mt: 2}}>يبحث الخادم في المراجع أولًا. عند عدم وجود مرجع يعيد النتيجة دون تشغيل Qwen، وعند وجود مرجع واحد واضح يستخدمه مباشرة، ولا يُشغَّل النموذج المحلي إلا إذا وُجدت عدة مراجع محتملة تحتاج إلى اختيار. التجهيز المسبق اختياري لتسريع هذه الحالات فقط.</Alert>
+      <Alert severity="info" sx={{mt: 2}}>يبحث الخادم في المراجع أولًا. عند عدم وجود مرجع يعيد النتيجة دون تشغيل Qwen، وعند وجود مرجع واحد قوي يستخدمه مباشرة. إذا وُجدت عدة مراجع متقاربة فقط، يبدأ Qwen تلقائيًا في وضع اختيار المرجع دون توليد صيانة؛ وتأتي خطوات الصيانة من المرجع الموثق في القاعدة.</Alert>
       {localModel.progress && <LocalModelProgress progress={localModel.progress} cancel={localModel.cancel} cancelLabel={localModel.preparing ? 'إلغاء التجهيز' : 'متابعة بالقواعد دون انتظار النموذج'} />}
       <Button variant="contained" onClick={runAnalysis} disabled={busy || localModel.preparing} startIcon={busy ? <CircularProgress size={18} /> : <PsychologyIcon />} sx={{ mt: 3 }}>التحقق والتحليل</Button>
     </CardContent></Card>}

@@ -8,6 +8,10 @@ describe('local model boundary', () => {
       expect(() => categoryToken(value)).toThrow('invalid_output');
     }
   });
+  it('keeps selection-only mode out of the server hash while the support context has its own binding', () => {
+    const input = {report_text: 'Battery low', device_type: 'VENTILATOR', patient_connected: false};
+    expect(serializeInput({...input, selection_only: true})).toBe(serializeInput(input));
+  });
   it('binds the result to the complete input including patient context', () => {
     const input = {report_text: '  بطارية لا تشحن  ', device_type: 'VENTILATOR', patient_connected: false};
     expect(serializeInput(input)).toBe('{"report_text":"بطارية لا تشحن","device_type":"VENTILATOR","patient_connected":false}');

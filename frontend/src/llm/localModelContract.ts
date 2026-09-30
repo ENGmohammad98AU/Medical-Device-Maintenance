@@ -7,13 +7,14 @@ export { config as localModelConfig };
 export const LOCAL_INFERENCE_TIMEOUT_MS = 45_000;
 export const LOCAL_PREPARATION_TIMEOUT_MS = 15 * 60_000;
 export type CategoryToken = keyof typeof config.categories;
-export interface LocalInput { report_text: string; device_type: string; patient_connected: boolean; support_context?: SupportContext }
+export interface LocalInput { report_text: string; device_type: string; patient_connected: boolean; support_context?: SupportContext; selection_only?: boolean }
 export type LocalError = 'cancelled' | 'timeout' | 'unsupported_browser' | 'insufficient_storage' | 'load_failed' | 'input_too_long' | 'invalid_output';
 export interface LocalResult {
   status: 'success' | 'error' | 'disabled';
   revision: string;
   prompt_version?: string;
   output_token?: CategoryToken;
+  selection_only?: boolean;
   input_sha256?: string;
   latency_ms: number;
   preparation_ms?: number;

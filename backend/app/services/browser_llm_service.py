@@ -19,6 +19,7 @@ class BrowserLLMResult(BaseModel):
     revision: str = Field(max_length=40)
     prompt_version: Optional[str] = Field(default=None, max_length=80)
     output_token: Optional[Literal["A", "B", "C", "D", "E", "F", "G", "H"]] = None
+    selection_only: bool = False
     input_sha256: Optional[str] = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     latency_ms: float = Field(default=0, ge=0, le=2700000, allow_inf_nan=False)
     preparation_ms: Optional[float] = Field(default=None, ge=0, le=2700000, allow_inf_nan=False)
@@ -34,12 +35,17 @@ class BrowserLLMResult(BaseModel):
     @model_validator(mode="after")
     def validate_result(self):
         if self.status == "success":
-            if self.output_token is None or self.input_sha256 is None or self.error_code is not None:
-                raise ValueError("Successful browser inference requires a token and input hash")
-        elif self.output_token is not None:
-            raise ValueError("Failed or disabled inference cannot supply a category")
+            if self.input_sha256 is None or self.error_code is not None:
+                raise ValueError("Successful browser inference requires an input hash")
+            if self.selection_only:
+                if self.output_token is not None or self.support is None or self.guidance is not None:
+                    raise ValueError("Selection-only inference requires support only and no category/guidance")
+            elif self.output_token is None:
+                raise ValueError("Successful browser classification requires a category token")
+        elif self.output_token is not None or self.selection_only:
+            raise ValueError("Failed or disabled inference cannot supply a category or selection-only result")
         if self.status != "success" and (self.support is not None or self.guidance is not None):
-            raise ValueError("Support or generation requires a completed local classification")
+            raise ValueError("Support or generation requires successful local inference")
         if self.reused_result and self.status != "success":
             raise ValueError("Only a successful inference can be reused")
         return self
@@ -78,6 +84,10 @@ def browser_run(result: BrowserLLMResult, *, report_text: str, device_type: str,
     # A client can forge this hash. Model execution and prompt are not attested.
     run.model = MANIFEST["model"]
     run.input_sha256 = expected_hash
+    if result.selection_only:
+        # Reference selection is allowed to use the local model without
+        # overriding server-side fault classification or safety routing.
+        return run
     run.output_token = result.output_token
     run.browser_category = MANIFEST["categories"][result.output_token]
     return run

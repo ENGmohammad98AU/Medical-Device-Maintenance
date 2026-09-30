@@ -78,7 +78,8 @@ async function verifiedBytes(response: Response | undefined, row: SlotState, pro
 // four static warmup prompts may be present when saving a reusable startup state.
 export async function prepareStaticPrefixState(model: PrefixModel, runtime: PrefixRuntime, options: LoadOptions,
   onProgress: (progress: PrefixProgress) => void,
-  bundled?: {manifest: PrefixManifest; baseUrl: string}) {
+  bundled?: {manifest: PrefixManifest; baseUrl: string},
+  requiredPhases?: Phase[]) {
   let fallback: PrefixProgress['fallback'];
   const warm = () => warmLocalPrompts(model, task => onProgress({task, source: 'computed', stage: 'warming', fallback}));
   // Compatibility workers come from the upstream package and do not expose this bridge.
@@ -112,11 +113,15 @@ export async function prepareStaticPrefixState(model: PrefixModel, runtime: Pref
       // eventual CPU fallback. Normal warmup is then saved for the next visit.
       if (elapsed >= 3000 && remoteBytes > 0 && totalBytes * elapsed / remoteBytes > 60_000) controller.abort();
     };
-    const totalBytes = manifest.slots.reduce((sum, row) => sum + row.bytes, 0);
+    const selectedRows = requiredPhases?.length
+      ? manifest.slots.filter((_, index) => requiredPhases.includes(manifest.prefixes[index].phase))
+      : manifest.slots;
+    if (!selectedRows.length) throw new Error('prefix_state_incompatible');
+    const totalBytes = selectedRows.reduce((sum, row) => sum + row.bytes, 0);
     let completedBytes = 0;
     let lastPercent = -1;
     try {
-      for (const row of manifest.slots) {
+      for (const row of selectedRows) {
         const progress = (loaded: number) => {
           const percent = Math.floor(100 * (completedBytes + loaded) / totalBytes);
           if (percent !== lastPercent) {
@@ -151,8 +156,10 @@ export async function prepareStaticPrefixState(model: PrefixModel, runtime: Pref
         }
         completedBytes += row.bytes;
       }
-      if (cache && persisted) {
+      if (cache && persisted && selectedRows.length === manifest.slots.length) {
         try {await cache.put(manifestUrl, new Response(JSON.stringify(manifest)));} catch {persisted = false;}
+      } else if (selectedRows.length !== manifest.slots.length) {
+        persisted = false;
       }
       onProgress({source, percent: 100, stage: 'restoring'});
       return {source, persisted};

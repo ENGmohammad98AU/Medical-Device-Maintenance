@@ -3,12 +3,12 @@ import type { Wllama } from '@wllama/wllama';
 import { inferenceThreads } from './browserIsolation.js';
 import { loadGgufModel, type StorageMode } from './modelStorage.js';
 import {selectComputeBackend, runtimeLoadOptions, type ComputeBackend} from './computeBackend.js';
-import { analyzeLocally, warmLocalPrompts } from './localModelEngine';
+import { analyzeLocally, selectSupportLocally, warmLocalPrompts, warmReferenceSelection } from './localModelEngine';
 import {modelRuntime} from './modelRuntime';
 import {prepareStaticPrefixState} from './staticPrefixState';
 import { generateGuidance, type GuidanceResult } from './guidanceModel';
-import type { SupportResult } from './supportModelContract';
-import { inputHash, localFailure, localModelConfig as config, type LocalInput, type LocalError } from './localModelContract';
+import type { SupportResult, SupportToken } from './supportModelContract';
+import { inputHash, localFailure, localModelConfig as config, type CategoryToken, type LocalInput, type LocalError } from './localModelContract';
 
 // wllama resolves assets against document.baseURI. In this outer worker,
 // provide only that URL base. The runtime itself starts a dedicated worker.
@@ -41,15 +41,22 @@ self.addEventListener('message', async (event: MessageEvent<{id: number; input?:
         storageMode = mode;
         self.postMessage({id, progress: {stage: 'loading', storage_mode: mode, compute_backend: computeBackend}});
       }, () => self.postMessage({id, progress: {stage: 'initializing', storage_mode: storageMode, compute_backend: computeBackend}}));
+      const selectionOnlyStartup = Boolean(input?.selection_only && input.support_context);
       if (runtime.identity) preparation = await prepareStaticPrefixState(model, runtime.identity, loadOptions,
         progress => self.postMessage({id, progress: {
           stage: progress.stage ?? 'warming', task: progress.task, percent: progress.percent,
           preparation_source: progress.source, preparation_fallback: progress.fallback,
           storage_mode: storageMode, compute_backend: computeBackend, backend_ready: true,
-        }}), runtime.bundled);
+        }}), runtime.bundled, selectionOnlyStartup ? ['reference_selection'] : undefined);
       else {
-        await warmLocalPrompts(model, task => self.postMessage({id, progress: {
-          stage: 'warming', task, storage_mode: storageMode, compute_backend: computeBackend, backend_ready: true}}));
+        if (selectionOnlyStartup) {
+          self.postMessage({id, progress: {stage: 'warming', task: 'reference_selection',
+            storage_mode: storageMode, compute_backend: computeBackend, backend_ready: true}});
+          await warmReferenceSelection(model);
+        } else {
+          await warmLocalPrompts(model, task => self.postMessage({id, progress: {
+            stage: 'warming', task, storage_mode: storageMode, compute_backend: computeBackend, backend_ready: true}}));
+        }
         preparation = {source: 'computed', persisted: false};
       }
       return model;
@@ -65,10 +72,29 @@ self.addEventListener('message', async (event: MessageEvent<{id: number; input?:
     }
     loading = false;
     const inferenceStarted = performance.now();
-    const {output_token, selection, support_ms} = await analyzeLocally(loaded, input,
-      false,
-      task => self.postMessage({id, progress: {stage: 'running', task, storage_mode: storageMode,
-        compute_backend: computeBackend, backend_ready: true}}));
+    let output_token: CategoryToken | undefined;
+    let selection: PromiseSettledResult<SupportToken | undefined> = {status: 'fulfilled', value: undefined};
+    let support_ms = 0;
+    if (input.selection_only && input.support_context) {
+      self.postMessage({id, progress: {stage: 'running', task: 'reference_selection',
+        storage_mode: storageMode, compute_backend: computeBackend, backend_ready: true}});
+      const supportStarted = performance.now();
+      try {
+        const value = await selectSupportLocally(loaded, input.support_context);
+        support_ms = Math.round(performance.now() - supportStarted);
+        selection = {status: 'fulfilled', value};
+      } catch (reason) {
+        support_ms = Math.round(performance.now() - supportStarted);
+        selection = {status: 'rejected', reason};
+      }
+    } else {
+      const analyzed = await analyzeLocally(loaded, input, false,
+        task => self.postMessage({id, progress: {stage: 'running', task, storage_mode: storageMode,
+          compute_backend: computeBackend, backend_ready: true}}));
+      output_token = analyzed.output_token;
+      selection = analyzed.selection;
+      support_ms = analyzed.support_ms;
+    }
     let support: SupportResult | undefined;
     let guidance: GuidanceResult | undefined;
     if (input.support_context) {
@@ -99,7 +125,7 @@ self.addEventListener('message', async (event: MessageEvent<{id: number; input?:
       if (computeBackend === 'webgpu' && guidance.error_code === 'load_failed') throw new Error('generation_failed');
     }
     self.postMessage({id, result: {
-      status: 'success', revision: config.revision, output_token, support, guidance,
+      status: 'success', revision: config.revision, output_token, selection_only: Boolean(input.selection_only), support, guidance,
       prompt_version: config.prompt_version,
       runtime: `wllama-3.6.1/${computeBackend}`,
       input_sha256: await inputHash(input), latency_ms: Math.round(performance.now() - started),

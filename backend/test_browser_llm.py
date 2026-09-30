@@ -40,6 +40,45 @@ def test_unknown_runtime_is_rejected():
         BrowserLLMResult(**{**payload(), "runtime": "unverified-engine"})
 
 
+def test_selection_only_result_keeps_server_classification():
+    text = "Battery low"
+    result = BrowserLLMResult(**{
+        "status": "success",
+        "revision": MANIFEST["revision"],
+        "prompt_version": MANIFEST["prompt_version"],
+        "selection_only": True,
+        "input_sha256": browser_input_hash(text, "VENTILATOR", False),
+        "latency_ms": 250,
+        "support": {
+            "status": "success",
+            "version": "browser-reference-selection-v1",
+            "input_sha256": "a" * 64,
+            "output_token": "A",
+            "latency_ms": 220,
+        },
+    })
+    run = browser_run(result, report_text=text, device_type="VENTILATOR", patient_connected=False)
+    assert run.status == "success"
+    assert run.browser_category is None and run.output_token is None
+    after, source, route, _ = apply_triage(baseline(), run)
+    assert source == "RULES"
+    assert after.severity == baseline().severity
+    assert route == "TECHNICAL_SUPPORT"
+
+
+def test_selection_only_rejects_category_or_guidance():
+    text = "Battery low"
+    base = {
+        "status": "success", "revision": MANIFEST["revision"],
+        "prompt_version": MANIFEST["prompt_version"], "selection_only": True,
+        "input_sha256": browser_input_hash(text, "VENTILATOR", False),
+        "support": {"status": "success", "version": "browser-reference-selection-v1",
+                    "input_sha256": "a" * 64, "output_token": "A", "latency_ms": 1},
+    }
+    with pytest.raises(ValidationError):
+        BrowserLLMResult(**{**base, "output_token": "A"})
+
+
 def test_preparation_and_inference_timings_survive_client_validation():
     result = BrowserLLMResult(**{**payload(), "preparation_ms": 0, "inference_ms": 1234})
     run = browser_run(result, report_text="Battery is no longer charging",
