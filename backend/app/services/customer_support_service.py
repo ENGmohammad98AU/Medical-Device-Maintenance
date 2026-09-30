@@ -24,6 +24,11 @@ def _direct_reference(references):
         return None
     top = float(references[0].get("match_confidence") or 0.0)
     second = float(references[1].get("match_confidence") or 0.0) if len(references) > 1 else 0.0
+    # A normalized exact manufacturer match is decisive even when another
+    # reference shares generic words such as "low". This lets spelling-corrected
+    # alarms like LOW OXSEGEN -> LOW OXYGEN bypass local-model selection.
+    if top >= 0.99:
+        return references[0]
     if top >= 0.90 and (len(references) == 1 or top - second >= 0.15):
         return references[0]
     return None
